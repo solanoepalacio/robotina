@@ -233,12 +233,18 @@ The developer can provide a JSON override file by setting the `AGENTS_DEFINITION
 The LLM backend configuration for any task must include full connection details (url, model, token). Two different agent runs may connect to different LLM instances, so provider-level configuration alone is insufficient.
 
 #### Context & System Prompt
-Since tasks are broken into their smallest possible form, each system prompt is crafted with one specific goal: solve its associated task type.
+Since tasks are broken into their smallest possible form, each system prompt has one well-defined responsibility: solve its associated task type. Phase 1 requires four prompts:
+- handle-incoming-message — understand a user's message in context of their conversation history, decide whether to answer directly or break the request into follow-up tasks.
+- recipe-research — search for a recipe online using the available tools and produce a structured result.
+- recipe-load — take a structured recipe and persist it to the household-manager backend.
+- send-notification — compose and send a message to the user via the gateway.
 
-Prompts are written in markdown, versioned, and old versions are kept for history and analysis.
-
-Each skill configured for a task exposes an `index_content` property — a string containing the skill's main file, which includes a brief description and an index of sub-files. This index content is pre-loaded into the agent context at startup. The agent can load individual sub-files at runtime using the `read-skill` tool, avoiding unnecessary context bloat.
-
+These prompts are not yet written. They will be developed alongside the skills they depend on, since skills and prompts are tightly coupled — a prompt's instructions reference how a skill is structured, and a skill's content is written to complement the prompt it supports.                       
+                                                                        
+The precise wording of each prompt is intentionally left out of this spec. That is the role of the experimentation and prompt versioning infrastructure: prompts are written in markdown, versioned (old versions kept for history and regression), and can be swapped at runtime via AGENTS_DEFINITION_FILEPATH. This allows iterating on prompt quality independently of the rest of the system.  
+                                                                        
+Each skill configured for a task exposes an index_content property — a string containing the skill's main file, which includes a brief description and an index of sub-files. This index content is pre-loaded into the agent context at startup. The agent can load individual sub-files at runtime using the read-skill tool, avoiding unnecessary context bloat.                                       
+                                                                        
 Tools are loaded into the agent context based on what the specific task type requires.
 
 #### Tools
