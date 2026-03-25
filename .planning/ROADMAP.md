@@ -83,10 +83,18 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `LLMBackend` Protocol is defined; Ollama, Anthropic, and OpenAI adapters each create a working `create_react_agent` instance when given valid connection details
   2. `agents.py` registry drives per-task-type configuration (model, prompt path, tools, skills) and reads API tokens from env vars named by task type
-  3. A skill directory under `src/agent/skills/` with an `index.md` is pre-loaded into agent context; a sub-file is loaded on demand via `read-skill` tool; path traversal outside the configured skill directory is blocked
+  3. A skill directory under `src/robotina/agent/skills/` with an `index.md` is pre-loaded into agent context; a sub-file is loaded on demand via `read-skill` tool; path traversal outside the configured skill directory is blocked
   4. System prompts are loaded from versioned markdown files; switching the active version via `AGENT_OVERRIDES_FILEPATH` at runtime (without redeploy) selects the new prompt on the next job
   5. LangWatch + OTel instrumentation initializes at process startup, reads endpoint and API key from env vars, and produces a trace for a test agent invocation
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Wave 0: unit test scaffolds (6 test files) + gateway enqueue string fix (run_task)
+- [ ] 04-02-PLAN.md — LLMBackend Protocol + OllamaBackend, AnthropicBackend, OpenAIBackend adapters
+- [ ] 04-03-PLAN.md — agents.py registry: AgentConfig dataclass, AGENT_REGISTRY, get_agent_config(), configure_logging()
+- [ ] 04-04-PLAN.md — run_task() universal job function + AgentLoggingHandler + runner.py LangWatch init
+- [ ] 04-05-PLAN.md — SkillSet + ReadSkillTool + household-manager skill relocation to canonical path
+- [ ] 04-06-PLAN.md — hello-world prompt file + full unit suite verification + manual end-to-end checkpoint
 
 ### Phase 5: Task Runner and Workflow Engine
 **Goal**: The sequential task runner correctly orchestrates workflow state — marking steps running, persisting artifacts, advancing to the next step, and propagating failures — before any real agent runs through it
@@ -153,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
 | 3. Gateway | 3/3 | Complete   | 2026-03-25 |
-| 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
+| 4. LLM Module and Agent Infrastructure | 0/6 | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |
 | 7. handle-incoming-message Agent | 0/TBD | Not started | - |
