@@ -395,7 +395,6 @@ class WorkflowStepDef(BaseModel):
 class WorkflowDefinition(BaseModel):
     workflow_type: str                         # e.g. "add-recipe"
     steps: list[WorkflowStepDef]
-    on_failure: WorkflowStepDef | None         # optional cleanup/notification step on any failure
 
 WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
     "add-recipe": WorkflowDefinition(
@@ -426,14 +425,6 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 ),
             ),
         ],
-        on_failure=WorkflowStepDef(
-            step_key="notify-failure",
-            task_type="send-notification",
-            build_input=lambda ctx, artifacts: SendNotificationInput(
-                **ctx["reply_context"],
-                text="Sorry, I couldn't add the recipe.",
-            ),
-        ),
     )
 }
 ```
@@ -462,6 +453,7 @@ class WorkflowStepStatus(enum.Enum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class WorkflowRun(Base):
     __tablename__ = "workflow_runs"
@@ -507,12 +499,10 @@ When the job finishes:
 4. If no steps remain on `PENDING` mark `WorkflowRun` as `DONE`.
 
 If the job fails:
-1. Marks the `WorkflowRunStep` as `FAILED`.
-2. Marks the `WorkflowRun` as `FAILED`.
-3. If the workflow definition has an `on_failure` step, enqueues the task directly.
-
-Note:
-No automatic retry is attempted at the workflow level — failed jobs remain in RQ's failed registry for developer inspection.
+1. Mark the `WorkflowRunStep` as `FAILED`.
+2. Mark all remaining `PENDING` steps as `CANCELLED`.
+3. Mark the `WorkflowRun` as `FAILED`.
+The failed RQ job is retained in RQ's failed registry for developer inspection. No automatic retry or compensating action is attempted at the workflow level.
 - `reply_context` is **never** in any task input except `send-notification`, where it is resolved from `shared_context`.
 - `RecipeData` flows from `recipe-research` → `recipe-load` via `artifacts["research"]["recipe"]`, not via a field on `RecipeLoadInput`.
 - Adding a new step to a workflow requires only a new `WorkflowStepDef` in `workflows.py` — no existing task input models change.
@@ -563,7 +553,7 @@ The following tools are essential for phase 1:
 - **web-search**: searches the internet via the Tavily API.
 - **scheduler**: allows the agent to CRUD scheduled jobs.
 - **queue**: allows the agent to enqueue a single follow-up task directly (e.g. `send-notification` from `handle-incoming-message` for a direct reply). For multi-step sequences, use `start-workflow` instead.
-- **start-workflow**: creates a `WorkflowRun` record with the given `workflow_type` and `shared_context`, builds the first step's input, and enqueues it directly as a regular agent task (with the `WorkflowRunStep.taskJobId` set). Returns the `workflow_run_id`. Used by `handle-incoming-message` when it identifies a multi-step intent.
+- **start-workflow**: creates a `WorkflowRun` record and a `WorkflowRunStep` record (status `PENDING`) for every step defined in the workflow. It then builds the first step's input, enqueues it as a regular agent task, and sets `task_job_id` on the first step's record. Returns the `workflow_run_id`. Used by `handle-incoming-message` when it identifies a multi-step intent. The task runner links an incoming job to its workflow by looking up the `WorkflowRunStep` whose `task_job_id` matches the RQ job ID.
 - **send-notification**: sends a message to the user via the gateway (Telegram).
 
 #### Skills
@@ -715,13 +705,13 @@ robotina/
 |   |   |    ├── robotina
 |   |   |    |   ├── V001.md
 |   |   |    |   └── V002.md
-|   |   |    └── research-recipe
+|   |   |    └── recipe-research
 |   |   |        ├── V001.md
 |   |   |        └── V002.md
 |   |   ├── skills/
 |   |   |   ├── recipe-load/
 |   |   |   ├── format-telegram-message/
-|   |   |   ├── research-recipe/
+|   |   |   ├── recipe-research/
 |   |   |   |   └── ...
 |   |   |   └── household-manager/
 |   |   |       └── ...
