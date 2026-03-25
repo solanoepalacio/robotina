@@ -51,7 +51,12 @@ Plans:
   3. RQ worker starts with `concurrency=1` and processes a test job sequentially
   4. Jobs with `result_ttl=-1` and `failure_ttl=-1` are retained in the job registry after completion and failure; failed jobs appear in the built-in failed job registry
   5. Queue state changes (queued, started, finished, failed) are logged to console
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — SQLAlchemy models (Conversation, StoredMessage, WorkflowRun, WorkflowRunStep), db.py Base, Alembic migration 0002
+- [ ] 02-02-PLAN.md — Pydantic v2 task I/O models (all 8 Input/Output classes) in task_types.py
+- [ ] 02-03-PLAN.md — LoggingWorker refactor, pyproject.toml markers, RQ integration tests
 
 ### Phase 3: Gateway
 **Goal**: The Telegram bot is the live front door — it receives user messages, persists them with deduplication, fetches conversation history, and enqueues tasks at the front of the queue
@@ -141,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
-| 2. Database Models and Queue Layer | 0/TBD | Not started | - |
+| 2. Database Models and Queue Layer | 0/3 | Not started | - |
 | 3. Gateway | 0/TBD | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
