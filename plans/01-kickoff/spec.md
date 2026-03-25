@@ -521,10 +521,21 @@ No automatic retry is attempted at the workflow level — failed jobs remain in 
 
 Every time a task is dequeued, the task runner looks up the matching entry in `agents.py` to determine what LLM model to use, which system prompt file to load, which tools to give the agent, and which skills to load. It then spawns the agent with that configuration.
 
-The developer can override the model configuration or prompt path per task type at runtime by setting `AGENTS_DEFINITION_FILEPATH` to a JSON file. The file maps task type names to an object with only the fields to override — `model`, `prompt`, or both. Tools and skills are fixed in `agents.py` and cannot be overridden at runtime. This supports prompt experimentation and quick rollback without a redeploy.
+The developer can override the model configuration or prompt path per task type at runtime by setting `AGENT_OVERRIDES_FILEPATH` to a JSON file. The file maps task type names to an object with only the fields to override — `model`, `prompt`, or both. Tools and skills are fixed in `agents.py` and cannot be overridden at runtime. This supports prompt experimentation and quick rollback without a redeploy.
 
 Each model config's API token cannot be hardcoded in `agents.py`. It is read from an environment variable named by uppercasing the task type (hyphens to underscores) and appending `_API_TOKEN` — e.g. `recipe-research` → `RECIPE_RESEARCH_API_TOKEN`.
 
+```python
+[
+    {
+        "type": "recipe-research",
+        "model": { "base_url": "", "api_token": "", "model": "" },
+        "prompt": "./prompts/recipe-research/V002.md",
+        "tools": [web_search, household_manager_api],
+        "skills": [household_manager_skill, recipe_research_skill]
+    }
+]
+```
 #### LLM Backend
 The LLM backend configuration for any task must include full connection details (url, model, token). Two different agent runs may connect to different LLM instances, so provider-level configuration alone is insufficient.
 
@@ -537,7 +548,7 @@ Since tasks are broken into their smallest possible form, each system prompt has
 
 These prompts are not yet written. They will be developed alongside the skills they depend on, since skills and prompts are tightly coupled — a prompt's instructions reference how a skill is structured, and a skill's content is written to complement the prompt it supports.                       
                                                                         
-The precise wording of each prompt is intentionally left out of this spec. That is the role of the experimentation and prompt versioning infrastructure: prompts are written in markdown, versioned (old versions kept for history and regression), and can be swapped at runtime via AGENTS_DEFINITION_FILEPATH. This allows iterating on prompt quality independently of the rest of the system.  
+The precise wording of each prompt is intentionally left out of this spec. That is the role of the experimentation and prompt versioning infrastructure: prompts are written in markdown, versioned (old versions kept for history and regression), and can be swapped at runtime via AGENT_OVERRIDES_FILEPATH. This allows iterating on prompt quality independently of the rest of the system.  
                                                                         
 Each skill configured for a task exposes an index_content property — a string containing the skill's main file, which includes a brief description and an index of sub-files. This index content is pre-loaded into the agent context at startup. The agent can load individual sub-files at runtime using the read-skill tool, avoiding unnecessary context bloat.                                       
                                                                         
@@ -600,9 +611,11 @@ Phase 1 adapters:
 - **openai** — via `langchain-openai`
 
 ### Scheduler
-The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required. The RQ worker must be started with the `--with-scheduler` flag to activate the built-in scheduler.
+The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required.
 
-A dedicated `scheduled-tasks` queue is used for deferred jobs, separate from `agent-tasks`. A lightweight worker consumes `scheduled-tasks` and its only responsibility is to move each job into `agent-tasks` for the agent to process. This keeps scheduling concerns decoupled from agent execution.
+A dedicated `scheduled-tasks` queue is used for deferred jobs, separate from `agent-tasks`. Two workers run as separate processes:
+- **scheduler-worker** — listens on the `scheduled-tasks` queue and must be started with the `--with-scheduler` flag to activate the built-in RQ scheduler. Its only responsibility is to move each fired job into `agent-tasks`. This keeps scheduling concerns decoupled from agent execution.
+- **task-runner** — listens on the `agent-tasks` queue with concurrency set to exactly one, processing agent jobs sequentially. This worker does **not** use `--with-scheduler`.
 
 Tasks can be added to the scheduler in two ways:
 - The agent can schedule tasks using the `scheduler` tool
@@ -761,7 +774,7 @@ robotina/
 
 - Agent Infrastructure
   - LLM module + adapters (Ollama, Anthropic, OpenAI)
-  - agents.py scaffold + AGENTS_DEFINITION_FILEPATH override
+  - agents.py scaffold + AGENT_OVERRIDES_FILEPATH override
   - Skill loading (index_content pre-load + read-skill tool)
   - Prompt versioning infrastructure
   - LangWatch + OTel instrumentation
