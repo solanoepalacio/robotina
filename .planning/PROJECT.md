@@ -25,7 +25,7 @@ Families can delegate household tasks to Robotina in natural language and trust 
 - [ ] Recipe Research agent (`recipe-research`): skill, prompt, web-search tool, experiment
 - [ ] Recipe Loader agent (`recipe-load`): skill, prompt, household-manager-api tool, experiment
 - [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API
-- [ ] Developer tooling: Docker Compose (Postgres + Redis), uv project setup, uv run shortcuts
+- [x] Developer tooling: Docker Compose (Postgres + Redis), uv project setup, uv run shortcuts — Validated in Phase 1: Developer Tooling and Infrastructure
 
 ### Out of Scope
 
