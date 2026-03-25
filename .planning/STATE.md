@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-25T19:51:39.051Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-25T19:55:11.234Z"
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (developer-tooling-and-infrastructure) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 01-developer-tooling-and-infrastructure P01 | 3 | 1 tasks | 1 files |
+| Phase 01-developer-tooling-and-infrastructure P02 | 2 | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,9 @@ Recent decisions affecting current work:
 - Phase 4: All per-job objects must be instantiated inside the job function, never at module level
 - [Phase 01-developer-tooling-and-infrastructure]: Redis AOF set via command-line args (--appendonly yes --appendfsync always) not a mounted config — simpler, no extra file needed
 - [Phase 01-developer-tooling-and-infrastructure]: RQ Dashboard uses eoranged/rq-dashboard:latest (locked decision D-03), connected to Redis via internal Docker hostname redis://redis:6379
+- [Phase 01-developer-tooling-and-infrastructure]: Python 3.12 pinned with <3.13 upper bound in pyproject.toml to prevent uv selecting system Python 3.13
+- [Phase 01-developer-tooling-and-infrastructure]: Both src/robotina and experiments declared in hatch packages so uv run experiments.* scripts are importable
+- [Phase 01-developer-tooling-and-infrastructure]: Alembic env.py fully replaced to add sys.path injection and DATABASE_URL override before config loading
 
 ### Pending Todos
 
@@ -75,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T19:51:39.049Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-03-25T19:55:11.232Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

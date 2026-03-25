@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Docker Compose stack (Postgres 15, Redis 7 AOF, RQ Dashboard)
-- [ ] 01-02-PLAN.md — uv project scaffold, src/robotina package tree, Alembic configuration
+- [x] 01-02-PLAN.md — uv project scaffold, src/robotina package tree, Alembic configuration
 - [ ] 01-03-PLAN.md — uv run agent entrypoint, experiment stubs, automated test scaffold
 
 ### Phase 2: Database Models and Queue Layer
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Developer Tooling and Infrastructure | 0/3 | Not started | - |
+| 1. Developer Tooling and Infrastructure | 2/3 | In Progress|  |
 | 2. Database Models and Queue Layer | 0/TBD | Not started | - |
 | 3. Gateway | 0/TBD | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
