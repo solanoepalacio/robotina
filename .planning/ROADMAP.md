@@ -89,7 +89,7 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Wave 0: unit test scaffolds (6 test files) + gateway enqueue string fix (run_task)
+- [x] 04-01-PLAN.md — Wave 0: unit test scaffolds (6 test files) + gateway enqueue string fix (run_task)
 - [ ] 04-02-PLAN.md — LLMBackend Protocol + OllamaBackend, AnthropicBackend, OpenAIBackend adapters
 - [ ] 04-03-PLAN.md — agents.py registry: AgentConfig dataclass, AGENT_REGISTRY, get_agent_config(), configure_logging()
 - [ ] 04-04-PLAN.md — run_task() universal job function + AgentLoggingHandler + runner.py LangWatch init
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
 | 3. Gateway | 3/3 | Complete   | 2026-03-25 |
-| 4. LLM Module and Agent Infrastructure | 0/6 | Not started | - |
+| 4. LLM Module and Agent Infrastructure | 1/6 | In Progress|  |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |
 | 7. handle-incoming-message Agent | 0/TBD | Not started | - |

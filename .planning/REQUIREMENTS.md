@@ -49,17 +49,17 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Agent Infrastructure
 
-- [ ] **AGENT-01**: `LLMBackend` Protocol abstraction exists with `model` property and `create_agent()` method
-- [ ] **AGENT-02**: Three LLM adapters are implemented: Ollama (`langchain-ollama`), Anthropic (`langchain-anthropic`), OpenAI (`langchain-openai`)
-- [ ] **AGENT-03**: `agents.py` defines per-task-type configuration: model, prompt path, tools, skills
-- [ ] **AGENT-04**: Agent model API tokens are read from env vars named by task type (e.g. `RECIPE_RESEARCH_API_TOKEN`)
-- [ ] **AGENT-05**: Developer can override model or prompt per task type at runtime via `AGENT_OVERRIDES_FILEPATH` JSON file without redeploy
-- [ ] **AGENT-06**: Each skill is a directory under `src/agent/skills/` with an `index.md`; `index_content` is pre-loaded into agent context
-- [ ] **AGENT-07**: Agent can load skill sub-files on demand via `read-skill` tool using `skill-name/subfile.md` path format; path traversal outside configured skill directories is blocked
-- [ ] **AGENT-08**: System prompts are versioned markdown files at `src/agent/prompts/<task-type>/V001.md`; old versions are kept
-- [ ] **AGENT-09**: Debug log level can be enabled independently per module (gateway, scheduler, queue, agent, LLM)
-- [ ] **AGENT-10**: All agent actions are logged (LLM stream start, tool calls and results)
-- [ ] **AGENT-11**: `create_react_agent` from `langgraph.prebuilt` is used for all agents
+- [x] **AGENT-01**: `LLMBackend` Protocol abstraction exists with `model` property and `create_agent()` method
+- [x] **AGENT-02**: Three LLM adapters are implemented: Ollama (`langchain-ollama`), Anthropic (`langchain-anthropic`), OpenAI (`langchain-openai`)
+- [x] **AGENT-03**: `agents.py` defines per-task-type configuration: model, prompt path, tools, skills
+- [x] **AGENT-04**: Agent model API tokens are read from env vars named by task type (e.g. `RECIPE_RESEARCH_API_TOKEN`)
+- [x] **AGENT-05**: Developer can override model or prompt per task type at runtime via `AGENT_OVERRIDES_FILEPATH` JSON file without redeploy
+- [x] **AGENT-06**: Each skill is a directory under `src/agent/skills/` with an `index.md`; `index_content` is pre-loaded into agent context
+- [x] **AGENT-07**: Agent can load skill sub-files on demand via `read-skill` tool using `skill-name/subfile.md` path format; path traversal outside configured skill directories is blocked
+- [x] **AGENT-08**: System prompts are versioned markdown files at `src/agent/prompts/<task-type>/V001.md`; old versions are kept
+- [x] **AGENT-09**: Debug log level can be enabled independently per module (gateway, scheduler, queue, agent, LLM)
+- [x] **AGENT-10**: All agent actions are logged (LLM stream start, tool calls and results)
+- [x] **AGENT-11**: `create_react_agent` from `langgraph.prebuilt` is used for all agents
 
 ### Notification Agent
 
@@ -99,8 +99,8 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Observability
 
-- [ ] **OBS-01**: LangWatch + OpenTelemetry instrumentation is active on all agents
-- [ ] **OBS-02**: LangWatch endpoint and API key are read from environment variables
+- [x] **OBS-01**: LangWatch + OpenTelemetry instrumentation is active on all agents
+- [x] **OBS-02**: LangWatch endpoint and API key are read from environment variables
 - [ ] **OBS-03**: The same instrumentation used in production is active during experiment runs; traces appear in the correct LangWatch experiment collection
 - [ ] **OBS-04**: Each experiment script (`recipe-research`, `recipe-load`, `send-notification`) pins prompt version and model config via LangWatch tags/metadata
 - [ ] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
@@ -159,19 +159,19 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | GW-04 | Phase 3 | Complete |
 | GW-05 | Phase 3 | Complete |
 | GW-06 | Phase 3 | Complete |
-| AGENT-01 | Phase 4 | Pending |
-| AGENT-02 | Phase 4 | Pending |
-| AGENT-03 | Phase 4 | Pending |
-| AGENT-04 | Phase 4 | Pending |
-| AGENT-05 | Phase 4 | Pending |
-| AGENT-06 | Phase 4 | Pending |
-| AGENT-07 | Phase 4 | Pending |
-| AGENT-08 | Phase 4 | Pending |
-| AGENT-09 | Phase 4 | Pending |
-| AGENT-10 | Phase 4 | Pending |
-| AGENT-11 | Phase 4 | Pending |
-| OBS-01 | Phase 4 | Pending |
-| OBS-02 | Phase 4 | Pending |
+| AGENT-01 | Phase 4 | Complete |
+| AGENT-02 | Phase 4 | Complete |
+| AGENT-03 | Phase 4 | Complete |
+| AGENT-04 | Phase 4 | Complete |
+| AGENT-05 | Phase 4 | Complete |
+| AGENT-06 | Phase 4 | Complete |
+| AGENT-07 | Phase 4 | Complete |
+| AGENT-08 | Phase 4 | Complete |
+| AGENT-09 | Phase 4 | Complete |
+| AGENT-10 | Phase 4 | Complete |
+| AGENT-11 | Phase 4 | Complete |
+| OBS-01 | Phase 4 | Complete |
+| OBS-02 | Phase 4 | Complete |
 | WF-02 | Phase 5 | Pending |
 | WF-03 | Phase 5 | Pending |
 | WF-04 | Phase 5 | Pending |
