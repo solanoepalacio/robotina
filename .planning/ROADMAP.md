@@ -12,7 +12,7 @@ Robotina is built in nine phases following a strict dependency order: infrastruc
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Developer Tooling and Infrastructure** - Docker Compose, uv project, Alembic, and dev shortcuts are fully operational
+- [x] **Phase 1: Developer Tooling and Infrastructure** - Docker Compose, uv project, Alembic, and dev shortcuts are fully operational (completed 2026-03-25)
 - [ ] **Phase 2: Database Models and Queue Layer** - All SQLAlchemy models, Alembic migrations, Pydantic task I/O models, and RQ basics in place
 - [ ] **Phase 3: Gateway** - Telegram bot receives, deduplicates, persists messages, and enqueues tasks
 - [ ] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation
@@ -39,7 +39,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Docker Compose stack (Postgres 15, Redis 7 AOF, RQ Dashboard)
 - [x] 01-02-PLAN.md — uv project scaffold, src/robotina package tree, Alembic configuration
-- [ ] 01-03-PLAN.md — uv run agent entrypoint, experiment stubs, automated test scaffold
+- [x] 01-03-PLAN.md — uv run agent entrypoint, experiment stubs, automated test scaffold
 
 ### Phase 2: Database Models and Queue Layer
 **Goal**: All shared data contracts exist — SQLAlchemy models are migrated to Postgres, all Pydantic task I/O models are defined, and RQ serialization is verified for every task type before any agent is written
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Developer Tooling and Infrastructure | 2/3 | In Progress|  |
+| 1. Developer Tooling and Infrastructure | 3/3 | Complete   | 2026-03-25 |
 | 2. Database Models and Queue Layer | 0/TBD | Not started | - |
 | 3. Gateway | 0/TBD | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |

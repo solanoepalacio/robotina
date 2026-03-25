@@ -11,8 +11,8 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 - [x] **INFRA-01**: Developer can spin up Postgres and Redis via `docker compose up`
 - [x] **INFRA-02**: Project is managed with uv (`pyproject.toml`, dependency groups, lock file)
-- [ ] **INFRA-03**: Developer can run the task runner via `uv run agent`
-- [ ] **INFRA-04**: Developer can run experiments via `uv run experiments.<task_type>` (e.g. `uv run experiments.recipe_research`)
+- [x] **INFRA-03**: Developer can run the task runner via `uv run agent`
+- [x] **INFRA-04**: Developer can run experiments via `uv run experiments.<task_type>` (e.g. `uv run experiments.recipe_research`)
 - [x] **INFRA-05**: Developer can run Alembic migrations via `uv run migrate`
 - [x] **INFRA-06**: RQ Dashboard is accessible for job inspection
 
@@ -141,8 +141,8 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
-| INFRA-03 | Phase 1 | Pending |
-| INFRA-04 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Complete |
+| INFRA-04 | Phase 1 | Complete |
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
 | QUEUE-01 | Phase 2 | Pending |
