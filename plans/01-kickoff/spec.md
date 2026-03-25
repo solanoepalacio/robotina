@@ -13,21 +13,23 @@
   - [Diagrams](#diagrams)
   - [Gateway](#gateway)
     - [Storage](#storage)
-  - [Scheduler](#scheduler)
-    - [Scheduler API](#scheduler-api)
+
   - [Queue](#queue)
     - [Task Types](#task-types)
-  - [Workflows](#workflows)
+  - [Task Runner](#task-runner)
+    - [Workflows](#workflows)
     - [Workflow Registry](#workflow-registry)
-    - [Storage](#storage-1)
-    - [Artifact Flow](#artifact-flow)
-    - [Failure Handling](#failure-handling)
+    - [Workflow Storage](#storage-1)
+    - [Workflow Artifact Flow](#artifact-flow)
+    - [Workflow Failure Handling](#failure-handling)
   - [Agent](#agent)
     - [LLM Backend](#llm-backend)
     - [Context & System Prompt](#context--system-prompt)
     - [Tools](#tools)
     - [Skills](#skills)
   - [LLM](#llm)
+  - [Scheduler](#scheduler)
+    - [Scheduler API](#scheduler-api)
   - [Non Functional Requirements](#non-functional-requirements)
   - [Draft Project Structure](#draft-project-structure)
   - [Developer Tooling Requirements](#developer-tooling-requirements)
@@ -64,7 +66,10 @@ The possible sources of agent tasks are:
 - Scheduled tasks: The agent or application maintainers can create scheduled tasks. The agent doesn't process these tasks directly; instead the tasks are enqueued in the agent-task-queue for the agent to process when available.
 - Agent created tasks: The agent itself may push a task to the agent-task-queue to perform a task as soon as possible.
 
-### Context
+### Workflows
+Multi-step sequences are coordinated by a centralized orchestrator (task-runner) rather than by tasks enqueuing their own successors. This separates concerns: individual agents know nothing about the sequence they belong to — they just accept their input, do their job, and return their output. The task runner handles everything else.
+
+### Agents
 The context the agent gets injected at each turn is dynamic and depends on the task type.
 For example: A `handle-incoming-message` task type may receive the user chat history, while a `recipe-research` task type may receive information about the recipe.
 
@@ -244,79 +249,7 @@ class StoredMessage(Base):
 
 A `Conversation` groups all messages for a given `(platform, chatId)` pair. The `@@unique` constraint ensures only one conversation record exists per chat. `StoredMessage.platformMessageId` is unique across all messages to prevent processing duplicates on retry.
 
-### Scheduler
-The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required. The RQ worker must be started with the `--with-scheduler` flag to activate the built-in scheduler.
 
-A dedicated `scheduled-tasks` queue is used for deferred jobs, separate from `agent-tasks`. A lightweight worker consumes `scheduled-tasks` and its only responsibility is to move each job into `agent-tasks` for the agent to process. This keeps scheduling concerns decoupled from agent execution.
-
-Tasks can be added to the scheduler in two ways:
-- The agent can schedule tasks using the `scheduler` tool
-- Other clients may add scheduled tasks via a scheduler API
-
-Scheduled tasks carry a scheduling directive alongside the base task input:
-```python
-class ScheduledTask(BaseModel):
-    task_type: str
-    input: dict                   # serialized base task input (e.g. RecipeResearchInput)
-    run_at: datetime | None       # one-off: execute at this datetime
-    cron: str | None              # recurring: standard cron expression, e.g. "0 9 * * 1"
-```
-
-When a scheduled job fires it is dequeued from `scheduled-tasks` and re-enqueued into `agent-tasks` using the base input type, stripping the scheduling metadata.
-
-#### Scheduler API
-
-A simple HTTP API for managing scheduled tasks. All endpoints require an `Authorization: Bearer <token>` header (token read from env var).
-
-**Create a scheduled task**
-```
-POST /api/scheduled-tasks
-```
-Request body:
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| task_type | string | Yes | e.g. `recipe-research` |
-| input | object | Yes | Task input matching the task type's input model |
-| run_at | ISO 8601 datetime | No* | One-off: execute at this datetime |
-| cron | string | No* | Recurring: cron expression, e.g. `"0 9 * * 1"` |
-
-*Exactly one of `run_at` or `cron` must be provided.
-
-Responses: `201` — created, returns the scheduled task object. `400` — validation error.
-
-**List scheduled tasks**
-```
-GET /api/scheduled-tasks
-```
-Returns all scheduled tasks currently in the `scheduled-tasks` queue (pending jobs only — completed one-off jobs are not returned).
-
-Response: `200` — array of scheduled task objects.
-
-**Get a scheduled task**
-```
-GET /api/scheduled-tasks/:id
-```
-Responses: `200` — scheduled task object. `404` — not found.
-
-**Delete a scheduled task**
-```
-DELETE /api/scheduled-tasks/:id
-```
-Cancels and removes the scheduled job from the queue. For recurring jobs this stops all future executions.
-
-Responses: `204` — deleted. `404` — not found.
-
-Scheduled task object shape (returned by all read endpoints):
-```json
-{
-  "id": "rq-job-id",
-  "task_type": "recipe-research",
-  "input": { "query": "spaghetti carbonara", "household_id": "..." },
-  "run_at": "2026-04-01T09:00:00Z",
-  "cron": null,
-  "created_at": "2026-03-24T10:00:00Z"
-}
-```
 
 ### Queue
 The queue represents the work pending to be done by the agent. The agent reads from the queue and consumes tasks sequentially (concurrency exactly 1). Each task consumed from the queue is considered "an agent run".
@@ -339,13 +272,6 @@ Each task is an RQ job with the following properties:
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
 
 The result_ttl and failure_ttl for all jobs should be set to infinite (-1).
-
-#### Task Runner
-
-The component that consumes the queue is called the **task runner**. It runs a single RQ worker with concurrency set to exactly one, processing jobs sequentially. This single-worker, synchronous constraint is intentional: because the task runner is always idle between jobs, it is the natural place to handle workflow orchestration without a separate orchestrator process or additional coordination.
-
-When a job finishes — successfully or with a failure — the task runner checks whether that job is associated with a `WorkflowRunStep`. If it is, workflow advancement is performed inline before the next queued job is picked up. The mechanics of this (artifact persistence, next-step enqueueing, failure propagation) are described in the [Workflows](#workflows) section below.
-
 #### Task Types
 
 Shared models:
@@ -443,13 +369,19 @@ class SendNotificationOutput(BaseModel):
 
 > The caller (whichever agent enqueues this task) is responsible for providing the full message text. The send-notification agent does not compose content — it only reformats the text for correct Telegram rendering and delivers it.
 
+### Task Runner
+
+The component that consumes the queue is called the **task runner**. It runs a single RQ worker with concurrency set to exactly one, processing jobs sequentially. This single-worker, synchronous constraint is intentional to limit agent concurrency to exactly one.
+
+Task runner is capable of running multi-step sequences of tasks through it's "Workflow" Implementation, detailed below.
+Before executing a job, the task runner will check if the job is associated with a workflow (through `WorkflowRunStep`). If it is, it will wrap the execution of the job, hooking it with workflow advancement.
+For jobs that are associated with a If it is, workflow advancement is performed inline before the next queued job is picked up. The mechanics of this (artifact persistence, next-step enqueueing, failure propagation) are described in the [Workflows](#workflows) section below.
+
 #### Workflows
 
-Multi-step sequences are coordinated by a centralized orchestrator rather than by tasks enqueuing their own successors. This separates concerns: individual agents know nothing about the sequence they belong to — they just accept their input, do their job, and return their output. The task runner handles everything else.
+The workflow engine has two moving parts: a **registry** that defines workflow structure, and a **store** (Postgres) that holds live run state. Advancement is handled handled by the task runner.
 
-The workflow engine has two moving parts: a **registry** that defines workflow structure, and a **store** (Postgres) that holds live run state. Advancement is handled inline by the task runner.
-
-##### Workflow Registry
+#### Workflow Registry
 
 `workflows.py` (alongside `agents.py`) is the authoritative source for all workflow definitions. It maps a workflow type name to its ordered steps and the rules for building each step's input:
 
@@ -508,7 +440,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
 
 The `build_input` callables receive `shared_context` (set at workflow creation, never mutated) and `accumulated_artifacts` (a dict of `{step_key: step_output}`, grown by the task runner as each step completes).
 
-##### Workflow Storage
+#### Workflow Storage
 
 `WorkflowRun` and `WorkflowRunStep` are stored in the same Postgres database as the gateway's conversation tables. SQLAlchemy is used for models; Alembic handles migrations.
 
@@ -561,29 +493,37 @@ class WorkflowRunStep(Base):
 
 `WorkflowRun.sharedContext` holds everything steps need but shouldn't own: `reply_context`, `household_id`, the user's original intent. `WorkflowRunStep.artifact` holds the step's output and is keyed by `step_key` when the task runner builds `accumulated_artifacts` for subsequent steps.
 
-##### Workflow Artifact Flow
+#### Workflow Advancement
+For jobs that are associated with a workflow, the task runner must advance the workflow before and after executing the job.
 
-When any task completes, the task runner checks whether the RQ job ID maps to a `WorkflowRunStep` (via `WorkflowRunStep.taskJobId`). If it does:
+The process for advancing the workflow looks like this:
+When the job starts processing:
+1. Mark the `WorkflowRunStep` as `RUNNING`
+
+When the job finishes:
 1. Write the task output to `WorkflowRunStep.artifact` and mark the step `DONE`.
 2. Build `accumulated_artifacts` from all `DONE` steps' `artifact` fields.
-3. Identify the next `PENDING` step, call `step_def.build_input(shared_context, accumulated_artifacts)`, and enqueue the next agent task — storing its RQ job ID in the new step's `taskJobId` and marking it `RUNNING`.
-4. If no steps remain: mark `WorkflowRun` as `DONE`.
+3. Identify the next `PENDING` step, call `step_def.build_input(shared_context, accumulated_artifacts)`, and enqueue the next agent task — storing its RQ job ID 
+4. If no steps remain on `PENDING` mark `WorkflowRun` as `DONE`.
 
-Advancement is fully inline — no extra task type passes through the queue. This also means:
+If the job fails:
+1. Marks the `WorkflowRunStep` as `FAILED`.
+2. Marks the `WorkflowRun` as `FAILED`.
+3. If the workflow definition has an `on_failure` step, enqueues the task directly.
 
+Note:
+No automatic retry is attempted at the workflow level — failed jobs remain in RQ's failed registry for developer inspection.
 - `reply_context` is **never** in any task input except `send-notification`, where it is resolved from `shared_context`.
 - `RecipeData` flows from `recipe-research` → `recipe-load` via `artifacts["research"]["recipe"]`, not via a field on `RecipeLoadInput`.
 - Adding a new step to a workflow requires only a new `WorkflowStepDef` in `workflows.py` — no existing task input models change.
 
-##### Workflow Failure Handling
+### Agent
 
-If a step's RQ job fails (lands in RQ's failed job registry), the task runner:
-1. Marks the `WorkflowRunStep` as `FAILED`.
-2. Marks the `WorkflowRun` as `FAILED`.
-3. If the workflow definition has an `on_failure` step, enqueues it directly so the user is notified.
+Every time a task is dequeued, the task runner looks up the matching entry in `agents.py` to determine what LLM model to use, which system prompt file to load, which tools to give the agent, and which skills to load. It then spawns the agent with that configuration.
 
-No automatic retry is attempted at the workflow level — failed jobs remain in RQ's failed registry for developer inspection, consistent with the rest of the system.
+The developer can override the model configuration or prompt path per task type at runtime by setting `AGENTS_DEFINITION_FILEPATH` to a JSON file. The file maps task type names to an object with only the fields to override — `model`, `prompt`, or both. Tools and skills are fixed in `agents.py` and cannot be overridden at runtime. This supports prompt experimentation and quick rollback without a redeploy.
 
+Each model config's API token cannot be hardcoded in `agents.py`. It is read from an environment variable named by uppercasing the task type (hyphens to underscores) and appending `_API_TOKEN` — e.g. `recipe-research` → `RECIPE_RESEARCH_API_TOKEN`.
 
 #### LLM Backend
 The LLM backend configuration for any task must include full connection details (url, model, token). Two different agent runs may connect to different LLM instances, so provider-level configuration alone is insufficient.
@@ -608,7 +548,7 @@ Tools are written in a composable manner so that different sets can be loaded fo
 
 The following tools are essential for phase 1:
 - **household-manager-api**: calls the household-manager API, handling authentication and error codes on behalf of the agent. The tool reads the API key from an environment variable and injects it as an `Authorization: Bearer <token>` header on every request. The agent has no awareness of authentication. A `401` or `403` response is unrecoverable and must raise a hard error — these are not passed back to the agent. For phase 1, a single shared API key is used; per-household keys are out of scope.
-- **read-skill**: loads a skill sub-file from `robotina/agent/skills/...`.
+- **read-skill**: loads a skill sub-file. Accepts a path in `skill-name/subfile.md` format (e.g. `household-manager/api-endpoints.md`). A single instance of this tool is constructed at agent setup, covering all skill directories configured for that task type. The tool resolves the skill-name prefix to the matching directory and returns the file contents. Path traversal outside any configured skill directory is blocked.
 - **web-search**: searches the internet via the Tavily API.
 - **scheduler**: allows the agent to CRUD scheduled jobs.
 - **queue**: allows the agent to enqueue a single follow-up task directly (e.g. `send-notification` from `handle-incoming-message` for a direct reply). For multi-step sequences, use `start-workflow` instead.
@@ -616,7 +556,9 @@ The following tools are essential for phase 1:
 - **send-notification**: sends a message to the user via the gateway (Telegram).
 
 #### Skills
-Skills are markdown files containing precise instructions for solving particular tasks. Each skill exposes an `index_content` property (its main file) which is pre-loaded into the agent context. Sub-files are loaded on demand via the `read-skill` tool.
+Each skill is a directory under `src/agent/skills/` containing an `index.md` and one or more sub-files. Skills are represented in code as `SkillSet` objects: the constructor reads `index.md` from the skill directory and exposes it as an `index_content` string.
+
+At agent setup, one `SkillSet` is instantiated per configured skill. Their `index_content` strings are each appended to the system prompt, giving the agent an upfront description of every available skill and a map of its sub-files. A single `read_skill` LangChain tool is then constructed from all configured `SkillSet` instances. It accepts paths in `skill-name/subfile.md` format, resolves the prefix to the matching skill directory, and returns the file contents. Sub-files are loaded on demand, keeping the initial context lean.
 
 Phase 1 skills:
 - **recipe-research**: detailed instructions for searching multiple sites and summarizing recipe information.
@@ -656,6 +598,80 @@ Phase 1 adapters:
 - **ollama** — via `langchain-ollama`
 - **anthropic** — via `langchain-anthropic`
 - **openai** — via `langchain-openai`
+
+### Scheduler
+The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required. The RQ worker must be started with the `--with-scheduler` flag to activate the built-in scheduler.
+
+A dedicated `scheduled-tasks` queue is used for deferred jobs, separate from `agent-tasks`. A lightweight worker consumes `scheduled-tasks` and its only responsibility is to move each job into `agent-tasks` for the agent to process. This keeps scheduling concerns decoupled from agent execution.
+
+Tasks can be added to the scheduler in two ways:
+- The agent can schedule tasks using the `scheduler` tool
+- Other clients may add scheduled tasks via a scheduler API
+
+Scheduled tasks carry a scheduling directive alongside the base task input:
+```python
+class ScheduledTask(BaseModel):
+    task_type: str
+    input: dict                   # serialized base task input (e.g. RecipeResearchInput)
+    run_at: datetime | None       # one-off: execute at this datetime
+    cron: str | None              # recurring: standard cron expression, e.g. "0 9 * * 1"
+```
+
+When a scheduled job fires it is dequeued from `scheduled-tasks` and re-enqueued into `agent-tasks` using the base input type, stripping the scheduling metadata.
+
+#### Scheduler API
+
+A simple HTTP API for managing scheduled tasks. All endpoints require an `Authorization: Bearer <token>` header (token read from env var).
+
+**Create a scheduled task**
+```
+POST /api/scheduled-tasks
+```
+Request body:
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| task_type | string | Yes | e.g. `recipe-research` |
+| input | object | Yes | Task input matching the task type's input model |
+| run_at | ISO 8601 datetime | No* | One-off: execute at this datetime |
+| cron | string | No* | Recurring: cron expression, e.g. `"0 9 * * 1"` |
+
+*Exactly one of `run_at` or `cron` must be provided.
+
+Responses: `201` — created, returns the scheduled task object. `400` — validation error.
+
+**List scheduled tasks**
+```
+GET /api/scheduled-tasks
+```
+Returns all scheduled tasks currently in the `scheduled-tasks` queue (pending jobs only — completed one-off jobs are not returned).
+
+Response: `200` — array of scheduled task objects.
+
+**Get a scheduled task**
+```
+GET /api/scheduled-tasks/:id
+```
+Responses: `200` — scheduled task object. `404` — not found.
+
+**Delete a scheduled task**
+```
+DELETE /api/scheduled-tasks/:id
+```
+Cancels and removes the scheduled job from the queue. For recurring jobs this stops all future executions.
+
+Responses: `204` — deleted. `404` — not found.
+
+Scheduled task object shape (returned by all read endpoints):
+```json
+{
+  "id": "rq-job-id",
+  "task_type": "recipe-research",
+  "input": { "query": "spaghetti carbonara", "household_id": "..." },
+  "run_at": "2026-04-01T09:00:00Z",
+  "cron": null,
+  "created_at": "2026-03-24T10:00:00Z"
+}
+```
 
 ### Non functional Requirements:
 - System prompts should be written in markdown and versioned.
