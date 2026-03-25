@@ -68,8 +68,13 @@ Plans:
   3. The bot returns HTTP 200 to Telegram on all outcomes, including internal errors
   4. Conversation history up to the configured N messages is attached to the enqueued task input
   5. A `Conversation` record groups all messages for a `(platform, chat_id)` pair and enforces the `@@unique` constraint
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 03-01-PLAN.md — Test scaffold: conftest.py gateway fixtures + test_gateway.py stubs (GW-01 through GW-06)
+- [ ] 03-02-PLAN.md — Incoming handler (handler.py, gateway __init__.py), uv run all subprocess launcher, pyproject.toml entries
+- [ ] 03-03-PLAN.md — Outgoing send_message() function (send.py)
 
 ### Phase 4: LLM Module and Agent Infrastructure
 **Goal**: A general-purpose agent execution foundation exists — LLMBackend abstraction, three provider adapters, agent runner with correct per-job object scoping, skill loading, prompt versioning, runtime overrides, and LangWatch instrumentation initialized
@@ -147,7 +152,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
-| 3. Gateway | 0/TBD | Not started | - |
+| 3. Gateway | 0/3 | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |
