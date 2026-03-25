@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase complete — ready for verification
-stopped_at: Completed 03-03-PLAN.md (send_message outgoing function)
-last_updated: "2026-03-25T21:59:24.522Z"
+stopped_at: Completed 03-02-PLAN.md (gateway handler and entry points)
+last_updated: "2026-03-25T21:59:32.625Z"
 progress:
   total_phases: 9
   completed_phases: 3
@@ -85,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 03-gateway]: test_send_message_persists not marked @pytest.mark.integration — uses mocked Bot, no live services required
 - [Phase 03-gateway]: Bot used as async context manager (async with bot:) per PTB 22.7 standalone pattern for send_message — avoids PTB Application entanglement
 - [Phase 03-gateway]: SQLAlchemy Enum requires values_callable=lambda e: [x.value for x in e] for PostgreSQL native enum columns (enum name vs enum value mismatch)
+- [Phase 03-gateway]: Enqueue string function ref 'robotina.queue.jobs.handle_incoming_message' — Phase 4 will create the actual function; RQ resolves at execution time
+- [Phase 03-gateway]: Redis connection created per-message inside handler (not module-level) — simplest approach for Phase 1 sequential load
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:59:17.818Z
-Stopped at: Completed 03-03-PLAN.md (send_message outgoing function)
+Last session: 2026-03-25T21:59:32.623Z
+Stopped at: Completed 03-02-PLAN.md (gateway handler and entry points)
 Resume file: None
