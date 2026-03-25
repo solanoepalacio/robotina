@@ -13,7 +13,7 @@ Users can use the application to consult and edit their household information ma
 Users can also talk to Robotina so that robotina does this on their behalf.
 Robotina has access to read and modify household information on their behalf.
 In the future Robotina could serve multiple households, but during research and development phase Robotina will serve only one household. We are adding the field household_id to some of our models and abstractions to make it future proof.
-Until multi-household support is developer household_id will be static and gotten from and environment variable.
+Until multi-household support is developed, household_id will be static and gotten from an environment variable.
 
 Robotina inner workings is described by four areas:
 - triggers: telegram + scheduled tasks
@@ -24,15 +24,15 @@ Robotina inner workings is described by four areas:
 In it's core Robotina works as a tasks queue. When a complex task arrives, Robotina will split it into multiple simple tasks, each of which is small enough that can be solved by a specialized agent in a single run.
 
 ### Triggers
-To ensure that the agent process is executed with concurrency exactly equal to one, the agent is triggered by exactly one task queue (agent-task-queue), which acts as a multiplexer for work comming from different sources.
+To ensure that the agent process is executed with concurrency exactly equal to one, the agent is triggered by exactly one task queue (agent-task-queue), which acts as a multiplexer for work coming from different sources.
 The possible sources of agent tasks are:
-- User messages: user can write to the agent asking questions or delegating tasks. Multiple chat clients may be used. All incomming communications will be centralized by the "gateway" component described on the Tech Spec. User messages are not processed immediately, instead they enqueued for the agent to process when available.
-- Scheduled tasks: The agent or application maintainers can create scheduled tasks. The agent doesn't process this tasks directly; instead the tasks are enqueued in the agent-task-queue for the agent to process when available.
+- User messages: user can write to the agent asking questions or delegating tasks. Multiple chat clients may be used. All incoming communications will be centralized by the "gateway" component described on the Tech Spec. User messages are not processed immediately, instead they enqueued for the agent to process when available.
+- Scheduled tasks: The agent or application maintainers can create scheduled tasks. The agent doesn't process these tasks directly; instead the tasks are enqueued in the agent-task-queue for the agent to process when available.
 - Agent created tasks: The agent itself may push a task to the agent-task-queue to perform a task as soon as possible.
 
 ### Context
 The context the agent gets injected at each turn is dynamic and depends on the task type.
-For example: An "incomming-user-message" task type may receive the user chat history, while a "research-recipe" task type may receive information about the recipe.
+For example: A `handle-incoming-message` task type may receive the user chat history, while a `recipe-research` task type may receive information about the recipe.
 
 ### Abilities
 The agent has two ways to interact with its environment: Skills and Tools.
@@ -44,7 +44,7 @@ Tools: Regular agent tools allowing the agent to perform actions by calling code
 ### Output
 All agent runs produce an output which should be persisted along with the completed task status (success or failure) on the agent-task-queue.
 Only some agent runs may produce an output message to the user.
-Some runs will only side effects by writting data to the backend, creating a schedule tasks or queueing a subsequent task.
+Some runs will only have side effects by writing data to the backend, creating scheduled tasks or queueing a subsequent task.
 
 ## Scope:
 This document describes the features to be implemented for **Phase 1** of Robotina.
@@ -59,17 +59,20 @@ sequenceDiagram
     actor User
     participant Gateway
     participant Queue as agent-tasks queue
-    participant Agent as Robotina agent<br/>(handle-incoming-message)
+    participant A1 as Robotina agent<br/>(handle-incoming-message)
+    participant A2 as Notification agent<br/>(send-notification)
     participant HM as Household Manager API
 
     User->>Gateway: sends Telegram message
     Gateway->>Gateway: persist message, fetch history
     Gateway->>Queue: enqueue handle-incoming-message task
-    Queue->>Agent: spawn agent
-    Agent->>HM: query household data (household-manager-api tool)
-    HM-->>Agent: household data
-    Agent->>Agent: format reply (format-telegram-message skill)
-    Agent->>Gateway: send reply (send-notification tool)
+    Queue->>A1: spawn agent
+    A1->>HM: query household data (household-manager-api tool)
+    HM-->>A1: household data
+    A1->>Queue: enqueue send-notification task (queue tool)
+    Queue->>A2: spawn agent
+    A2->>A2: format reply (format-telegram-message skill)
+    A2->>Gateway: send reply (send-notification tool)
     Gateway->>Gateway: persist reply
     Gateway-->>User: Telegram message
 ```
@@ -109,19 +112,21 @@ sequenceDiagram
 ```
 To achieve this workflows we'll create:
 
-1. Three Agents:
+1. Four Agents:
     - Robotina: Handles receiving and answering telegram messages. Has read access to the household-manager api to read and answer user questions.
-    - Recipe Researcher: Handles researching recipes online
-    - Recipe Loader: handles loading a recipe into household-manager backend.
+    - Recipe Researcher: Handles researching recipes online.
+    - Recipe Loader: Handles loading a recipe into household-manager backend.
+    - Notification: Handles formatting and sending messages to the user via Telegram.
 2. Four task types:
-    - handle-incomming-message
+    - handle-incoming-message
     - recipe-research
     - recipe-load
     - send-notification
-3. Three task specific skills:
-    - recipe-research
-    - recipe-load
-    - format-telegram-message
+3. Four skills:
+    - recipe-research (new)
+    - recipe-load (new)
+    - format-telegram-message (new)
+    - household-manager (already implemented, minor update to remove auth instructions)
 
 ## Tech Spec:
 Comprised of the following components:
@@ -164,12 +169,12 @@ model Conversation {
   householdId  String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  messages     Message[]
+  messages     StoredMessage[]
 
   @@unique([platform, chatId])
 }
 
-model Message {
+model StoredMessage {
   id                 String       @id @default(uuid())
   conversation       Conversation @relation(fields: [conversationId], references: [id])
   conversationId     String
@@ -181,7 +186,7 @@ model Message {
 }
 ```
 
-A `Conversation` groups all messages for a given `(platform, chatId)` pair. The `@@unique` constraint ensures only one conversation record exists per chat. `platformMessageId` is unique across all messages to prevent processing duplicates on retry.
+A `Conversation` groups all messages for a given `(platform, chatId)` pair. The `@@unique` constraint ensures only one conversation record exists per chat. `StoredMessage.platformMessageId` is unique across all messages to prevent processing duplicates on retry.
 
 ### Scheduler
 The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required. The RQ worker must be started with the `--with-scheduler` flag to activate the built-in scheduler.
@@ -264,7 +269,7 @@ The queue is implemented using Redis + RQ. Redis is configured with AOF persiste
 Developers will use RQ Dashboard for job inspection.
 
 The agent may enqueue a new task at the back of the queue (normal priority, default) or at the front (urgent, processed next). RQ supports this natively via the at_front parameter.
-User icomming messages are always queued at the front of the queue (urgent, processed next).
+User incoming messages are always queued at the front of the queue (urgent, processed next).
 
 Each task is an RQ job with the following properties:
 - type — the task type (e.g. handle-incoming-message, recipe-research, ...)
@@ -277,7 +282,7 @@ Each task is an RQ job with the following properties:
 
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
 
-The result_ttl and failure_ttl for all jobs should be set to infinit (-1)
+The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
 
 #### Task Types
 
@@ -387,9 +392,9 @@ Before spawning the agent, the task runner uses `agents.py` to determine, based 
 ```python
 [
     {
-        "type": "research-recipe",
+        "type": "recipe-research",
         "model": { "baseUrl": "", "apiToken": "", "model": "" },
-        "prompt": "./prompts/research-recipe/v002.md",
+        "prompt": "./prompts/recipe-research/V002.md",
         "tools": [web_search, household_manager_api],
         "skills": [household_manager_skill, recipe_research_skill]
     }
@@ -508,7 +513,7 @@ robotina/
 |   |   |   └── household-manager/
 |   |   |       └── ...
 |   |   └── tools/
-|   |       ├── send-notitication
+|   |       ├── send-notification
 |   |       ├── queue
 |   |       ├── scheduler
 |   |       ├── web-search (tavily)
@@ -527,11 +532,55 @@ robotina/
 ## Development phases:
 
 - Gateway infrastructure
+  - Postgres + Prisma schema (Conversation, StoredMessage)
+  - Alembic migrations setup
+  - Telegram bot integration
+  - Message persistence + history fetch
+  - Enqueue handle-incoming-message task
+
 - Agent Queue
-- Agent Infrastructure (prompt loading, agents.py, instrumentation, experiments...)
-- "Robotina" Task and Agent -- Handles telegram messages
-- "Recipe Research" Task and Agent -- handles recipe research
-- scheduler
+  - Redis + RQ setup
+  - RQ Dashboard
+  - Task type Pydantic models (all inputs/outputs)
+  - Task runner scaffold
+
+- Agent Infrastructure
+  - LLM module + adapters (Ollama, Anthropic, OpenAI)
+  - agents.py scaffold + AGENTS_DEFINITION_FILEPATH override
+  - Skill loading (index_content pre-load + read-skill tool)
+  - Prompt versioning infrastructure
+  - LangWatch + OTel instrumentation
+
+- "Notification" Agent (send-notification)
+  - Skill: format-telegram-message
+  - Prompt: send-notification/V001.md
+  - Tool: send-notification
+  - Experiment: send-notification
+
+- "Robotina" Agent (handle-incoming-message)
+  - Skill: household-manager (update: remove auth instructions)
+  - Prompt: robotina/V001.md
+  - Tools: household-manager-api, queue
+
+- "Recipe Research" Agent (recipe-research)
+  - Skill: recipe-research
+  - Prompt: recipe-research/V001.md
+  - Tools: web-search, queue
+  - Experiment: recipe-research
+
+- "Recipe Loader" Agent (recipe-load)
+  - Skill: recipe-load
+  - Prompt: recipe-load/V001.md
+  - Tools: household-manager-api, queue
+  - Experiment: recipe-load
+
+- Scheduler
+  - scheduled-tasks queue + worker (moves jobs to agent-tasks)
+  - RQ cron/enqueue_at integration
+  - scheduler tool for agents
+
+- Scheduler API
+  - HTTP API (CRUD endpoints)
 
 
 
