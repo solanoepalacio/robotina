@@ -18,22 +18,22 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Gateway
 
-- [ ] **GW-01**: Telegram bot receives user messages via webhook and persists them to Postgres (`StoredMessage`)
-- [ ] **GW-02**: Gateway deduplicates incoming messages using `platform_message_id` unique constraint
-- [ ] **GW-03**: Gateway fetches the last N conversation messages (N configurable via env var) and attaches them as history
-- [ ] **GW-04**: Gateway enqueues a `handle-incoming-message` task at the front of the queue (urgent priority)
-- [ ] **GW-05**: Gateway sends outgoing Telegram messages and persists them to Postgres
-- [ ] **GW-06**: A `Conversation` record groups all messages for a `(platform, chat_id)` pair with a `@@unique` constraint
+- [x] **GW-01**: Telegram bot receives user messages via webhook and persists them to Postgres (`StoredMessage`)
+- [x] **GW-02**: Gateway deduplicates incoming messages using `platform_message_id` unique constraint
+- [x] **GW-03**: Gateway fetches the last N conversation messages (N configurable via env var) and attaches them as history
+- [x] **GW-04**: Gateway enqueues a `handle-incoming-message` task at the front of the queue (urgent priority)
+- [x] **GW-05**: Gateway sends outgoing Telegram messages and persists them to Postgres
+- [x] **GW-06**: A `Conversation` record groups all messages for a `(platform, chat_id)` pair with a `@@unique` constraint
 
 ### Queue
 
 - [x] **QUEUE-01**: Redis is configured with AOF persistence (`appendfsync always`) — no tasks lost on crash/reboot
-- [ ] **QUEUE-02**: Task runner processes jobs sequentially with exactly one worker (concurrency = 1)
+- [x] **QUEUE-02**: Task runner processes jobs sequentially with exactly one worker (concurrency = 1)
 - [x] **QUEUE-03**: All task inputs and outputs are strongly-typed Pydantic v2 models (`IncomingMessageInput/Output`, `RecipeResearchInput/Output`, `RecipeLoadInput/Output`, `SendNotificationInput/Output`)
-- [ ] **QUEUE-04**: All jobs have `result_ttl = -1` and `failure_ttl = -1` (infinite retention)
-- [ ] **QUEUE-05**: Failed jobs are retained in RQ's built-in failed job registry (dead-letter queue)
-- [ ] **QUEUE-06**: Agent can enqueue follow-up tasks at normal priority (back of queue) or urgent priority (front of queue)
-- [ ] **QUEUE-07**: All queue state changes are logged to console (task queued, processing started, task finished/failed)
+- [x] **QUEUE-04**: All jobs have `result_ttl = -1` and `failure_ttl = -1` (infinite retention)
+- [x] **QUEUE-05**: Failed jobs are retained in RQ's built-in failed job registry (dead-letter queue)
+- [x] **QUEUE-06**: Agent can enqueue follow-up tasks at normal priority (back of queue) or urgent priority (front of queue)
+- [x] **QUEUE-07**: All queue state changes are logged to console (task queued, processing started, task finished/failed)
 
 ### Workflow Engine
 
@@ -146,19 +146,19 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
 | QUEUE-01 | Phase 2 | Complete |
-| QUEUE-02 | Phase 2 | Pending |
+| QUEUE-02 | Phase 2 | Complete |
 | QUEUE-03 | Phase 2 | Complete |
-| QUEUE-04 | Phase 2 | Pending |
-| QUEUE-05 | Phase 2 | Pending |
-| QUEUE-06 | Phase 2 | Pending |
-| QUEUE-07 | Phase 2 | Pending |
+| QUEUE-04 | Phase 2 | Complete |
+| QUEUE-05 | Phase 2 | Complete |
+| QUEUE-06 | Phase 2 | Complete |
+| QUEUE-07 | Phase 2 | Complete |
 | WF-01 | Phase 2 | Complete |
-| GW-01 | Phase 3 | Pending |
-| GW-02 | Phase 3 | Pending |
-| GW-03 | Phase 3 | Pending |
-| GW-04 | Phase 3 | Pending |
-| GW-05 | Phase 3 | Pending |
-| GW-06 | Phase 3 | Pending |
+| GW-01 | Phase 3 | Complete |
+| GW-02 | Phase 3 | Complete |
+| GW-03 | Phase 3 | Complete |
+| GW-04 | Phase 3 | Complete |
+| GW-05 | Phase 3 | Complete |
+| GW-06 | Phase 3 | Complete |
 | AGENT-01 | Phase 4 | Pending |
 | AGENT-02 | Phase 4 | Pending |
 | AGENT-03 | Phase 4 | Pending |

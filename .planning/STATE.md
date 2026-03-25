@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-03-25T21:04:57.060Z"
+status: Ready to execute
+stopped_at: Completed 03-01-PLAN.md (gateway test scaffold)
+last_updated: "2026-03-25T21:55:18.072Z"
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 02 — database-models-and-queue-layer
+**Current focus:** Phase 03 — gateway
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 03 (gateway) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Plan: Not started
 | Phase 02-database-models-and-queue-layer P01 | 5 | 2 tasks | 7 files |
 | Phase 02-database-models-and-queue-layer P02 | 3 | 1 tasks | 2 files |
 | Phase 02-database-models-and-queue-layer P03 | 3 | 2 tasks | 3 files |
+| Phase 03-gateway P01 | 57 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 02-database-models-and-queue-layer]: reply_context absent from RecipeResearchInput and RecipeLoadInput — lives in WorkflowRun.shared_context, resolved by task runner in Phase 5
 - [Phase 02-database-models-and-queue-layer]: LoggingWorker defined as direct class at module level — clean import, no deferred pattern
 - [Phase 02-database-models-and-queue-layer]: Integration tests use burst=True worker in foreground for test-safe job processing without background threads
+- [Phase 03-gateway]: pytest.skip() used for stubs (SKIPPED not FAILED) — acceptable since plan goal is test name existence and clean collection
+- [Phase 03-gateway]: test_send_message_persists not marked @pytest.mark.integration — uses mocked Bot, no live services required
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:00:59.252Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-03-25T21:55:18.070Z
+Stopped at: Completed 03-01-PLAN.md (gateway test scaffold)
 Resume file: None
