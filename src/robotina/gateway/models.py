@@ -18,11 +18,18 @@ class MessageRole(enum.Enum):
     ASSISTANT = "assistant"
 
 
+def _enum_values(enum_class):
+    """Return enum values (not names) for PostgreSQL native enum compatibility."""
+    return [e.value for e in enum_class]
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (UniqueConstraint("platform", "chat_id"),)
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    platform: Mapped[Platform] = mapped_column(Enum(Platform), nullable=False)
+    platform: Mapped[Platform] = mapped_column(
+        Enum(Platform, values_callable=_enum_values), nullable=False
+    )
     chat_id: Mapped[str] = mapped_column(String, nullable=False)
     household_id: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -36,7 +43,9 @@ class StoredMessage(Base):
     conversation_id: Mapped[str] = mapped_column(String, ForeignKey("conversations.id"), nullable=False)
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
     platform_message_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    role: Mapped[MessageRole] = mapped_column(Enum(MessageRole), nullable=False)
+    role: Mapped[MessageRole] = mapped_column(
+        Enum(MessageRole, values_callable=_enum_values), nullable=False
+    )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
