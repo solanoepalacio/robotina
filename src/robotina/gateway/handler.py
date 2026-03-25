@@ -116,7 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     redis_conn = Redis.from_url(redis_url)
     q = Queue("agent-tasks", connection=redis_conn)
     q.enqueue(
-        "robotina.queue.jobs.handle_incoming_message",
+        "robotina.queue.jobs.run_task",
         task_input,
         at_front=True,
         result_ttl=-1,
