@@ -13,6 +13,7 @@ Users can use the application to consult and edit their household information ma
 Users can also talk to Robotina so that robotina does this on their behalf.
 Robotina has access to read and modify household information on their behalf.
 In the future Robotina could serve multiple households, but during research and development phase Robotina will serve only one household. We are adding the field household_id to some of our models and abstractions to make it future proof.
+Until multi-household support is developer household_id will be static and gotten from and environment variable.
 
 Robotina inner workings is described by four areas:
 - triggers: telegram + scheduled tasks
@@ -91,9 +92,28 @@ Comprised of the following components:
 - [Components Diagram](./components.png)
 
 ### Gateway
-Gateway component centralises the messages incoming from different messaging platforms and abstract away from the agent the details of handling communication (loading chat history, understanding message channels, etc).
-On a first iteration only telegram will be integrated using a telegram bot.
-Messages don't trigger the orchestrator directly, instead they are queued in the agent-task-queue.
+The gateway centralises messages incoming from different messaging platforms, abstracting away from the agent the details of         
+communication handling. On the first iteration, only Telegram will be integrated via a Telegram bot.                                 
+                                                                                                                                    
+When a message arrives, the gateway does not trigger the agent directly. Instead it:                                                 
+1. Fetches the last X messages from the conversation history (X is configurable via env var)
+2. Enqueues a handle-incoming-message task with the following input:                                                                 
+```python
+class IncomingMessageInput(BaseModel):
+    message_id: str               # platform-assigned ID, used for deduplication
+    platform: Literal["telegram"]
+    received_at: datetime         # when the gateway received the message
+    chat_id: str                  # platform chat/thread identifier
+    user_id: str                  # platform user identifier
+    text: str                     # raw message text
+    history: list[Message]        # last X messages, ordered oldest to newest
+
+class Message(BaseModel):
+    message_id: str
+    role: Literal["user", "assistant"]
+    text: str
+    sent_at: datetime
+```
 
 ### Scheduler
 A standalone scheduling service capable of producing tasks. When a schedule tasks run it doesn't invoke the agent process directly, instead it writes to the agent-task-queue.
@@ -116,7 +136,7 @@ Each task is an RQ job with the following properties:
 - output — a strongly-typed result stored in the RQ result backend
 - status — managed by RQ: queued | started | finished | failed
 - started_at — managed by RQ, set the worker picks up the job
-- household_id —  
+- household_id — Which household the task is for.
 - completed_at — managed by RQ, set on finish or failure
 
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
@@ -230,7 +250,6 @@ robotina/
 |   |   |   └── household-manager/
 |   |   |       └── ...
 |   |   └── tools/
-|   |       ├── read-conversation-history
 |   |       ├── scheduler
 |   |       ├── web-search (tavily)
 |   |       └── household-manager
