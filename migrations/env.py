@@ -16,8 +16,10 @@ if _db_url:
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Phase 1: no models yet — Phase 2 will set Base.metadata here
-target_metadata = None
+from robotina.db import Base
+import robotina.gateway.models   # noqa: F401 — registers Conversation, StoredMessage with Base.metadata
+import robotina.queue.models     # noqa: F401 — registers WorkflowRun, WorkflowRunStep with Base.metadata
+target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
