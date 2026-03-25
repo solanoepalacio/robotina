@@ -12,6 +12,7 @@ The source of truth of household data in the system is the "backend" component.
 Users can use the application to consult and edit their household information manually (recipes, meal plan, etc...)
 Users can also talk to Robotina so that robotina does this on their behalf.
 Robotina has access to read and modify household information on their behalf.
+In the future Robotina could serve multiple households, but during research and development phase Robotina will serve only one household. We are adding the field household_id to some of our models and abstractions to make it future proof.
 
 Robotina inner workings is described by four areas:
 - triggers: telegram + scheduled tasks
@@ -101,20 +102,26 @@ Tasks can be added to the scheduler in two ways:
 - Other clients may add scheduled tasks using an api
 
 ### Queue
-The queue represents the work pending to be done by the agent.
-The agent reads from the queue and consumes it sequentially (concurrency exactly 1).
-Each task consumed from the queue by the agent is considered "an agent run".
-The agent may decide, based on the task, to enqueue a new task at the back or front of the queue.
-Tasks in the queue must be easy to inspect by developers to understand when they have been executed, what was their input and output.
-Each task has the following properties:
-- a type
-- an input
-- an addition date
-- a completion date
-- a status (queued | processing | completed)
-- a result status (null, success, failure)
-- an output
-Tasks inputs and outputs are strongly typed.
+The queue represents the work pending to be done by the agent. The agent reads from the queue and consumes tasks sequentially (concurrency exactly 1). Each task consumed from the queue is considered "an agent run".
+
+The queue is implemented using Redis + RQ.
+Redis is configured with AOF persistence (appendfsync always) to guarantee that every enqueued task is flushed to disk before the operation is acknowledged. This ensures no tasks are silently lost across reboots or crashes.
+Job inspection can be achieved by using RQ dashboard.
+The agent may enqueue a new task at the back of the queue (normal priority, default) or at the front (urgent, processed next). RQ supports this natively via the at_front parameter.
+User icomming messages are always queued at the front of the queue (urgent, processed next).
+
+Each task is an RQ job with the following properties:
+- type — the task type (e.g. handle-incoming-message, recipe-research, ...)
+- input — a strongly-typed JSONB payload passed as job arguments
+- output — a strongly-typed result stored in the RQ result backend
+- status — managed by RQ: queued | started | finished | failed
+- started_at — managed by RQ, set the worker picks up the job
+- household_id —  
+- completed_at — managed by RQ, set on finish or failure
+
+Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
+
+The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
 
 ### Agent
 Every time a task is taken from the queue, an agent is spawned to process it. We call the process consuming the queue and spawning the agent "task-runner".
@@ -223,6 +230,7 @@ robotina/
 |   |   |   └── household-manager/
 |   |   |       └── ...
 |   |   └── tools/
+|   |       ├── read-conversation-history
 |   |       ├── scheduler
 |   |       ├── web-search (tavily)
 |   |       └── household-manager
