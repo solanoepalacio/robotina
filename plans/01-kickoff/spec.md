@@ -52,6 +52,61 @@ It needs to covers two user stories:
 - as a user I want to ask robotina questions in natural language about my household and get intelligent responses back based on the information stored on household-manager backend.
 - as a user I want to ask robotina to research a recipe and eventually see that the recipe was added to my household recipes
 
+**Workflow 1: user asks a question about their household**
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Gateway
+    participant Queue as agent-tasks queue
+    participant Agent as Robotina agent<br/>(handle-incoming-message)
+    participant HM as Household Manager API
+
+    User->>Gateway: sends Telegram message
+    Gateway->>Gateway: persist message, fetch history
+    Gateway->>Queue: enqueue handle-incoming-message task
+    Queue->>Agent: spawn agent
+    Agent->>HM: query household data (household-manager-api tool)
+    HM-->>Agent: household data
+    Agent->>Agent: format reply (format-telegram-message skill)
+    Agent->>Gateway: send reply (send-notification tool)
+    Gateway->>Gateway: persist reply
+    Gateway-->>User: Telegram message
+```
+
+**Workflow 2: user asks to research and add a recipe**
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Gateway
+    participant Queue as agent-tasks queue
+    participant A1 as Robotina agent<br/>(handle-incoming-message)
+    participant A2 as Recipe Researcher agent<br/>(recipe-research)
+    participant A3 as Recipe Loader agent<br/>(recipe-load)
+    participant A4 as Notification agent<br/>(send-notification)
+    participant Web as Web (Tavily)
+    participant HM as Household Manager API
+
+    User->>Gateway: "add a recipe for carbonara"
+    Gateway->>Gateway: persist message, fetch history
+    Gateway->>Queue: enqueue handle-incoming-message task
+    Queue->>A1: spawn agent
+    A1->>Queue: enqueue recipe-research task (queue tool)
+    Queue->>A2: spawn agent
+    A2->>Web: search for recipe (web-search tool)
+    Web-->>A2: recipe data
+    A2->>Queue: enqueue recipe-load task (queue tool)
+    Queue->>A3: spawn agent
+    A3->>HM: create recipe (household-manager-api tool)
+    HM-->>A3: recipe created
+    A3->>Queue: enqueue send-notification task (queue tool)
+    Queue->>A4: spawn agent
+    A4->>A4: format message (format-telegram-message skill)
+    A4->>Gateway: send notification (send-notification tool)
+    Gateway->>Gateway: persist reply
+    Gateway-->>User: "Recipe added: Carbonara"
+```
 To achieve this workflows we'll create:
 
 1. Three Agents:
@@ -66,18 +121,7 @@ To achieve this workflows we'll create:
 3. Three task specific skills:
     - recipe-research
     - recipe-load
-    - format-message
-
-
-The workflow for the first user story (user message) looks like this:
-```
-user writes a message -> gateway -> task (handle-incomming-message) -> skill (household manager) -> skill (format message) -> reply sent to user
-```
-
-The workflow for the second user story (recipe research) looks like this:
-```
-user asks to research or add a recipe -> task (handle-incomming-message) -> tool-call (queue new tasks) -> task (recipe-research) -> task (recipe-load) -> task (send notification) -> skill (format message) -> message sent to user letting him know that the recipe was added to the household
-```
+    - format-telegram-message
 
 ## Tech Spec:
 Comprised of the following components:
@@ -216,9 +260,9 @@ Scheduled task object shape (returned by all read endpoints):
 ### Queue
 The queue represents the work pending to be done by the agent. The agent reads from the queue and consumes tasks sequentially (concurrency exactly 1). Each task consumed from the queue is considered "an agent run".
 
-The queue is implemented using Redis + RQ.
-Redis is configured with AOF persistence (appendfsync always) to guarantee that every enqueued task is flushed to disk before the operation is acknowledged. This ensures no tasks are silently lost across reboots or crashes.
-Job inspection can be achieved by using RQ dashboard.
+The queue is implemented using Redis + RQ. Redis is configured with AOF persistence (appendfsync always) to guarantee that every enqueued task is flushed to disk before the operation is acknowledged. This ensures no tasks are silently lost across reboots or crashes.
+Developers will use RQ Dashboard for job inspection.
+
 The agent may enqueue a new task at the back of the queue (normal priority, default) or at the front (urgent, processed next). RQ supports this natively via the at_front parameter.
 User icomming messages are always queued at the front of the queue (urgent, processed next).
 
@@ -233,7 +277,7 @@ Each task is an RQ job with the following properties:
 
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
 
-The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
+The result_ttl and failure_ttl for all jobs should be set to infinit (-1)
 
 #### Task Types
 
@@ -283,6 +327,7 @@ class IncomingMessageInput(BaseModel):
     received_at: datetime         # when the gateway received the message
     chat_id: str                  # platform chat/thread identifier
     user_id: str                  # platform user identifier
+    household_id: str             # populated by the gateway from env var
     text: str                     # raw message text
     history: list[Message]        # last X messages, ordered oldest to newest
 
@@ -392,11 +437,37 @@ Phase 1 skills:
 - **household-manager**: instructions for interacting with the household-manager backend API to CRUD household data on behalf of the user. Authentication is handled by the `household-manager-api` tool, not by the agent. This skill is already implemented at `robotina/agent/skills/household-manager/*`.
 
 ### LLM
-LLM module is a protocol abstracting the connection to LLM backends to allow the agents to easily swap between different module providers.
-From the get go support for the following providers:
-- ollama
-- anthropic
-- openai
+The LLM module is a Protocol-based abstraction over LangChain model backends. Consumers (agents, task-runner) depend only on the `LLMBackend` protocol — never on adapter internals — making it trivial to swap providers per task or for experimentation.
+
+```python
+from typing import Any, Protocol, runtime_checkable
+from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
+
+@runtime_checkable
+class LLMBackend(Protocol):
+    """Interface for LLM adapters. Each agent run holds its own backend instance."""
+
+    @property
+    def model(self) -> BaseChatModel:
+        """The underlying LangChain chat model."""
+        ...
+
+    def create_agent(
+        self,
+        system_prompt: str,
+        tools: list[BaseTool] | None = None,
+    ) -> Any:
+        """Return a runnable LangChain agent (e.g. create_react_agent) bound to this model."""
+        ...
+```
+
+Each adapter reads its connection details (url, api key, model name) from the config passed in `agents.py` and wraps the appropriate LangChain model class (e.g. `ChatOllama`, `ChatAnthropic`, `ChatOpenAI`).
+
+Phase 1 adapters:
+- **ollama** — via `langchain-ollama`
+- **anthropic** — via `langchain-anthropic`
+- **openai** — via `langchain-openai`
 
 ## Non functional Requirements:
 - System prompts should be written in markdown and versioned.
@@ -424,18 +495,21 @@ robotina/
 |   |   ├── agents.py
 |   |   ├── prompts/
 |   |   |    ├── robotina
-|   |   |    |   ├── V001.txt
-|   |   |    |   └── V002.txt
+|   |   |    |   ├── V001.md
+|   |   |    |   └── V002.md
 |   |   |    └── research-recipe
-|   |   |        ├── V001.txt
-|   |   |        └── V002.txt
+|   |   |        ├── V001.md
+|   |   |        └── V002.md
 |   |   ├── skills/
+|   |   |   ├── recipe-load/
 |   |   |   ├── format-telegram-message/
 |   |   |   ├── research-recipe/
 |   |   |   |   └── ...
 |   |   |   └── household-manager/
 |   |   |       └── ...
 |   |   └── tools/
+|   |       ├── send-notitication
+|   |       ├── queue
 |   |       ├── scheduler
 |   |       ├── web-search (tavily)
 |   |       └── household-manager
@@ -454,7 +528,7 @@ robotina/
 
 - Gateway infrastructure
 - Agent Queue
-- Agent Infrastructure (prompt loading, agents.json, instrumentation, experiments...)
+- Agent Infrastructure (prompt loading, agents.py, instrumentation, experiments...)
 - "Robotina" Task and Agent -- Handles telegram messages
 - "Recipe Research" Task and Agent -- handles recipe research
 - scheduler
