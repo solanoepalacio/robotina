@@ -13,7 +13,7 @@ Robotina is built in nine phases following a strict dependency order: infrastruc
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Developer Tooling and Infrastructure** - Docker Compose, uv project, Alembic, and dev shortcuts are fully operational (completed 2026-03-25)
-- [ ] **Phase 2: Database Models and Queue Layer** - All SQLAlchemy models, Alembic migrations, Pydantic task I/O models, and RQ basics in place
+- [x] **Phase 2: Database Models and Queue Layer** - All SQLAlchemy models, Alembic migrations, Pydantic task I/O models, and RQ basics in place (completed 2026-03-25)
 - [ ] **Phase 3: Gateway** - Telegram bot receives, deduplicates, persists messages, and enqueues tasks
 - [ ] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation
 - [ ] **Phase 5: Task Runner and Workflow Engine** - Sequential RQ worker with workflow state transitions, artifact persistence, and next-step advancement
@@ -56,7 +56,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — SQLAlchemy models (Conversation, StoredMessage, WorkflowRun, WorkflowRunStep), db.py Base, Alembic migration 0002
 - [x] 02-02-PLAN.md — Pydantic v2 task I/O models (all 8 Input/Output classes) in task_types.py
-- [ ] 02-03-PLAN.md — LoggingWorker refactor, pyproject.toml markers, RQ integration tests
+- [x] 02-03-PLAN.md — LoggingWorker refactor, pyproject.toml markers, RQ integration tests
 
 ### Phase 3: Gateway
 **Goal**: The Telegram bot is the live front door — it receives user messages, persists them with deduplication, fetches conversation history, and enqueues tasks at the front of the queue
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
-| 2. Database Models and Queue Layer | 2/3 | In Progress|  |
+| 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
 | 3. Gateway | 0/TBD | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
