@@ -17,6 +17,11 @@
     - [Scheduler API](#scheduler-api)
   - [Queue](#queue)
     - [Task Types](#task-types)
+  - [Workflows](#workflows)
+    - [Workflow Registry](#workflow-registry)
+    - [Storage](#storage-1)
+    - [Artifact Flow](#artifact-flow)
+    - [Failure Handling](#failure-handling)
   - [Agent](#agent)
     - [LLM Backend](#llm-backend)
     - [Context & System Prompt](#context--system-prompt)
@@ -81,6 +86,27 @@ It must implement two user stories:
 - as a user I want to ask robotina questions in natural language about my household and get intelligent responses back based on the information stored on household-manager backend.
 - as a user I want to ask robotina to research a recipe and eventually see that the recipe was added to my household recipes
 
+To achieve this workflows we'll create:
+
+1. Four Agents:
+    - Robotina: Handles receiving and answering telegram messages. Has read access to the household-manager api to read and answer user questions.
+    - Recipe Researcher: Handles researching recipes online.
+    - Recipe Loader: Handles loading a recipe into household-manager backend.
+    - Notification: Receives pre-written text and ensures it is correctly formatted for Telegram rendering (links, bullet points, titles, etc.) before sending it via the Gateway.
+2. Four task types:
+    - handle-incoming-message
+    - recipe-research
+    - recipe-load
+    - send-notification
+3. Four skills:
+    - recipe-research (new)
+    - recipe-load (new)
+    - format-telegram-message (new)
+    - household-manager (already implemented, minor update to remove auth instructions)
+4. Workflow infrastructure:
+    - `WorkflowRun` / `WorkflowRunStep` Prisma models (Postgres)
+    - `workflows.py` registry — defines multi-step workflow types alongside `agents.py`
+    - `start-workflow` tool — used by agents to initiate a named workflow
 **Workflow 1: user asks a question about their household**
 
 ```mermaid
@@ -113,9 +139,11 @@ sequenceDiagram
     actor User
     participant Gateway
     participant Queue as agent-tasks queue
+    participant WF as Workflow Store<br/>(Postgres)
+    participant TR as Task Runner
     participant A1 as Robotina agent<br/>(handle-incoming-message)
-    participant A2 as Recipe Researcher agent<br/>(recipe-research)
-    participant A3 as Recipe Loader agent<br/>(recipe-load)
+    participant A2 as Recipe Researcher<br/>(recipe-research)
+    participant A3 as Recipe Loader<br/>(recipe-load)
     participant A4 as Notification agent<br/>(send-notification)
     participant Web as Web (Tavily)
     participant HM as Household Manager API
@@ -124,39 +152,33 @@ sequenceDiagram
     Gateway->>Gateway: persist message, fetch history
     Gateway->>Queue: enqueue handle-incoming-message task
     Queue->>A1: spawn agent
-    A1->>Queue: enqueue recipe-research task (queue tool)
+    A1->>WF: create WorkflowRun "add-recipe"<br/>(shared_context: query, household_id, reply_context)
+    A1->>Queue: enqueue recipe-research [start-workflow tool]
+
     Queue->>A2: spawn agent
     A2->>Web: search for recipe (web-search tool)
     Web-->>A2: recipe data
-    A2->>Queue: enqueue recipe-load task (queue tool)
+    A2-->>TR: RecipeResearchOutput
+
+    TR->>WF: persist step artifact {recipe: ...}
+    TR->>Queue: enqueue recipe-load (input built from shared_context + artifact)
+
     Queue->>A3: spawn agent
     A3->>HM: create recipe (household-manager-api tool)
     HM-->>A3: recipe created
-    A3->>Queue: enqueue send-notification task (queue tool)
+    A3-->>TR: RecipeLoadOutput
+
+    TR->>WF: persist step artifact {recipe_id, recipe_name}
+    TR->>Queue: enqueue send-notification (input built from shared_context + artifacts)
+
     Queue->>A4: spawn agent
     A4->>A4: format message (format-telegram-message skill)
     A4->>Gateway: send notification (send-notification tool)
     Gateway->>Gateway: persist reply
     Gateway-->>User: "Recipe added: Carbonara"
+
+    TR->>WF: mark WorkflowRun done
 ```
-To achieve this workflows we'll create:
-
-1. Four Agents:
-    - Robotina: Handles receiving and answering telegram messages. Has read access to the household-manager api to read and answer user questions.
-    - Recipe Researcher: Handles researching recipes online.
-    - Recipe Loader: Handles loading a recipe into household-manager backend.
-    - Notification: Handles formatting and sending messages to the user via Telegram.
-2. Four task types:
-    - handle-incoming-message
-    - recipe-research
-    - recipe-load
-    - send-notification
-3. Four skills:
-    - recipe-research (new)
-    - recipe-load (new)
-    - format-telegram-message (new)
-    - household-manager (already implemented, minor update to remove auth instructions)
-
 ## Tech Spec:
 Comprised of the following components:
 - gateway
@@ -179,40 +201,45 @@ When a message arrives, the gateway does not trigger the agent directly. Instead
 When the agent produces a reply, the gateway sends it to the user via Telegram and persists the outgoing message to Postgres.
 
 #### Storage
-Conversation history is stored in Postgres. Alembic is used for migrations. Prisma is used for data models.
+Conversation history is stored in Postgres. SQLAlchemy is used for data models. Alembic is used for migrations.
 
-```prisma
-enum Platform {
-  TELEGRAM
-}
+```python
+import enum, uuid
+from datetime import datetime
+from sqlalchemy import String, DateTime, Enum, Text, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
-enum MessageRole {
-  USER
-  ASSISTANT
-}
+class Platform(enum.Enum):
+    TELEGRAM = "telegram"
 
-model Conversation {
-  id           String    @id @default(uuid())
-  platform     Platform
-  chatId       String
-  householdId  String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  messages     StoredMessage[]
+class MessageRole(enum.Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
 
-  @@unique([platform, chatId])
-}
+class Conversation(Base):
+    __tablename__ = "conversations"
+    __table_args__ = (UniqueConstraint("platform", "chat_id"),)
 
-model StoredMessage {
-  id                 String       @id @default(uuid())
-  conversation       Conversation @relation(fields: [conversationId], references: [id])
-  conversationId     String
-  platformMessageId  String       @unique   // platform-assigned ID, used for deduplication
-  role               MessageRole
-  text               String
-  sentAt             DateTime               // when the platform sent/received the message
-  createdAt          DateTime     @default(now())
-}
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    platform: Mapped[Platform] = mapped_column(Enum(Platform), nullable=False)
+    chat_id: Mapped[str] = mapped_column(String, nullable=False)
+    household_id: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    messages: Mapped[list["StoredMessage"]] = relationship(back_populates="conversation")
+
+class StoredMessage(Base):
+    __tablename__ = "stored_messages"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id: Mapped[str] = mapped_column(String, ForeignKey("conversations.id"), nullable=False)
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    platform_message_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)  # used for deduplication
+    role: Mapped[MessageRole] = mapped_column(Enum(MessageRole), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # when the platform sent/received the message
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 ```
 
 A `Conversation` groups all messages for a given `(platform, chatId)` pair. The `@@unique` constraint ensures only one conversation record exists per chat. `StoredMessage.platformMessageId` is unique across all messages to prevent processing duplicates on retry.
@@ -311,7 +338,13 @@ Each task is an RQ job with the following properties:
 
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
 
-The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
+The result_ttl and failure_ttl for all jobs should be set to infinite (-1).
+
+#### Task Runner
+
+The component that consumes the queue is called the **task runner**. It runs a single RQ worker with concurrency set to exactly one, processing jobs sequentially. This single-worker, synchronous constraint is intentional: because the task runner is always idle between jobs, it is the natural place to handle workflow orchestration without a separate orchestrator process or additional coordination.
+
+When a job finishes — successfully or with a failure — the task runner checks whether that job is associated with a `WorkflowRunStep`. If it is, workflow advancement is performed inline before the next queued job is picked up. The mechanics of this (artifact persistence, next-step enqueueing, failure propagation) are described in the [Workflows](#workflows) section below.
 
 #### Task Types
 
@@ -353,6 +386,8 @@ class RecipeData(BaseModel):
 
 > `RecipeData` uses human-readable food and unit names because the recipe-research agent has no access to household-manager IDs. The recipe-load agent is responsible for resolving names to `foodId` / `unitId` via `GET /api/foods?name=` and `GET /api/units?name=` before calling `POST /api/recipes`.
 
+> `ReplyContext` is **not** forwarded through intermediate task inputs. It is stored once in `WorkflowRun.sharedContext` when the workflow is created and is resolved by the task runner when building the `send-notification` input at the final step.
+
 **handle-incoming-message**
 ```python
 class IncomingMessageInput(BaseModel):
@@ -366,8 +401,9 @@ class IncomingMessageInput(BaseModel):
     history: list[Message]        # last X messages, ordered oldest to newest
 
 class IncomingMessageOutput(BaseModel):
-    action: Literal["replied", "queued_tasks", "no_action"]
-    queued_task_ids: list[str]
+    action: Literal["replied", "started_workflow", "no_action"]
+    queued_task_ids: list[str]    # populated when action is "replied" (direct send-notification)
+    workflow_run_id: str | None   # populated when action is "started_workflow"
 ```
 
 **recipe-research**
@@ -375,22 +411,22 @@ class IncomingMessageOutput(BaseModel):
 class RecipeResearchInput(BaseModel):
     query: str                    # e.g. "spaghetti carbonara"
     household_id: str
-    reply_context: ReplyContext   # forwarded through the chain for final notification
+    # reply_context is NOT here — it lives in WorkflowRun.shared_context
 
 class RecipeResearchOutput(BaseModel):
-    recipe: RecipeData            # structured recipe (name, ingredients, steps, etc.)
+    recipe: RecipeData            # persisted to WorkflowRunStep.artifact by the task runner
 ```
 
 **recipe-load**
 ```python
 class RecipeLoadInput(BaseModel):
-    recipe: RecipeData
+    recipe: RecipeData            # resolved from prior step's artifact by the task runner
     household_id: str
-    reply_context: ReplyContext
+    # reply_context is NOT here — it lives in WorkflowRun.shared_context
 
 class RecipeLoadOutput(BaseModel):
     recipe_id: str
-    recipe_name: str
+    recipe_name: str              # persisted to WorkflowRunStep.artifact by the task runner
 ```
 
 **send-notification**
@@ -405,32 +441,149 @@ class SendNotificationOutput(BaseModel):
     message_id: str               # platform-assigned ID
 ```
 
-### Agent
+> The caller (whichever agent enqueues this task) is responsible for providing the full message text. The send-notification agent does not compose content — it only reformats the text for correct Telegram rendering and delivers it.
 
-Every time a task is taken from the queue, an agent is spawned to process it. We call the process consuming the queue and spawning the agent "task-runner".
+#### Workflows
 
-The task runner acts as a wrapper around the agent run and is responsible for updating the task status, result status, and output. When an agent run fails, the task is sent to RQ's failed job registry (the dead letter queue) for developer inspection.
+Multi-step sequences are coordinated by a centralized orchestrator rather than by tasks enqueuing their own successors. This separates concerns: individual agents know nothing about the sequence they belong to — they just accept their input, do their job, and return their output. The task runner handles everything else.
 
-Before spawning the agent, the task runner uses `agents.py` to determine, based on the task type:
-- what LLM provider and model will be used
-- what system prompt is injected
-- what tools are given to the agent
-- what skills are loaded into the agent
+The workflow engine has two moving parts: a **registry** that defines workflow structure, and a **store** (Postgres) that holds live run state. Advancement is handled inline by the task runner.
 
-`agents.py` holds the authoritative agent configurations as Python objects, with direct references to tool and skill implementations:
+##### Workflow Registry
+
+`workflows.py` (alongside `agents.py`) is the authoritative source for all workflow definitions. It maps a workflow type name to its ordered steps and the rules for building each step's input:
+
 ```python
-[
-    {
-        "type": "recipe-research",
-        "model": { "baseUrl": "", "apiToken": "", "model": "" },
-        "prompt": "./prompts/recipe-research/V002.md",
-        "tools": [web_search, household_manager_api],
-        "skills": [household_manager_skill, recipe_research_skill]
-    }
-]
+class WorkflowStepDef(BaseModel):
+    step_key: str                              # unique identifier within this workflow
+    task_type: str                             # e.g. "recipe-research"
+    build_input: Callable[[dict, dict], BaseModel]
+    # ^ (shared_context, accumulated_artifacts) -> task input model
+
+class WorkflowDefinition(BaseModel):
+    workflow_type: str                         # e.g. "add-recipe"
+    steps: list[WorkflowStepDef]
+    on_failure: WorkflowStepDef | None         # optional cleanup/notification step on any failure
+
+WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
+    "add-recipe": WorkflowDefinition(
+        workflow_type="add-recipe",
+        steps=[
+            WorkflowStepDef(
+                step_key="research",
+                task_type="recipe-research",
+                build_input=lambda ctx, _: RecipeResearchInput(
+                    query=ctx["recipe_query"],
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="load",
+                task_type="recipe-load",
+                build_input=lambda ctx, artifacts: RecipeLoadInput(
+                    recipe=artifacts["research"]["recipe"],
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="notify",
+                task_type="send-notification",
+                build_input=lambda ctx, artifacts: SendNotificationInput(
+                    **ctx["reply_context"],
+                    text=f"Recipe added: {artifacts['load']['recipe_name']}",
+                ),
+            ),
+        ],
+        on_failure=WorkflowStepDef(
+            step_key="notify-failure",
+            task_type="send-notification",
+            build_input=lambda ctx, artifacts: SendNotificationInput(
+                **ctx["reply_context"],
+                text="Sorry, I couldn't add the recipe.",
+            ),
+        ),
+    )
+}
 ```
 
-The developer can provide a JSON override file by setting the `AGENTS_DEFINITION_FILEPATH` environment variable. This file specifies only the fields to override (e.g. model, prompt path) and is merged on top of the base configuration from `agents.py`. Prompt files are loaded from disk after the merge is applied, with paths resolved relative to the project root. This mechanism supports prompt experimentation, evaluation, and quick rollback if performance degradation is detected after release.
+The `build_input` callables receive `shared_context` (set at workflow creation, never mutated) and `accumulated_artifacts` (a dict of `{step_key: step_output}`, grown by the task runner as each step completes).
+
+##### Workflow Storage
+
+`WorkflowRun` and `WorkflowRunStep` are stored in the same Postgres database as the gateway's conversation tables. SQLAlchemy is used for models; Alembic handles migrations.
+
+```python
+import enum, uuid
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import String, DateTime, Enum, JSON, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+
+class WorkflowStatus(enum.Enum):
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+class WorkflowStepStatus(enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+class WorkflowRun(Base):
+    __tablename__ = "workflow_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    workflow_type: Mapped[str] = mapped_column(String, nullable=False)
+    household_id: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[WorkflowStatus] = mapped_column(Enum(WorkflowStatus), default=WorkflowStatus.RUNNING, nullable=False)
+    shared_context: Mapped[dict] = mapped_column(JSON, nullable=False)  # reply_context, household_id, user intent — set once at creation
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    steps: Mapped[list["WorkflowRunStep"]] = relationship(back_populates="workflow_run")
+
+class WorkflowRunStep(Base):
+    __tablename__ = "workflow_run_steps"
+    __table_args__ = (UniqueConstraint("workflow_run_id", "step_key"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    workflow_run_id: Mapped[str] = mapped_column(String, ForeignKey("workflow_runs.id"), nullable=False)
+    workflow_run: Mapped["WorkflowRun"] = relationship(back_populates="steps")
+    step_key: Mapped[str] = mapped_column(String, nullable=False)       # matches WorkflowStepDef.step_key
+    task_type: Mapped[str] = mapped_column(String, nullable=False)
+    task_job_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # RQ job ID, set when the step is enqueued
+    status: Mapped[WorkflowStepStatus] = mapped_column(Enum(WorkflowStepStatus), default=WorkflowStepStatus.PENDING, nullable=False)
+    artifact: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)       # step output, written by the task runner on completion
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+```
+
+`WorkflowRun.sharedContext` holds everything steps need but shouldn't own: `reply_context`, `household_id`, the user's original intent. `WorkflowRunStep.artifact` holds the step's output and is keyed by `step_key` when the task runner builds `accumulated_artifacts` for subsequent steps.
+
+##### Workflow Artifact Flow
+
+When any task completes, the task runner checks whether the RQ job ID maps to a `WorkflowRunStep` (via `WorkflowRunStep.taskJobId`). If it does:
+1. Write the task output to `WorkflowRunStep.artifact` and mark the step `DONE`.
+2. Build `accumulated_artifacts` from all `DONE` steps' `artifact` fields.
+3. Identify the next `PENDING` step, call `step_def.build_input(shared_context, accumulated_artifacts)`, and enqueue the next agent task — storing its RQ job ID in the new step's `taskJobId` and marking it `RUNNING`.
+4. If no steps remain: mark `WorkflowRun` as `DONE`.
+
+Advancement is fully inline — no extra task type passes through the queue. This also means:
+
+- `reply_context` is **never** in any task input except `send-notification`, where it is resolved from `shared_context`.
+- `RecipeData` flows from `recipe-research` → `recipe-load` via `artifacts["research"]["recipe"]`, not via a field on `RecipeLoadInput`.
+- Adding a new step to a workflow requires only a new `WorkflowStepDef` in `workflows.py` — no existing task input models change.
+
+##### Workflow Failure Handling
+
+If a step's RQ job fails (lands in RQ's failed job registry), the task runner:
+1. Marks the `WorkflowRunStep` as `FAILED`.
+2. Marks the `WorkflowRun` as `FAILED`.
+3. If the workflow definition has an `on_failure` step, enqueues it directly so the user is notified.
+
+No automatic retry is attempted at the workflow level — failed jobs remain in RQ's failed registry for developer inspection, consistent with the rest of the system.
+
 
 #### LLM Backend
 The LLM backend configuration for any task must include full connection details (url, model, token). Two different agent runs may connect to different LLM instances, so provider-level configuration alone is insufficient.
@@ -440,7 +593,7 @@ Since tasks are broken into their smallest possible form, each system prompt has
 - handle-incoming-message — understand a user's message in context of their conversation history, decide whether to answer directly or break the request into follow-up tasks.
 - recipe-research — search for a recipe online using the available tools and produce a structured result.
 - recipe-load — take a structured recipe and persist it to the household-manager backend.
-- send-notification — compose and send a message to the user via the gateway.
+- send-notification — take the pre-written message text provided in the task input, apply correct Telegram formatting (links, bullet points, headings, etc.), and send it via the gateway.
 
 These prompts are not yet written. They will be developed alongside the skills they depend on, since skills and prompts are tightly coupled — a prompt's instructions reference how a skill is structured, and a skill's content is written to complement the prompt it supports.                       
                                                                         
@@ -458,7 +611,8 @@ The following tools are essential for phase 1:
 - **read-skill**: loads a skill sub-file from `robotina/agent/skills/...`.
 - **web-search**: searches the internet via the Tavily API.
 - **scheduler**: allows the agent to CRUD scheduled jobs.
-- **queue**: allows the agent to enqueue follow-up tasks (e.g. `recipe-research`, `recipe-load`).
+- **queue**: allows the agent to enqueue a single follow-up task directly (e.g. `send-notification` from `handle-incoming-message` for a direct reply). For multi-step sequences, use `start-workflow` instead.
+- **start-workflow**: creates a `WorkflowRun` record with the given `workflow_type` and `shared_context`, builds the first step's input, and enqueues it directly as a regular agent task (with the `WorkflowRunStep.taskJobId` set). Returns the `workflow_run_id`. Used by `handle-incoming-message` when it identifies a multi-step intent.
 - **send-notification**: sends a message to the user via the gateway (Telegram).
 
 #### Skills
@@ -527,6 +681,7 @@ robotina/
 |   ├── agent/
 |   |   ├── agent.py
 |   |   ├── agents.py
+|   |   ├── workflows.py
 |   |   ├── prompts/
 |   |   |    ├── robotina
 |   |   |    |   ├── V001.md
@@ -544,6 +699,7 @@ robotina/
 |   |   └── tools/
 |   |       ├── send-notification
 |   |       ├── queue
+|   |       ├── start-workflow
 |   |       ├── scheduler
 |   |       ├── web-search (tavily)
 |   |       └── household-manager
@@ -567,7 +723,7 @@ robotina/
 ## Development phases:
 
 - Gateway infrastructure
-  - Postgres + Prisma schema (Conversation, StoredMessage)
+  - Postgres + SQLAlchemy models (Conversation, StoredMessage)
   - Alembic migrations setup
   - Telegram bot integration
   - Message persistence + history fetch
@@ -578,6 +734,14 @@ robotina/
   - RQ Dashboard
   - Task type Pydantic models (all inputs/outputs)
   - Task runner scaffold
+
+- Workflow Infrastructure
+  - WorkflowRun / WorkflowRunStep SQLAlchemy models + Alembic migration
+  - WorkflowDefinition / WorkflowStepDef Python types
+  - workflows.py registry scaffold (add-recipe workflow registered)
+  - Task runner step-completion hook: persist artifact → build next step input → enqueue next agent task
+  - Failure propagation: mark WorkflowRunStep + WorkflowRun failed; trigger on_failure step
+  - start-workflow tool
 
 - Agent Infrastructure
   - LLM module + adapters (Ollama, Anthropic, OpenAI)
@@ -595,18 +759,18 @@ robotina/
 - "Robotina" Agent (handle-incoming-message)
   - Skill: household-manager (update: remove auth instructions)
   - Prompt: robotina/V001.md
-  - Tools: household-manager-api, queue
+  - Tools: household-manager-api, queue, start-workflow
 
 - "Recipe Research" Agent (recipe-research)
   - Skill: recipe-research
   - Prompt: recipe-research/V001.md
-  - Tools: web-search, queue
+  - Tools: web-search
   - Experiment: recipe-research
 
 - "Recipe Loader" Agent (recipe-load)
   - Skill: recipe-load
   - Prompt: recipe-load/V001.md
-  - Tools: household-manager-api, queue
+  - Tools: household-manager-api
   - Experiment: recipe-load
 
 - Scheduler
