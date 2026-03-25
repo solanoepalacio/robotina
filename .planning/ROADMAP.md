@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Developer Tooling and Infrastructure** - Docker Compose, uv project, Alembic, and dev shortcuts are fully operational (completed 2026-03-25)
 - [x] **Phase 2: Database Models and Queue Layer** - All SQLAlchemy models, Alembic migrations, Pydantic task I/O models, and RQ basics in place (completed 2026-03-25)
-- [ ] **Phase 3: Gateway** - Telegram bot receives, deduplicates, persists messages, and enqueues tasks
+- [x] **Phase 3: Gateway** - Telegram bot receives, deduplicates, persists messages, and enqueues tasks (completed 2026-03-25)
 - [ ] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation
 - [ ] **Phase 5: Task Runner and Workflow Engine** - Sequential RQ worker with workflow state transitions, artifact persistence, and next-step advancement
 - [ ] **Phase 6: send-notification Agent** - Notification agent formats and delivers Telegram messages with LangWatch traces verified
@@ -73,8 +73,8 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Test scaffold: conftest.py gateway fixtures + test_gateway.py stubs (GW-01 through GW-06)
-- [ ] 03-02-PLAN.md — Incoming handler (handler.py, gateway __init__.py), uv run all subprocess launcher, pyproject.toml entries
-- [ ] 03-03-PLAN.md — Outgoing send_message() function (send.py)
+- [x] 03-02-PLAN.md — Incoming handler (handler.py, gateway __init__.py), uv run all subprocess launcher, pyproject.toml entries
+- [x] 03-03-PLAN.md — Outgoing send_message() function (send.py)
 
 ### Phase 4: LLM Module and Agent Infrastructure
 **Goal**: A general-purpose agent execution foundation exists — LLMBackend abstraction, three provider adapters, agent runner with correct per-job object scoping, skill loading, prompt versioning, runtime overrides, and LangWatch instrumentation initialized
@@ -152,7 +152,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
-| 3. Gateway | 1/3 | In Progress|  |
+| 3. Gateway | 3/3 | Complete   | 2026-03-25 |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |

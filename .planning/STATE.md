@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 03-01-PLAN.md (gateway test scaffold)
-last_updated: "2026-03-25T21:55:18.072Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 03-03-PLAN.md (send_message outgoing function)
+last_updated: "2026-03-25T21:59:24.522Z"
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 03 (gateway) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -53,6 +53,8 @@ Plan: 2 of 3
 | Phase 02-database-models-and-queue-layer P02 | 3 | 1 tasks | 2 files |
 | Phase 02-database-models-and-queue-layer P03 | 3 | 2 tasks | 3 files |
 | Phase 03-gateway P01 | 57 | 2 tasks | 2 files |
+| Phase 03-gateway P03 | 2 | 1 tasks | 3 files |
+| Phase 03-gateway P02 | 3 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -81,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 02-database-models-and-queue-layer]: Integration tests use burst=True worker in foreground for test-safe job processing without background threads
 - [Phase 03-gateway]: pytest.skip() used for stubs (SKIPPED not FAILED) — acceptable since plan goal is test name existence and clean collection
 - [Phase 03-gateway]: test_send_message_persists not marked @pytest.mark.integration — uses mocked Bot, no live services required
+- [Phase 03-gateway]: Bot used as async context manager (async with bot:) per PTB 22.7 standalone pattern for send_message — avoids PTB Application entanglement
+- [Phase 03-gateway]: SQLAlchemy Enum requires values_callable=lambda e: [x.value for x in e] for PostgreSQL native enum columns (enum name vs enum value mismatch)
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T21:55:18.070Z
-Stopped at: Completed 03-01-PLAN.md (gateway test scaffold)
+Last session: 2026-03-25T21:59:17.818Z
+Stopped at: Completed 03-03-PLAN.md (send_message outgoing function)
 Resume file: None
