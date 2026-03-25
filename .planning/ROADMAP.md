@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Docker Compose stack (Postgres 15, Redis 7 AOF, RQ Dashboard)
+- [x] 01-01-PLAN.md — Docker Compose stack (Postgres 15, Redis 7 AOF, RQ Dashboard)
 - [ ] 01-02-PLAN.md — uv project scaffold, src/robotina package tree, Alembic configuration
 - [ ] 01-03-PLAN.md — uv run agent entrypoint, experiment stubs, automated test scaffold
 
