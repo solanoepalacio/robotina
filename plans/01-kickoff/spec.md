@@ -327,7 +327,7 @@ class IncomingMessageInput(BaseModel):
     history: list[Message]        # last X messages, ordered oldest to newest
 
 class IncomingMessageOutput(BaseModel):
-    action: Literal["replied", "started_workflow", "no_action"]
+    action: Literal["replied", "started_workflow"]
     queued_task_ids: list[str]    # populated when action is "replied" (direct send-notification)
     workflow_run_id: str | None   # populated when action is "started_workflow"
 ```
@@ -759,7 +759,8 @@ robotina/
   - WorkflowDefinition / WorkflowStepDef Python types
   - workflows.py registry scaffold (add-recipe workflow registered)
   - Task runner step-completion hook: persist artifact → build next step input → enqueue next agent task
-  - Failure propagation: mark WorkflowRunStep + WorkflowRun failed; trigger on_failure step
+  - Workflow creation tooling (creates workflow and all steps on db)
+  - Workflow update tooling (Advances workflow in DB)
   - start-workflow tool
 
 - Agent Infrastructure
@@ -796,9 +797,7 @@ robotina/
   - scheduled-tasks queue + worker (moves jobs to agent-tasks)
   - RQ cron/enqueue_at integration
   - scheduler tool for agents
-
-- Scheduler API
-  - HTTP API (CRUD endpoints)
+  - Scheduler API 
 
 
 
