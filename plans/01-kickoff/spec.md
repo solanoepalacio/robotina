@@ -1,4 +1,33 @@
 # Robotina
+
+## Index
+- [Project Overview](#project-overview)
+  - [Triggers](#triggers)
+  - [Context](#context)
+  - [Abilities](#abilities)
+  - [Output](#output)
+- [Scope](#scope)
+  - [Workflow 1: user asks a question about their household](#workflow-1-user-asks-a-question-about-their-household)
+  - [Workflow 2: user asks to research and add a recipe](#workflow-2-user-asks-to-research-and-add-a-recipe)
+- [Tech Spec](#tech-spec)
+  - [Diagrams](#diagrams)
+  - [Gateway](#gateway)
+    - [Storage](#storage)
+  - [Scheduler](#scheduler)
+    - [Scheduler API](#scheduler-api)
+  - [Queue](#queue)
+    - [Task Types](#task-types)
+  - [Agent](#agent)
+    - [LLM Backend](#llm-backend)
+    - [Context & System Prompt](#context--system-prompt)
+    - [Tools](#tools)
+    - [Skills](#skills)
+  - [LLM](#llm)
+  - [Non Functional Requirements](#non-functional-requirements)
+  - [Draft Project Structure](#draft-project-structure)
+  - [Developer Tooling Requirements](#developer-tooling-requirements)
+- [Development Phases](#development-phases)
+
 ## Project Overview:
 Robotina is a home assistant helping families organize their recipes, meal plan, groceries stock and other useful tasks for households.
 
@@ -48,7 +77,7 @@ Some runs will only have side effects by writing data to the backend, creating s
 
 ## Scope:
 This document describes the features to be implemented for **Phase 1** of Robotina.
-It needs to covers two user stories:
+It must implement two user stories:
 - as a user I want to ask robotina questions in natural language about my household and get intelligent responses back based on the information stored on household-manager backend.
 - as a user I want to ask robotina to research a recipe and eventually see that the recipe was added to my household recipes
 
@@ -474,7 +503,7 @@ Phase 1 adapters:
 - **anthropic** — via `langchain-anthropic`
 - **openai** — via `langchain-openai`
 
-## Non functional Requirements:
+### Non functional Requirements:
 - System prompts should be written in markdown and versioned.
 - All changes on the queue state are logged to console (new task queued, processing new task, task finished...)
 - All actions performed by the agent are logged (llm start streaming, tool calls...)
@@ -488,7 +517,7 @@ Phase 1 adapters:
 - Each experiment defines its own evaluation criteria. Evaluation criteria are TBD and will be designed as part of the planning phase for each individual skill — designing the experiment is a required deliverable when planning the development of a skill.
 - The decision of which LangWatch instance (project, endpoint) an experiment writes to is left to the developer running it, controlled entirely via environment variables.
 
-## Draft Project Structure:
+### Draft Project Structure:
 ```
 robotina/
 ├── plans/
@@ -528,6 +557,12 @@ robotina/
 ├── README.md
 └── pyproject.toml
 ```
+### Developer Tooling Requirements:
+- Postgres and Redis on docker compose
+- project managed using uv
+- agent easily ran using uv shortcut (uv run agent)
+- experiments easily ran using uv shortcut (uv run experiments.recipe_research)
+- migrations easily ran using uv shortcut (uv run migrate)
 
 ## Development phases:
 
