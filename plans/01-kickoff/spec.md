@@ -94,24 +94,124 @@ Comprised of the following components:
 ### Gateway
 The gateway centralises messages incoming from different messaging platforms, abstracting away from the agent the details of communication handling. On the first iteration, only Telegram will be integrated via a Telegram bot.
 When a message arrives, the gateway does not trigger the agent directly. Instead it:
-1. Fetches the last X messages from the conversation history (X is configurable via env var)
-2. Enqueues a `handle-incoming-message` task (see Queue section for the input type)
+1. Persists the incoming message to Postgres
+2. Fetches the last X messages from the conversation history (X is configurable via env var)
+3. Enqueues a `handle-incoming-message` task (see Queue section for the input type)
+
+When the agent produces a reply, the gateway sends it to the user via Telegram and persists the outgoing message to Postgres.
+
+#### Storage
+Conversation history is stored in Postgres. Alembic is used for migrations. Prisma is used for data models.
+
+```prisma
+enum Platform {
+  TELEGRAM
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+model Conversation {
+  id           String    @id @default(uuid())
+  platform     Platform
+  chatId       String
+  householdId  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
+
+  @@unique([platform, chatId])
+}
+
+model Message {
+  id                 String       @id @default(uuid())
+  conversation       Conversation @relation(fields: [conversationId], references: [id])
+  conversationId     String
+  platformMessageId  String       @unique   // platform-assigned ID, used for deduplication
+  role               MessageRole
+  text               String
+  sentAt             DateTime               // when the platform sent/received the message
+  createdAt          DateTime     @default(now())
+}
+```
+
+A `Conversation` groups all messages for a given `(platform, chatId)` pair. The `@@unique` constraint ensures only one conversation record exists per chat. `platformMessageId` is unique across all messages to prevent processing duplicates on retry.
 
 ### Scheduler
-A standalone scheduling service capable of producing tasks. When a scheduled task fires it does not invoke the agent process directly — instead it writes to the agent-task-queue.
+The scheduler is implemented using native RQ scheduling (RQ 2.5+), which supports both one-off future execution (`enqueue_at`) and cron-style recurring jobs — no external daemon or add-on package required. The RQ worker must be started with the `--with-scheduler` flag to activate the built-in scheduler.
+
+A dedicated `scheduled-tasks` queue is used for deferred jobs, separate from `agent-tasks`. A lightweight worker consumes `scheduled-tasks` and its only responsibility is to move each job into `agent-tasks` for the agent to process. This keeps scheduling concerns decoupled from agent execution.
+
 Tasks can be added to the scheduler in two ways:
-- The agent can add scheduled tasks using the `scheduler` tool
-- Other clients may add scheduled tasks using an API
+- The agent can schedule tasks using the `scheduler` tool
+- Other clients may add scheduled tasks via a scheduler API
 
-Scheduled task input types extend the corresponding queue task input types with a `cron` field:
+Scheduled tasks carry a scheduling directive alongside the base task input:
 ```python
-class ScheduledRecipeResearchInput(RecipeResearchInput):
-    cron: str   # standard cron expression, e.g. "0 9 * * 1"
-
-class ScheduledRecipeLoadInput(RecipeLoadInput):
-    cron: str
+class ScheduledTask(BaseModel):
+    task_type: str
+    input: dict                   # serialized base task input (e.g. RecipeResearchInput)
+    run_at: datetime | None       # one-off: execute at this datetime
+    cron: str | None              # recurring: standard cron expression, e.g. "0 9 * * 1"
 ```
-When a scheduled task fires, the scheduler strips the `cron` field and enqueues the base input type.
+
+When a scheduled job fires it is dequeued from `scheduled-tasks` and re-enqueued into `agent-tasks` using the base input type, stripping the scheduling metadata.
+
+#### Scheduler API
+
+A simple HTTP API for managing scheduled tasks. All endpoints require an `Authorization: Bearer <token>` header (token read from env var).
+
+**Create a scheduled task**
+```
+POST /api/scheduled-tasks
+```
+Request body:
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| task_type | string | Yes | e.g. `recipe-research` |
+| input | object | Yes | Task input matching the task type's input model |
+| run_at | ISO 8601 datetime | No* | One-off: execute at this datetime |
+| cron | string | No* | Recurring: cron expression, e.g. `"0 9 * * 1"` |
+
+*Exactly one of `run_at` or `cron` must be provided.
+
+Responses: `201` — created, returns the scheduled task object. `400` — validation error.
+
+**List scheduled tasks**
+```
+GET /api/scheduled-tasks
+```
+Returns all scheduled tasks currently in the `scheduled-tasks` queue (pending jobs only — completed one-off jobs are not returned).
+
+Response: `200` — array of scheduled task objects.
+
+**Get a scheduled task**
+```
+GET /api/scheduled-tasks/:id
+```
+Responses: `200` — scheduled task object. `404` — not found.
+
+**Delete a scheduled task**
+```
+DELETE /api/scheduled-tasks/:id
+```
+Cancels and removes the scheduled job from the queue. For recurring jobs this stops all future executions.
+
+Responses: `204` — deleted. `404` — not found.
+
+Scheduled task object shape (returned by all read endpoints):
+```json
+{
+  "id": "rq-job-id",
+  "task_type": "recipe-research",
+  "input": { "query": "spaghetti carbonara", "household_id": "..." },
+  "run_at": "2026-04-01T09:00:00Z",
+  "cron": null,
+  "created_at": "2026-03-24T10:00:00Z"
+}
+```
 
 ### Queue
 The queue represents the work pending to be done by the agent. The agent reads from the queue and consumes tasks sequentially (concurrency exactly 1). Each task consumed from the queue is considered "an agent run".
@@ -149,7 +249,31 @@ class ReplyContext(BaseModel):
     platform: Literal["telegram"]
     chat_id: str
     user_id: str
+
+class RecipeIngredient(BaseModel):
+    food_name: str            # human-readable name, e.g. "Huevo" — resolved to foodId by recipe-load
+    unit_name: str | None     # human-readable unit, e.g. "kilogramo" — resolved to unitId by recipe-load
+    quantity: float | None
+    note: str | None
+
+class RecipeStep(BaseModel):
+    body: str                 # instruction text
+    title: str | None         # optional step heading
+
+class RecipeData(BaseModel):
+    name: str
+    description: str | None
+    servings_qty: int | None
+    servings_unit: str | None  # e.g. "porciones"
+    prep_time: int | None      # minutes
+    cook_time: int | None      # minutes
+    total_time: int | None     # minutes
+    source_url: str | None     # original recipe URL if found
+    ingredients: list[RecipeIngredient]
+    steps: list[RecipeStep]
 ```
+
+> `RecipeData` uses human-readable food and unit names because the recipe-research agent has no access to household-manager IDs. The recipe-load agent is responsible for resolving names to `foodId` / `unitId` via `GET /api/foods?name=` and `GET /api/units?name=` before calling `POST /api/recipes`.
 
 **handle-incoming-message**
 ```python
@@ -251,12 +375,12 @@ Tools are loaded into the agent context based on what the specific task type req
 Tools are written in a composable manner so that different sets can be loaded for different agent runs. When a tool call raises an error, the agent can recover by understanding the mistake and retrying with different parameters or a different tool.
 
 The following tools are essential for phase 1:
-- **household-manager-api**: calls the household-manager API, handling authentication and error codes on behalf of the agent.
+- **household-manager-api**: calls the household-manager API, handling authentication and error codes on behalf of the agent. The tool reads the API key from an environment variable and injects it as an `Authorization: Bearer <token>` header on every request. The agent has no awareness of authentication. A `401` or `403` response is unrecoverable and must raise a hard error — these are not passed back to the agent. For phase 1, a single shared API key is used; per-household keys are out of scope.
 - **read-skill**: loads a skill sub-file from `robotina/agent/skills/...`.
 - **web-search**: searches the internet via the Tavily API.
 - **scheduler**: allows the agent to CRUD scheduled jobs.
 - **queue**: allows the agent to enqueue follow-up tasks (e.g. `recipe-research`, `recipe-load`).
-- **notify**: sends a message to the user via the gateway (Telegram).
+- **send-notification**: sends a message to the user via the gateway (Telegram).
 
 #### Skills
 Skills are markdown files containing precise instructions for solving particular tasks. Each skill exposes an `index_content` property (its main file) which is pre-loaded into the agent context. Sub-files are loaded on demand via the `read-skill` tool.
@@ -280,25 +404,24 @@ From the get go support for the following providers:
 - All actions performed by the agent are logged (llm start streaming, tool calls...)
 - Debug log level can be enabled for each module independently (gateway, scheduler, queue, agent, LLM)
 - Agents are implemented using Langchain.
-- Agents should be carefully instrumented using LangWatch
-- each agent or agentic workflow should have a langwatch experiment associated with it
+- Agents should be carefully instrumented using LangWatch using OpenTelemetry. Traces are sent directly to LangWatch (no external collector). The LangWatch endpoint and API key are read from environment variables. The same instrumentation used in production must be active during experiment runs so that experiment traces appear correctly in LangWatch alongside their associated experiment collection.
+- One LangWatch experiment per task type is required, excluding `handle-incoming-message`. Phase 1 experiments: `recipe-research`, `recipe-load`, `send-notification`.
+- Each experiment is a standalone Python script runnable manually. Results are inspected via the LangWatch UI. A printed report is a nice-to-have.
+- Experiment inputs are hardcoded in the script (e.g. a list of recipe name strings for `recipe-research`). Inputs should be few but representative enough to surface quality issues in the skill.
+- Prompt version and model config are pinned per experiment run by attaching tags or metadata fields to the LangWatch experiment collection entry.
+- Each experiment defines its own evaluation criteria. Evaluation criteria are TBD and will be designed as part of the planning phase for each individual skill — designing the experiment is a required deliverable when planning the development of a skill.
+- The decision of which LangWatch instance (project, endpoint) an experiment writes to is left to the developer running it, controlled entirely via environment variables.
 
 ## Draft Project Structure:
 ```
 robotina/
 ├── plans/
 │   └── 01-kickoff/
-├── agent-workspace/
-|   └── memories/
-|       ├── household.md
-|       ├── food-preferences.md
-|       ├── meal-plan-preferences.md
-|       └── household-members.md
 ├── src/
 |   ├── llm/
 |   ├── agent/
 |   |   ├── agent.py
-|   |   ├── agents.json
+|   |   ├── agents.py
 |   |   ├── prompts/
 |   |   |    ├── robotina
 |   |   |    |   ├── V001.txt
@@ -320,9 +443,7 @@ robotina/
 |   ├── gateway/
 |   └── scheduler/
 ├── experiments/
-|   └── one experiment per skill/...
-├── scenarios/
-|   └── multiple scenarios per prompt/...
+|   └── one experiment per task type/...
 ├── tests/
 |   └── ...
 ├── README.md
