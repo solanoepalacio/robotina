@@ -95,29 +95,23 @@ Comprised of the following components:
 The gateway centralises messages incoming from different messaging platforms, abstracting away from the agent the details of communication handling. On the first iteration, only Telegram will be integrated via a Telegram bot.
 When a message arrives, the gateway does not trigger the agent directly. Instead it:
 1. Fetches the last X messages from the conversation history (X is configurable via env var)
-2. Enqueues a handle-incoming-message task with the following input:
-```python
-class IncomingMessageInput(BaseModel):
-    message_id: str               # platform-assigned ID, used for deduplication
-    platform: Literal["telegram"]
-    received_at: datetime         # when the gateway received the message
-    chat_id: str                  # platform chat/thread identifier
-    user_id: str                  # platform user identifier
-    text: str                     # raw message text
-    history: list[Message]        # last X messages, ordered oldest to newest
-
-class Message(BaseModel):
-    message_id: str
-    role: Literal["user", "assistant"]
-    text: str
-    sent_at: datetime
-```
+2. Enqueues a `handle-incoming-message` task (see Queue section for the input type)
 
 ### Scheduler
-A standalone scheduling service capable of producing tasks. When a schedule tasks run it doesn't invoke the agent process directly, instead it writes to the agent-task-queue.
+A standalone scheduling service capable of producing tasks. When a scheduled task fires it does not invoke the agent process directly — instead it writes to the agent-task-queue.
 Tasks can be added to the scheduler in two ways:
-- Agent can add scheduled tasks using a tool
-- Other clients may add scheduled tasks using an api
+- The agent can add scheduled tasks using the `scheduler` tool
+- Other clients may add scheduled tasks using an API
+
+Scheduled task input types extend the corresponding queue task input types with a `cron` field:
+```python
+class ScheduledRecipeResearchInput(RecipeResearchInput):
+    cron: str   # standard cron expression, e.g. "0 9 * * 1"
+
+class ScheduledRecipeLoadInput(RecipeLoadInput):
+    cron: str
+```
+When a scheduled task fires, the scheduler strips the `cron` field and enqueues the base input type.
 
 ### Queue
 The queue represents the work pending to be done by the agent. The agent reads from the queue and consumes tasks sequentially (concurrency exactly 1). Each task consumed from the queue is considered "an agent run".
@@ -140,6 +134,73 @@ Each task is an RQ job with the following properties:
 Failed jobs are moved automatically by RQ to a failed job registry. This serves as the dead letter queue — failed jobs are retained with their exception info and can be inspected or re-queued by application maintainers. This is separate from the main task queue concern.          
 
 The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
+
+#### Task Types
+
+Shared models:
+```python
+class Message(BaseModel):
+    message_id: str
+    role: Literal["user", "assistant"]
+    text: str
+    sent_at: datetime
+
+class ReplyContext(BaseModel):
+    platform: Literal["telegram"]
+    chat_id: str
+    user_id: str
+```
+
+**handle-incoming-message**
+```python
+class IncomingMessageInput(BaseModel):
+    message_id: str               # platform-assigned ID, used for deduplication
+    platform: Literal["telegram"]
+    received_at: datetime         # when the gateway received the message
+    chat_id: str                  # platform chat/thread identifier
+    user_id: str                  # platform user identifier
+    text: str                     # raw message text
+    history: list[Message]        # last X messages, ordered oldest to newest
+
+class IncomingMessageOutput(BaseModel):
+    action: Literal["replied", "queued_tasks", "no_action"]
+    queued_task_ids: list[str]
+```
+
+**recipe-research**
+```python
+class RecipeResearchInput(BaseModel):
+    query: str                    # e.g. "spaghetti carbonara"
+    household_id: str
+    reply_context: ReplyContext   # forwarded through the chain for final notification
+
+class RecipeResearchOutput(BaseModel):
+    recipe: RecipeData            # structured recipe (name, ingredients, steps, etc.)
+```
+
+**recipe-load**
+```python
+class RecipeLoadInput(BaseModel):
+    recipe: RecipeData
+    household_id: str
+    reply_context: ReplyContext
+
+class RecipeLoadOutput(BaseModel):
+    recipe_id: str
+    recipe_name: str
+```
+
+**send-notification**
+```python
+class SendNotificationInput(BaseModel):
+    platform: Literal["telegram"]
+    chat_id: str
+    user_id: str
+    text: str
+
+class SendNotificationOutput(BaseModel):
+    message_id: str               # platform-assigned ID
+```
 
 ### Agent
 
