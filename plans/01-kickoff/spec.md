@@ -92,12 +92,10 @@ Comprised of the following components:
 - [Components Diagram](./components.png)
 
 ### Gateway
-The gateway centralises messages incoming from different messaging platforms, abstracting away from the agent the details of         
-communication handling. On the first iteration, only Telegram will be integrated via a Telegram bot.                                 
-                                                                                                                                    
-When a message arrives, the gateway does not trigger the agent directly. Instead it:                                                 
+The gateway centralises messages incoming from different messaging platforms, abstracting away from the agent the details of communication handling. On the first iteration, only Telegram will be integrated via a Telegram bot.
+When a message arrives, the gateway does not trigger the agent directly. Instead it:
 1. Fetches the last X messages from the conversation history (X is configurable via env var)
-2. Enqueues a handle-incoming-message task with the following input:                                                                 
+2. Enqueues a handle-incoming-message task with the following input:
 ```python
 class IncomingMessageInput(BaseModel):
     message_id: str               # platform-assigned ID, used for deduplication
@@ -144,65 +142,63 @@ Failed jobs are moved automatically by RQ to a failed job registry. This serves 
 The result_ttl and failure_ttl for all jobs should be set to infinite (-1)
 
 ### Agent
+
 Every time a task is taken from the queue, an agent is spawned to process it. We call the process consuming the queue and spawning the agent "task-runner".
-The task runner acts like a wrapper around the agent run and is in charge of updating the task status, result status and output.
-Task runner is also responsible for catching errors from the agent and handle them. Errors can be handled by creating a new task in the queue or by sending them to a dead letter queue for developer inspection.
-Before spawning the agent the task runner uses the information on the files `agents.json` to determine, based on the task type, the following:
-- what LLM provider and model will be used for the agent
-- what system prompt and context is injected to the agent
+
+The task runner acts as a wrapper around the agent run and is responsible for updating the task status, result status, and output. When an agent run fails, the task is sent to RQ's failed job registry (the dead letter queue) for developer inspection.
+
+Before spawning the agent, the task runner uses `agents.py` to determine, based on the task type:
+- what LLM provider and model will be used
+- what system prompt is injected
 - what tools are given to the agent
 - what skills are loaded into the agent
-- what prompt the agent gets
-The values for each of these is configured by the developer using a json file (`agents.json`) that could look like (values are exemples, not exhaustive):
-```json
+
+`agents.py` holds the authoritative agent configurations as Python objects, with direct references to tool and skill implementations:
+```python
 [
     {
         "type": "research-recipe",
         "model": { "baseUrl": "", "apiToken": "", "model": "" },
-        "prompt": "./research-recipe/v002.txt",
-        "tools": ["web-search", "household-manager-api"],
-        "skills": ["household-manager", "research-recipe""]
+        "prompt": "./prompts/research-recipe/v002.md",
+        "tools": [web_search, household_manager_api],
+        "skills": [household_manager_skill, recipe_research_skill]
     }
 ]
 ```
-The agent of the above example would be able to handle a "research-recipe" type task, using as system-prompt the text file at `robotina/src/agent/prompts/research-recipe/v002.txt`.
 
-The developer must have the ability to override the file the configuration is taking from by passing in a `AGENTS_DEFINITION_FILEPATH` environment variable. This feature will be crucial for experimentation, evaluation and scenarios simulation.
+The developer can provide a JSON override file by setting the `AGENTS_DEFINITION_FILEPATH` environment variable. This file specifies only the fields to override (e.g. model, prompt path) and is merged on top of the base configuration from `agents.py`. Prompt files are loaded from disk after the merge is applied, with paths resolved relative to the project root. This mechanism supports prompt experimentation, evaluation, and quick rollback if performance degradation is detected after release.
 
+#### LLM Backend
+The LLM backend configuration for any task must include full connection details (url, model, token). Two different agent runs may connect to different LLM instances, so provider-level configuration alone is insufficient.
 
-#### LLM Backend:
-The LLM backend configuration of any task should comprise the full connection details (two different agents runs may connect to different ollama instances, so simply configuring "ollama" is not enough. Connection configuration needs to contain connection url, model, token, etc.)
+#### Context & System Prompt
+Since tasks are broken into their smallest possible form, each system prompt is crafted with one specific goal: solve its associated task type.
 
-#### Context & System prompt:
-Since the system breaks tasks into their smallest possible form, system prompts are crafted with one specific goal in mind: solve the task type they are associated with.
+Prompts are written in markdown, versioned, and old versions are kept for history and analysis.
 
-Prompts are versioned and old versions are kept around for history and analysis.
+Each skill configured for a task exposes an `index_content` property — a string containing the skill's main file, which includes a brief description and an index of sub-files. This index content is pre-loaded into the agent context at startup. The agent can load individual sub-files at runtime using the `read-skill` tool, avoiding unnecessary context bloat.
 
-The fact that the system prompt is configured in `AGENTS_DEFINITION_FILEPATH` per task can be used to evaluate and iterate on the prompts and for quick regression in case degradation on the agent performance is detected after release.
+Tools are loaded into the agent context based on what the specific task type requires.
 
-When a skill is needed for a certain task the skill index it will be pre-loaded into the agent context.
+#### Tools
+Tools are written in a composable manner so that different sets can be loaded for different agent runs. When a tool call raises an error, the agent can recover by understanding the mistake and retrying with different parameters or a different tool.
 
-For closed end tasks that can be solved with specific instructions the system prompt may make a direct mention of a skill the agent should use.
+The following tools are essential for phase 1:
+- **household-manager-api**: calls the household-manager API, handling authentication and error codes on behalf of the agent.
+- **read-skill**: loads a skill sub-file from `robotina/agent/skills/...`.
+- **web-search**: searches the internet via the Tavily API.
+- **scheduler**: allows the agent to CRUD scheduled jobs.
+- **queue**: allows the agent to enqueue follow-up tasks (e.g. `recipe-research`, `recipe-load`).
+- **notify**: sends a message to the user via the gateway (Telegram).
 
-Tools are also loaded into the agent context based on the specific tools the agent will need to perform a certain task.
+#### Skills
+Skills are markdown files containing precise instructions for solving particular tasks. Each skill exposes an `index_content` property (its main file) which is pre-loaded into the agent context. Sub-files are loaded on demand via the `read-skill` tool.
 
-#### Tools:
-Tools should be written in a composable manner such that different sets of tools can be loaded into different agent runs.
-When the agent calls a tool that throws an error the agent can recover from the error by understanding the mistake and trying again with new parameters or even different tools.
-
-The following tools will be essential for phase 1:
-- household-manager api: a tool that the agent can use to call the recipe-manager api. It must handle authentication and error codes on behalf of the agent.
-- read-skill: Allos the agent can use to read skills. Reads from `robotina/agent/skills/...`.
-- web-search: Allows the agent to search the internet using Tavily api.
-- scheduler: Allows the agent to CRUD scheduled jobs.
-
-#### Skills:
-Skills are markdown files that contain precise instructions to solve particular tasks.
-For example:
-- recipe-research: contains details instructions on how to search for a recipe on multiple internet sites and summarize the information from all sites
-- format-message: contains details of how to structure and format a message for proper formatting on telegram.
-
-One particularly relevant skill for this project is the "household-manager" skill, which tells the agent how to interact with the backend of the household-manager application to CRUD household information on behalf of the user. This skill is already implemented on `robotina/agent/skills/household-manager/*`. Based on requirements we must make some changes around how authentication is handled (should be handled by the tool and not by the agent).
+Phase 1 skills:
+- **recipe-research**: detailed instructions for searching multiple sites and summarizing recipe information.
+- **recipe-load**: instructions for loading a researched recipe into the household-manager backend.
+- **format-telegram-message**: instructions for structuring and formatting messages for Telegram.
+- **household-manager**: instructions for interacting with the household-manager backend API to CRUD household data on behalf of the user. Authentication is handled by the `household-manager-api` tool, not by the agent. This skill is already implemented at `robotina/agent/skills/household-manager/*`.
 
 ### LLM
 LLM module is a protocol abstracting the connection to LLM backends to allow the agents to easily swap between different module providers.
