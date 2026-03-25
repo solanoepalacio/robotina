@@ -54,7 +54,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — SQLAlchemy models (Conversation, StoredMessage, WorkflowRun, WorkflowRunStep), db.py Base, Alembic migration 0002
+- [x] 02-01-PLAN.md — SQLAlchemy models (Conversation, StoredMessage, WorkflowRun, WorkflowRunStep), db.py Base, Alembic migration 0002
 - [ ] 02-02-PLAN.md — Pydantic v2 task I/O models (all 8 Input/Output classes) in task_types.py
 - [ ] 02-03-PLAN.md — LoggingWorker refactor, pyproject.toml markers, RQ integration tests
 

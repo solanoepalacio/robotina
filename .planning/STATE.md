@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-25T20:26:17.417Z"
+status: Ready to execute
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-25T20:53:57.684Z"
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 01 — developer-tooling-and-infrastructure
+**Current focus:** Phase 02 — database-models-and-queue-layer
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (database-models-and-queue-layer) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: Not started
 | Phase 01-developer-tooling-and-infrastructure P01 | 3 | 1 tasks | 1 files |
 | Phase 01-developer-tooling-and-infrastructure P02 | 2 | 2 tasks | 16 files |
 | Phase 01-developer-tooling-and-infrastructure P03 | 2 | 2 tasks | 7 files |
+| Phase 02-database-models-and-queue-layer P01 | 5 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 01-developer-tooling-and-infrastructure]: Alembic env.py fully replaced to add sys.path injection and DATABASE_URL override before config loading
 - [Phase 01-developer-tooling-and-infrastructure]: Queue name is agent-tasks — all downstream phases must enqueue to this exact name
 - [Phase 01-developer-tooling-and-infrastructure]: All RQ jobs must use result_ttl=-1 and failure_ttl=-1 per CLAUDE.md no-lost-tasks requirement
+- [Phase 02-database-models-and-queue-layer]: Use postgresql.ENUM(create_type=False) in op.create_table — generic sa.Enum fires _on_table_create despite create_type=False in SQLAlchemy 2.0.48
+- [Phase 02-database-models-and-queue-layer]: PostgreSQL 15 idempotent ENUM creation requires DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = ...) pattern; CREATE TYPE IF NOT EXISTS is not supported
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:26:17.415Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-database-models-and-queue-layer/02-CONTEXT.md
+Last session: 2026-03-25T20:53:57.682Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
