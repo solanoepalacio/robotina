@@ -55,7 +55,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — SQLAlchemy models (Conversation, StoredMessage, WorkflowRun, WorkflowRunStep), db.py Base, Alembic migration 0002
-- [ ] 02-02-PLAN.md — Pydantic v2 task I/O models (all 8 Input/Output classes) in task_types.py
+- [x] 02-02-PLAN.md — Pydantic v2 task I/O models (all 8 Input/Output classes) in task_types.py
 - [ ] 02-03-PLAN.md — LoggingWorker refactor, pyproject.toml markers, RQ integration tests
 
 ### Phase 3: Gateway
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
-| 2. Database Models and Queue Layer | 0/3 | Not started | - |
+| 2. Database Models and Queue Layer | 2/3 | In Progress|  |
 | 3. Gateway | 0/TBD | Not started | - |
 | 4. LLM Module and Agent Infrastructure | 0/TBD | Not started | - |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |

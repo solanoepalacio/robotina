@@ -27,9 +27,9 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Queue
 
-- [ ] **QUEUE-01**: Redis is configured with AOF persistence (`appendfsync always`) — no tasks lost on crash/reboot
+- [x] **QUEUE-01**: Redis is configured with AOF persistence (`appendfsync always`) — no tasks lost on crash/reboot
 - [ ] **QUEUE-02**: Task runner processes jobs sequentially with exactly one worker (concurrency = 1)
-- [ ] **QUEUE-03**: All task inputs and outputs are strongly-typed Pydantic v2 models (`IncomingMessageInput/Output`, `RecipeResearchInput/Output`, `RecipeLoadInput/Output`, `SendNotificationInput/Output`)
+- [x] **QUEUE-03**: All task inputs and outputs are strongly-typed Pydantic v2 models (`IncomingMessageInput/Output`, `RecipeResearchInput/Output`, `RecipeLoadInput/Output`, `SendNotificationInput/Output`)
 - [ ] **QUEUE-04**: All jobs have `result_ttl = -1` and `failure_ttl = -1` (infinite retention)
 - [ ] **QUEUE-05**: Failed jobs are retained in RQ's built-in failed job registry (dead-letter queue)
 - [ ] **QUEUE-06**: Agent can enqueue follow-up tasks at normal priority (back of queue) or urgent priority (front of queue)
@@ -37,7 +37,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Workflow Engine
 
-- [ ] **WF-01**: `WorkflowRun` and `WorkflowRunStep` SQLAlchemy 2.x models exist in Postgres with Alembic migration
+- [x] **WF-01**: `WorkflowRun` and `WorkflowRunStep` SQLAlchemy 2.x models exist in Postgres with Alembic migration
 - [ ] **WF-02**: `workflows.py` defines a `WorkflowDefinition` registry with `WorkflowStepDef` entries and `build_input` callables
 - [ ] **WF-03**: The `add-recipe` workflow is registered with three steps: `research` → `load` → `notify`
 - [ ] **WF-04**: `start-workflow` tool creates a `WorkflowRun` + all `WorkflowRunStep` records (status `PENDING`), enqueues the first step, and returns `workflow_run_id`
@@ -145,14 +145,14 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | INFRA-04 | Phase 1 | Complete |
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
-| QUEUE-01 | Phase 2 | Pending |
+| QUEUE-01 | Phase 2 | Complete |
 | QUEUE-02 | Phase 2 | Pending |
-| QUEUE-03 | Phase 2 | Pending |
+| QUEUE-03 | Phase 2 | Complete |
 | QUEUE-04 | Phase 2 | Pending |
 | QUEUE-05 | Phase 2 | Pending |
 | QUEUE-06 | Phase 2 | Pending |
 | QUEUE-07 | Phase 2 | Pending |
-| WF-01 | Phase 2 | Pending |
+| WF-01 | Phase 2 | Complete |
 | GW-01 | Phase 3 | Pending |
 | GW-02 | Phase 3 | Pending |
 | GW-03 | Phase 3 | Pending |
