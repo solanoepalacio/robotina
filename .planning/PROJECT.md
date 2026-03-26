@@ -19,7 +19,7 @@ Families can delegate household tasks to Robotina in natural language and trust 
 - [x] Gateway: Telegram bot receives messages, persists conversations, enqueues `handle-incoming-message` tasks — Validated in Phase 3: gateway
 - [x] Queue: Redis + RQ task queue with sequential worker (concurrency = 1), all task input/output Pydantic models — Validated in Phase 2: Database Models and Queue Layer
 - [x] Workflow infrastructure: `WorkflowRun` / `WorkflowRunStep` Postgres models — Validated in Phase 2: Database Models and Queue Layer (registry + task-runner hook pending Phase 5)
-- [ ] Workflow registry + task-runner advancement hook + `start-workflow` tool
+- [x] Workflow registry + task-runner advancement hook + `start-workflow` tool — Validated in Phase 5: task-runner-and-workflow-engine
 - [x] Agent infrastructure: LLM module + adapters (Ollama, Anthropic, OpenAI), `agents.py` scaffold, skill loading, prompt versioning, LangWatch + OTel instrumentation — Validated in Phase 4: llm-module-and-agent-infrastructure
 - [ ] Notification agent (`send-notification`): format-telegram-message skill, prompt, tool, experiment
 - [ ] Robotina agent (`handle-incoming-message`): household-manager skill (auth update), prompt, tools (household-manager-api, queue, start-workflow)
@@ -81,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after Phase 4 completion (llm-module-and-agent-infrastructure)*
+*Last updated: 2026-03-26 after Phase 5 completion (task-runner-and-workflow-engine)*
