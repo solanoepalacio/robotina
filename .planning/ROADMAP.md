@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Developer Tooling and Infrastructure** - Docker Compose, uv project, Alembic, and dev shortcuts are fully operational (completed 2026-03-25)
 - [x] **Phase 2: Database Models and Queue Layer** - All SQLAlchemy models, Alembic migrations, Pydantic task I/O models, and RQ basics in place (completed 2026-03-25)
 - [x] **Phase 3: Gateway** - Telegram bot receives, deduplicates, persists messages, and enqueues tasks (completed 2026-03-25)
-- [ ] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation
+- [x] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation (completed 2026-03-26)
 - [ ] **Phase 5: Task Runner and Workflow Engine** - Sequential RQ worker with workflow state transitions, artifact persistence, and next-step advancement
 - [ ] **Phase 6: send-notification Agent** - Notification agent formats and delivers Telegram messages with LangWatch traces verified
 - [ ] **Phase 7: handle-incoming-message Agent** - Robotina routing agent handles direct replies and initiates multi-step workflows end-to-end
@@ -94,7 +94,7 @@ Plans:
 - [x] 04-03-PLAN.md — agents.py registry: AgentConfig dataclass, AGENT_REGISTRY, get_agent_config(), configure_logging()
 - [x] 04-04-PLAN.md — run_task() universal job function + AgentLoggingHandler + runner.py LangWatch init
 - [x] 04-05-PLAN.md — SkillSet + ReadSkillTool + household-manager skill relocation to canonical path
-- [ ] 04-06-PLAN.md — hello-world prompt file + full unit suite verification + manual end-to-end checkpoint
+- [x] 04-06-PLAN.md — hello-world prompt file + full unit suite verification + manual end-to-end checkpoint
 
 ### Phase 5: Task Runner and Workflow Engine
 **Goal**: The sequential task runner correctly orchestrates workflow state — marking steps running, persisting artifacts, advancing to the next step, and propagating failures — before any real agent runs through it
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Developer Tooling and Infrastructure | 3/3 | Complete    | 2026-03-25 |
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
 | 3. Gateway | 3/3 | Complete   | 2026-03-25 |
-| 4. LLM Module and Agent Infrastructure | 5/6 | In Progress|  |
+| 4. LLM Module and Agent Infrastructure | 6/6 | Complete   | 2026-03-26 |
 | 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |
 | 7. handle-incoming-message Agent | 0/TBD | Not started | - |
