@@ -103,6 +103,14 @@ None - no external service configuration required.
 - `configure_logging()` ready for Plan 04-04 to call in runner.main()
 - `AGENT_OVERRIDES_FILEPATH` hot-reload fully functional for experiment workflows in later plans
 
+## Self-Check: PASSED
+
+- FOUND: src/robotina/agent/agents.py
+- FOUND: tests/unit/test_agents_registry.py
+- FOUND: .planning/phases/04-llm-module-and-agent-infrastructure/04-03-SUMMARY.md
+- FOUND: commit 9fdc0c5 (feat)
+- FOUND: commit 6a585fb (docs)
+
 ---
 *Phase: 04-llm-module-and-agent-infrastructure*
 *Completed: 2026-03-25*
