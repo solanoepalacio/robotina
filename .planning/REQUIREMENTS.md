@@ -38,14 +38,14 @@ Requirements for the initial milestone. All map to roadmap phases.
 ### Workflow Engine
 
 - [x] **WF-01**: `WorkflowRun` and `WorkflowRunStep` SQLAlchemy 2.x models exist in Postgres with Alembic migration
-- [ ] **WF-02**: `workflows.py` defines a `WorkflowDefinition` registry with `WorkflowStepDef` entries and `build_input` callables
-- [ ] **WF-03**: The `add-recipe` workflow is registered with three steps: `research` → `load` → `notify`
-- [ ] **WF-04**: `start-workflow` tool creates a `WorkflowRun` + all `WorkflowRunStep` records (status `PENDING`), enqueues the first step, and returns `workflow_run_id`
-- [ ] **WF-05**: Task runner marks a `WorkflowRunStep` as `RUNNING` when its job starts processing
-- [ ] **WF-06**: On step completion, task runner writes output to `WorkflowRunStep.artifact`, builds `accumulated_artifacts`, and enqueues the next `PENDING` step
-- [ ] **WF-07**: On final step completion, task runner marks the `WorkflowRun` as `DONE`
-- [ ] **WF-08**: On step failure, task runner marks the step `FAILED`, cancels all remaining `PENDING` steps, and marks the `WorkflowRun` `FAILED`
-- [ ] **WF-09**: `reply_context` is stored in `WorkflowRun.shared_context` and never appears in intermediate task inputs (`RecipeResearchInput`, `RecipeLoadInput`)
+- [x] **WF-02**: `workflows.py` defines a `WorkflowDefinition` registry with `WorkflowStepDef` entries and `build_input` callables
+- [x] **WF-03**: The `add-recipe` workflow is registered with three steps: `research` → `load` → `notify`
+- [x] **WF-04**: `start-workflow` tool creates a `WorkflowRun` + all `WorkflowRunStep` records (status `PENDING`), enqueues the first step, and returns `workflow_run_id`
+- [x] **WF-05**: Task runner marks a `WorkflowRunStep` as `RUNNING` when its job starts processing
+- [x] **WF-06**: On step completion, task runner writes output to `WorkflowRunStep.artifact`, builds `accumulated_artifacts`, and enqueues the next `PENDING` step
+- [x] **WF-07**: On final step completion, task runner marks the `WorkflowRun` as `DONE`
+- [x] **WF-08**: On step failure, task runner marks the step `FAILED`, cancels all remaining `PENDING` steps, and marks the `WorkflowRun` `FAILED`
+- [x] **WF-09**: `reply_context` is stored in `WorkflowRun.shared_context` and never appears in intermediate task inputs (`RecipeResearchInput`, `RecipeLoadInput`)
 
 ### Agent Infrastructure
 
@@ -172,14 +172,14 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | AGENT-11 | Phase 4 | Complete |
 | OBS-01 | Phase 4 | Complete |
 | OBS-02 | Phase 4 | Complete |
-| WF-02 | Phase 5 | Pending |
-| WF-03 | Phase 5 | Pending |
-| WF-04 | Phase 5 | Pending |
-| WF-05 | Phase 5 | Pending |
-| WF-06 | Phase 5 | Pending |
-| WF-07 | Phase 5 | Pending |
-| WF-08 | Phase 5 | Pending |
-| WF-09 | Phase 5 | Pending |
+| WF-02 | Phase 5 | Complete |
+| WF-03 | Phase 5 | Complete |
+| WF-04 | Phase 5 | Complete |
+| WF-05 | Phase 5 | Complete |
+| WF-06 | Phase 5 | Complete |
+| WF-07 | Phase 5 | Complete |
+| WF-08 | Phase 5 | Complete |
+| WF-09 | Phase 5 | Complete |
 | NOTIF-01 | Phase 6 | Pending |
 | NOTIF-02 | Phase 6 | Pending |
 | NOTIF-03 | Phase 6 | Pending |
