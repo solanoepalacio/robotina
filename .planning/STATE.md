@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-26T22:10:14.093Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-26T22:15:36.624Z"
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 05 (task-runner-and-workflow-engine) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: 3 of 4
 | Phase 04-llm-module-and-agent-infrastructure P06 | 19h | 3 tasks | 6 files |
 | Phase 05-task-runner-and-workflow-engine P01 | 2min | 2 tasks | 3 files |
 | Phase 05-task-runner-and-workflow-engine P02 | 3min | 1 tasks | 2 files |
+| Phase 05-task-runner-and-workflow-engine P03 | 5min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,7 @@ Recent decisions affecting current work:
 - [Phase 05-task-runner-and-workflow-engine]: Phase 05-01: pytest.skip() stubs for Wave 0 — SKIPPED not FAILED; no module-level imports of not-yet-existing modules; @pytest.mark.integration for tests requiring live services
 - [Phase 05-task-runner-and-workflow-engine]: workflows.py: Pydantic ConfigDict(arbitrary_types_allowed=True) required for Callable fields in WorkflowStepDef and WorkflowDefinition
 - [Phase 05-task-runner-and-workflow-engine]: workflows.py: load step build_input uses RecipeData(**artifacts['research']['recipe']) to reconstruct from JSON-serialized dict
+- [Phase 05-task-runner-and-workflow-engine]: workflow_runner.py: queue injected (not hardcoded) — testable without live Redis; pre-assigned job_id before Postgres commit (D-07); session.flush() before querying DONE steps
 
 ### Pending Todos
 
@@ -125,6 +127,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T22:10:14.091Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-03-26T22:15:36.622Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
