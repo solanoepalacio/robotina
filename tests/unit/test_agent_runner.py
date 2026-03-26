@@ -19,7 +19,12 @@ def test_run_task_reads_task_type_from_job_meta():
     mock_config = MagicMock()
     mock_config.skills = []
     mock_config.tools = []
-    mock_config.model_config = {"provider": "ollama", "url": "http://localhost:11434", "model": "llama3.2", "api_key_env": "TEST_TOKEN"}
+    mock_config.model_config = {
+        "provider": "ollama",
+        "url": "http://localhost:11434",
+        "model": "llama3.2",
+        "api_key_env": "TEST_TOKEN",
+    }
     mock_config.prompt_path = "/tmp/test_prompt.md"
 
     mock_backend = MagicMock()
@@ -27,21 +32,14 @@ def test_run_task_reads_task_type_from_job_meta():
     mock_agent.invoke.return_value = {"messages": []}
     mock_backend.create_agent.return_value = mock_agent
 
-    with patch("rq.get_current_job", return_value=mock_job), \
+    with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
          patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config, \
          patch("robotina.llm.make_backend", return_value=mock_backend), \
-         patch("builtins.open", MagicMock(read_data="system prompt")), \
-         patch("pathlib.Path.read_text", return_value="system prompt"), \
-         patch("robotina.agent.SkillSet", side_effect=Exception("no skills needed")):
-        # Force SkillSet import to fail but ensure no skills are loaded (config.skills = [])
-        with patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config:
-            from robotina.queue.jobs import run_task
-            try:
-                run_task(MagicMock())
-            except Exception:
-                pass  # We only care that get_agent_config was called with the meta task_type
+         patch("pathlib.Path.read_text", return_value="system prompt"):
+        from robotina.queue.jobs import run_task
+        run_task(MagicMock())
 
-        mock_get_config.assert_called_once_with("hello-world")
+    mock_get_config.assert_called_once_with("hello-world")
 
 
 def test_run_task_raises_if_no_task_type_in_meta():
@@ -49,7 +47,7 @@ def test_run_task_raises_if_no_task_type_in_meta():
     mock_job = MagicMock()
     mock_job.meta = {}  # empty meta — no task_type
 
-    with patch("rq.get_current_job", return_value=mock_job):
+    with patch("robotina.queue.jobs.get_current_job", return_value=mock_job):
         from robotina.queue.jobs import run_task
         with pytest.raises(ValueError, match="task_type"):
             run_task(MagicMock())
@@ -62,12 +60,11 @@ def test_backend_instantiated_per_job_not_module_level():
     instantiation. The module is imported with LLM constructors patched to raise
     if called — a module-level call would fail the import itself.
     """
-    import importlib
     import sys
 
     # Remove cached module if already imported
     for mod_name in list(sys.modules.keys()):
-        if "robotina.queue.jobs" in mod_name:
+        if mod_name == "robotina.queue.jobs":
             del sys.modules[mod_name]
 
     called = []
