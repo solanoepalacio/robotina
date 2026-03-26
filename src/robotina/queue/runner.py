@@ -12,6 +12,8 @@ import sys
 
 from rq import Queue, Worker
 
+from robotina.agent.agents import configure_logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,9 +40,38 @@ class LoggingWorker(Worker):
         return success
 
 
+def setup_langwatch() -> None:
+    """Initialize LangWatch + OTel instrumentation. Non-fatal if credentials absent.
+
+    Reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from env vars.
+    If either is missing, logs a warning and returns — allows running locally
+    without a LangWatch account (D-15).
+
+    Called once at process startup in main() before the worker starts.
+    """
+    api_key = os.getenv("LANGWATCH_API_KEY")
+    endpoint_url = os.getenv("LANGWATCH_ENDPOINT")
+    if not api_key or not endpoint_url:
+        logger.warning(
+            "LangWatch credentials not set (LANGWATCH_API_KEY, LANGWATCH_ENDPOINT) "
+            "— traces will not be sent"
+        )
+        return
+    import langwatch
+    from openinference.instrumentation.langchain import LangChainInstrumentor
+    langwatch.setup(
+        api_key=api_key,
+        endpoint_url=endpoint_url,
+        instrumentors=[LangChainInstrumentor()],
+    )
+    logger.info("LangWatch instrumentation initialized (endpoint=%s)", endpoint_url)
+
+
 def main() -> None:
     """Entry point for `uv run agent`. Starts the sequential RQ task runner."""
     try:
+        configure_logging()
+        setup_langwatch()
         from redis import Redis
 
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
