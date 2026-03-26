@@ -52,7 +52,7 @@ def test_start_workflow_tool_creates_all_pending_steps(wf_db_session, redis_conn
     steps = (
         wf_db_session.query(WorkflowRunStep)
         .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.id)
+        .order_by(WorkflowRunStep.step_order)
         .all()
     )
     assert len(steps) == 2
@@ -75,7 +75,7 @@ def test_start_workflow_tool_enqueues_first_step(wf_db_session, redis_conn):
     first_step = (
         wf_db_session.query(WorkflowRunStep)
         .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.id)
+        .order_by(WorkflowRunStep.step_order)
         .first()
     )
     assert first_step.task_job_id is not None

@@ -98,8 +98,9 @@ def run_task(task_input) -> object:
     import os
 
     _session = SessionLocal()
+    _queue_name = job.meta.get("queue_name", "agent-tasks")
     _queue = Queue(
-        "agent-tasks",
+        _queue_name,
         connection=Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379")),
     )
 

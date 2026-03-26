@@ -65,10 +65,11 @@ def start_workflow(
 
     # Create all steps as PENDING
     steps = []
-    for step_def in workflow_def.steps:
+    for order, step_def in enumerate(workflow_def.steps):
         step = WorkflowRunStep(
             workflow_run_id=run.id,
             step_key=step_def.step_key,
+            step_order=order,
             task_type=step_def.task_type,
             status=WorkflowStepStatus.PENDING,
         )
@@ -85,7 +86,7 @@ def start_workflow(
         "robotina.queue.jobs.run_task",
         task_input,
         job_id=first_job_id,
-        meta={"task_type": first_step.task_type},
+        meta={"task_type": first_step.task_type, "queue_name": queue.name},
         result_ttl=-1,
         failure_ttl=-1,
     )
@@ -213,7 +214,7 @@ def on_step_complete(
             WorkflowRunStep.workflow_run_id == step.workflow_run_id,
             WorkflowRunStep.status == WorkflowStepStatus.PENDING,
         )
-        .order_by(WorkflowRunStep.id)  # steps created in order; preserve insertion order
+        .order_by(WorkflowRunStep.step_order)  # deterministic step ordering
         .first()
     )
 
@@ -230,7 +231,7 @@ def on_step_complete(
             "robotina.queue.jobs.run_task",
             task_input,
             job_id=next_job_id,
-            meta={"task_type": next_step.task_type},
+            meta={"task_type": next_step.task_type, "queue_name": queue.name},
             result_ttl=-1,
             failure_ttl=-1,
         )

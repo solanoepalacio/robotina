@@ -289,10 +289,11 @@ def wf_db_session():
 @pytest.mark.integration
 def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     """WF-04 through WF-07: hello-world-2step runs both steps, WorkflowRun ends DONE."""
+    import uuid
     from rq import Queue
     from robotina.queue.runner import LoggingWorker
 
-    queue = Queue("agent-tasks", connection=redis_conn)
+    queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
     shared_context = {"household_id": "test-household", "test_run": True}
 
     # start_workflow creates WorkflowRun + steps + enqueues step1
@@ -309,7 +310,7 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     steps = (
         wf_db_session.query(WorkflowRunStep)
         .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.id)
+        .order_by(WorkflowRunStep.step_order)
         .all()
     )
     assert len(steps) == 2
@@ -320,10 +321,15 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     assert steps[1].status == WorkflowStepStatus.PENDING
     assert steps[1].task_job_id is None
 
-    # Run the worker — processes step1 (calls on_step_complete, enqueues step2)
-    # then processes step2 (calls on_step_complete, marks WorkflowRun DONE)
-    worker = LoggingWorker([queue], connection=redis_conn)
-    worker.work(burst=True)
+    # Run the worker with agent mocked — avoids real LLM calls, tests state transitions only
+    from unittest.mock import MagicMock, patch
+    mock_agent = MagicMock()
+    mock_agent.invoke.return_value = {"messages": [], "result": "ok"}
+    mock_backend = MagicMock()
+    mock_backend.create_agent.return_value = mock_agent
+    with patch("robotina.llm.make_backend", return_value=mock_backend):
+        worker = LoggingWorker([queue], connection=redis_conn)
+        worker.work(burst=True)
 
     # Refresh session to see committed state
     wf_db_session.expire_all()
@@ -331,7 +337,7 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     steps_after = (
         wf_db_session.query(WorkflowRunStep)
         .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.id)
+        .order_by(WorkflowRunStep.step_order)
         .all()
     )
     assert steps_after[0].status == WorkflowStepStatus.DONE
@@ -346,11 +352,12 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
 @pytest.mark.integration
 def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
     """WF-08: step1 failure marks step1 FAILED, step2 CANCELLED, WorkflowRun FAILED."""
+    import uuid
     from unittest.mock import patch
     from rq import Queue
     from robotina.queue.runner import LoggingWorker
 
-    queue = Queue("agent-tasks", connection=redis_conn)
+    queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
     shared_context = {"household_id": "test-household", "test_run": True}
 
     run_id = start_workflow(
@@ -362,7 +369,7 @@ def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
     )
 
     # Make get_agent_config raise so the agent execution fails
-    with patch("robotina.queue.jobs.get_agent_config", side_effect=RuntimeError("forced failure")):
+    with patch("robotina.agent.agents.get_agent_config", side_effect=RuntimeError("forced failure")):
         worker = LoggingWorker([queue], connection=redis_conn)
         worker.work(burst=True)
 
@@ -371,7 +378,7 @@ def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
     steps_after = (
         wf_db_session.query(WorkflowRunStep)
         .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.id)
+        .order_by(WorkflowRunStep.step_order)
         .all()
     )
 
