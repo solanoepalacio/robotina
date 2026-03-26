@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Checkpoint 04-06 task 3 - awaiting human verify
-last_updated: "2026-03-26T00:11:17.853Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 04-06-PLAN.md — Phase 4 fully complete
+last_updated: "2026-03-26T19:35:33.482Z"
 progress:
   total_phases: 9
   completed_phases: 4
@@ -61,6 +61,7 @@ Plan: 6 of 6
 | Phase 04-llm-module-and-agent-infrastructure P05 | 2 | 2 tasks | 10 files |
 | Phase 04-llm-module-and-agent-infrastructure P04 | 20 | 2 tasks | 4 files |
 | Phase 04-llm-module-and-agent-infrastructure P06 | 2 | 2 tasks | 2 files |
+| Phase 04-llm-module-and-agent-infrastructure P06 | 19h | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - [Phase 04-llm-module-and-agent-infrastructure]: ReadSkillTool inherits BaseTool (not @tool) — needs skill_dirs instance state that @tool cannot hold
 - [Phase 04-llm-module-and-agent-infrastructure]: Lazy import SkillSet and build_read_skill_tool inside run_task() to allow Plan 04 to run before Plan 05 is complete
 - [Phase 04-llm-module-and-agent-infrastructure]: Patch rq.get_current_job at robotina.queue.jobs.get_current_job — from-import creates module-local binding that must be patched at its new location
+- [Phase 04-llm-module-and-agent-infrastructure]: LangWatch must be initialized in work-horse subprocess (perform_job), not main process — BatchSpanProcessor thread dies on fork causing silent trace drops
+- [Phase 04-llm-module-and-agent-infrastructure]: LangChainInstrumentor dropped; explicit LangChainTracer callback passed via RunnableConfig to agent.invoke() — per LangWatch 0.17.0 recommended pattern
+- [Phase 04-llm-module-and-agent-infrastructure]: on_chat_model_start used in AgentLoggingHandler (not on_llm_start) — LangChain routes chat model events to on_chat_model_start
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T00:11:10.427Z
-Stopped at: Checkpoint 04-06 task 3 - awaiting human verify
+Last session: 2026-03-26T19:35:33.480Z
+Stopped at: Completed 04-06-PLAN.md — Phase 4 fully complete
 Resume file: None
