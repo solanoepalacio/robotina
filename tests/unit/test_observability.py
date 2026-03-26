@@ -1,21 +1,78 @@
+"""Tests for LangWatch initialization and per-module logging configuration.
+
+Tests verify:
+- OBS-01: setup_langwatch() is non-fatal when credentials are missing
+- OBS-02: setup_langwatch() reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from env
+- AGENT-09: configure_logging() sets log levels per module from env vars
+"""
+import logging
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
-def test_setup_langwatch_nonfatal_when_missing_credentials():
+def test_setup_langwatch_nonfatal_when_missing_credentials(monkeypatch, caplog):
     """OBS-01/OBS-02: setup_langwatch() logs warning and returns when env vars missing."""
-    pytest.skip("not implemented")
+    monkeypatch.delenv("LANGWATCH_API_KEY", raising=False)
+    monkeypatch.delenv("LANGWATCH_ENDPOINT", raising=False)
+
+    from robotina.queue.runner import setup_langwatch
+
+    with caplog.at_level(logging.WARNING, logger="robotina.queue.runner"):
+        # Should NOT raise
+        setup_langwatch()
+
+    messages = [r.message for r in caplog.records]
+    assert any("LangWatch credentials not set" in m for m in messages), \
+        f"Expected warning about missing credentials. Got: {messages}"
 
 
-def test_setup_langwatch_reads_api_key_from_env():
+def test_setup_langwatch_reads_api_key_from_env(monkeypatch):
     """OBS-02: setup_langwatch reads LANGWATCH_API_KEY from env."""
-    pytest.skip("not implemented")
+    monkeypatch.setenv("LANGWATCH_API_KEY", "test-key")
+    monkeypatch.setenv("LANGWATCH_ENDPOINT", "http://test")
+
+    mock_setup = MagicMock()
+    with patch("langwatch.setup", mock_setup):
+        from robotina.queue.runner import setup_langwatch
+        setup_langwatch()
+
+    mock_setup.assert_called_once()
+    call_kwargs = mock_setup.call_args.kwargs
+    assert call_kwargs.get("api_key") == "test-key", \
+        f"Expected api_key='test-key', got: {call_kwargs}"
 
 
-def test_setup_langwatch_reads_endpoint_from_env():
+def test_setup_langwatch_reads_endpoint_from_env(monkeypatch):
     """OBS-02: setup_langwatch reads LANGWATCH_ENDPOINT from env."""
-    pytest.skip("not implemented")
+    monkeypatch.setenv("LANGWATCH_API_KEY", "test-key")
+    monkeypatch.setenv("LANGWATCH_ENDPOINT", "http://test")
+
+    mock_setup = MagicMock()
+    with patch("langwatch.setup", mock_setup):
+        from robotina.queue.runner import setup_langwatch
+        setup_langwatch()
+
+    mock_setup.assert_called_once()
+    call_kwargs = mock_setup.call_args.kwargs
+    assert call_kwargs.get("endpoint_url") == "http://test", \
+        f"Expected endpoint_url='http://test', got: {call_kwargs}"
 
 
-def test_configure_logging_per_module():
+def test_configure_logging_per_module(monkeypatch):
     """AGENT-09: configure_logging() sets log level per module from ROBOTINA_LOG_LEVEL_* env vars."""
-    pytest.skip("not implemented")
+    monkeypatch.setenv("ROBOTINA_LOG_LEVEL_AGENT", "DEBUG")
+
+    # Reset the logger level before test
+    agent_logger = logging.getLogger("robotina.agent")
+    original_level = agent_logger.level
+    agent_logger.setLevel(logging.NOTSET)
+
+    from robotina.agent.agents import configure_logging
+    configure_logging()
+
+    assert logging.getLogger("robotina.agent").level == logging.DEBUG, \
+        f"Expected DEBUG level, got: {logging.getLevelName(logging.getLogger('robotina.agent').level)}"
+
+    # Cleanup
+    agent_logger.setLevel(original_level)
