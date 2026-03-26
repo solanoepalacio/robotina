@@ -84,12 +84,12 @@ def test_backend_instantiated_per_job_not_module_level():
 
 
 def test_agent_logging_handler_on_llm_start(caplog):
-    """AGENT-10: AgentLoggingHandler.on_llm_start logs LLM stream start."""
+    """AGENT-10: AgentLoggingHandler.on_chat_model_start logs LLM stream start."""
     from robotina.queue.jobs import AgentLoggingHandler
 
     handler = AgentLoggingHandler()
     with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
-        handler.on_llm_start({"name": "ChatOllama"}, ["the prompt"])
+        handler.on_chat_model_start({"name": "ChatOllama"}, [[]])
 
     assert any("ChatOllama" in record.message for record in caplog.records), \
         f"Expected 'ChatOllama' in log. Got: {[r.message for r in caplog.records]}"

@@ -57,7 +57,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         model_config={
             "provider": "ollama",
             "url": "http://localhost:11434",
-            "model": "llama3.2",
+            "model": "gpt-oss:20b",
             "api_key_env": "HELLO_WORLD_API_TOKEN",
         },
         prompt_path="src/robotina/agent/prompts/hello-world/V001.md",

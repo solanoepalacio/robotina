@@ -1,8 +1,8 @@
 """Tests for LangWatch initialization and per-module logging configuration.
 
 Tests verify:
-- OBS-01: setup_langwatch() is non-fatal when credentials are missing
-- OBS-02: setup_langwatch() reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from env
+- OBS-01: __setup_langwatch_in_workhorse_in_workhorse() is non-fatal when credentials are missing
+- OBS-02: __setup_langwatch_in_workhorse_in_workhorse() reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from env
 - AGENT-09: configure_logging() sets log levels per module from env vars
 """
 import logging
@@ -11,31 +11,31 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-def test_setup_langwatch_nonfatal_when_missing_credentials(monkeypatch, caplog):
-    """OBS-01/OBS-02: setup_langwatch() logs warning and returns when env vars missing."""
+def test__setup_langwatch_in_workhorse_nonfatal_when_missing_credentials(monkeypatch, caplog):
+    """OBS-01/OBS-02: _setup_langwatch_in_workhorse() logs warning and returns when env vars missing."""
     monkeypatch.delenv("LANGWATCH_API_KEY", raising=False)
     monkeypatch.delenv("LANGWATCH_ENDPOINT", raising=False)
 
-    from robotina.queue.runner import setup_langwatch
+    from robotina.queue.runner import _setup_langwatch_in_workhorse
 
     with caplog.at_level(logging.WARNING, logger="robotina.queue.runner"):
         # Should NOT raise
-        setup_langwatch()
+        _setup_langwatch_in_workhorse()
 
     messages = [r.message for r in caplog.records]
     assert any("LangWatch credentials not set" in m for m in messages), \
         f"Expected warning about missing credentials. Got: {messages}"
 
 
-def test_setup_langwatch_reads_api_key_from_env(monkeypatch):
-    """OBS-02: setup_langwatch reads LANGWATCH_API_KEY from env."""
+def test__setup_langwatch_in_workhorse_reads_api_key_from_env(monkeypatch):
+    """OBS-02: _setup_langwatch_in_workhorse reads LANGWATCH_API_KEY from env."""
     monkeypatch.setenv("LANGWATCH_API_KEY", "test-key")
     monkeypatch.setenv("LANGWATCH_ENDPOINT", "http://test")
 
     mock_setup = MagicMock()
     with patch("langwatch.setup", mock_setup):
-        from robotina.queue.runner import setup_langwatch
-        setup_langwatch()
+        from robotina.queue.runner import _setup_langwatch_in_workhorse
+        _setup_langwatch_in_workhorse()
 
     mock_setup.assert_called_once()
     call_kwargs = mock_setup.call_args.kwargs
@@ -43,15 +43,15 @@ def test_setup_langwatch_reads_api_key_from_env(monkeypatch):
         f"Expected api_key='test-key', got: {call_kwargs}"
 
 
-def test_setup_langwatch_reads_endpoint_from_env(monkeypatch):
-    """OBS-02: setup_langwatch reads LANGWATCH_ENDPOINT from env."""
+def test__setup_langwatch_in_workhorse_reads_endpoint_from_env(monkeypatch):
+    """OBS-02: _setup_langwatch_in_workhorse reads LANGWATCH_ENDPOINT from env."""
     monkeypatch.setenv("LANGWATCH_API_KEY", "test-key")
     monkeypatch.setenv("LANGWATCH_ENDPOINT", "http://test")
 
     mock_setup = MagicMock()
     with patch("langwatch.setup", mock_setup):
-        from robotina.queue.runner import setup_langwatch
-        setup_langwatch()
+        from robotina.queue.runner import _setup_langwatch_in_workhorse
+        _setup_langwatch_in_workhorse()
 
     mock_setup.assert_called_once()
     call_kwargs = mock_setup.call_args.kwargs

@@ -28,7 +28,7 @@ class AgentLoggingHandler(BaseCallbackHandler):
     """LangChain callback handler for structured agent action logging.
 
     Logs three lifecycle events:
-    - LLM stream start (model name)
+    - Chat model start (model name) — on_chat_model_start, not on_llm_start (chat models only)
     - Tool call (tool name + first 200 chars of input)
     - Tool result (first 200 chars of output)
 
@@ -36,7 +36,7 @@ class AgentLoggingHandler(BaseCallbackHandler):
     need to emit their own tool-call log lines.
     """
 
-    def on_llm_start(self, serialized: dict, prompts: list, **kwargs) -> None:
+    def on_chat_model_start(self, serialized: dict, messages: list, **kwargs) -> None:
         logger.info("LLM stream start | model=%s", serialized.get("name"))
 
     def on_tool_start(self, serialized: dict, input_str: str, **kwargs) -> None:
@@ -85,6 +85,7 @@ def run_task(task_input) -> object:
             "run_task: job has no task_type in meta. "
             "Ensure all enqueue() calls set meta={'task_type': '<type>'}."
         )
+    logger.info("Running Task | Type=%s", task_type)
 
     # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
     from robotina.agent.agents import get_agent_config
@@ -108,12 +109,28 @@ def run_task(task_input) -> object:
         prompt_text = prompt_text + "\n\n" + skill_index
 
     # Step 7: Create and invoke agent
+    # @langwatch.trace() creates the parent trace; get_langchain_callback() captures
+    # LangChain events (LLM calls, tool calls) as child spans under that trace.
+    # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
     agent = backend.create_agent(system_prompt=prompt_text, tools=tools)
-    callback_handler = AgentLoggingHandler()
-    result = agent.invoke(
-        {"messages": [{"role": "user", "content": _extract_user_message(task_input)}]},
-        config={"callbacks": [callback_handler]},
-    )
+    user_message = _extract_user_message(task_input)
+
+    try:
+        import langwatch
+        import langwatch.langchain
+        from langchain_core.runnables import RunnableConfig
+        with langwatch.trace():
+            result = agent.invoke(
+                {"messages": [{"role": "user", "content": user_message}]},
+                config=RunnableConfig(
+                    callbacks=[AgentLoggingHandler(), langwatch.langchain.LangChainTracer()]
+                ),
+            )
+    except ImportError:
+        result = agent.invoke(
+            {"messages": [{"role": "user", "content": user_message}]},
+            config={"callbacks": [AgentLoggingHandler()]},
+        )
 
     logger.info("Agent run complete | task_type=%s", task_type)
     return result
