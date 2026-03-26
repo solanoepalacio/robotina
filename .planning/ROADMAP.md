@@ -110,7 +110,7 @@ Plans:
 
 Plans:
 - [x] 05-01-PLAN.md — Wave 0: test scaffolds (test_workflows.py, test_workflow_runner.py, test_start_workflow_tool.py)
-- [ ] 05-02-PLAN.md — workflows.py: WorkflowStepDef, WorkflowDefinition, WORKFLOW_REGISTRY (add-recipe + hello-world-2step)
+- [x] 05-02-PLAN.md — workflows.py: WorkflowStepDef, WorkflowDefinition, WORKFLOW_REGISTRY (add-recipe + hello-world-2step)
 - [ ] 05-03-PLAN.md — queue/workflow_runner.py: start_workflow, on_step_start, on_step_complete, on_step_failed
 - [ ] 05-04-PLAN.md — run_task() workflow hooks + agent/tools/start_workflow.py + integration tests + human checkpoint
 
