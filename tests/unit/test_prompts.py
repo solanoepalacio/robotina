@@ -1,16 +1,70 @@
-import pytest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 def test_prompt_file_exists_for_hello_world():
     """AGENT-08: src/robotina/agent/prompts/hello-world/V001.md exists."""
-    pytest.skip("not implemented")
+    prompt_path = Path("src/robotina/agent/prompts/hello-world/V001.md")
+    assert prompt_path.exists(), (
+        f"Expected prompt file at {prompt_path} — run from project root"
+    )
 
 
 def test_prompt_loaded_from_agent_config_path():
     """AGENT-08: Prompt text is loaded from the path in AgentConfig.prompt_path."""
-    pytest.skip("not implemented")
+    from robotina.agent.agents import get_agent_config
+
+    config = get_agent_config("hello-world")
+    assert config.prompt_path == "src/robotina/agent/prompts/hello-world/V001.md"
+
+    prompt_text = Path(config.prompt_path).read_text()
+    assert prompt_text.strip(), "Prompt file must not be empty"
 
 
 def test_skill_index_appended_to_prompt():
     """AGENT-11: Skill index.md content is appended to system prompt before agent invocation."""
-    pytest.skip("not implemented")
+    skill_index_content = "## Skill Index\nThis is the skill index content."
+
+    mock_skill = MagicMock()
+    mock_skill.index_content = skill_index_content
+
+    mock_backend = MagicMock()
+    mock_agent = MagicMock()
+    mock_backend.create_agent.return_value = mock_agent
+    mock_agent.invoke.return_value = {"messages": []}
+
+    mock_job = MagicMock()
+    mock_job.meta = {"task_type": "hello-world"}
+
+    with (
+        patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
+        patch("robotina.llm.make_backend", return_value=mock_backend),
+        patch("robotina.agent.SkillSet", return_value=mock_skill),
+        patch("robotina.agent.build_read_skill_tool", return_value=MagicMock()),
+    ):
+        # Temporarily give hello-world a skill so skill_index is non-empty
+        from robotina.agent.agents import AGENT_REGISTRY, AgentConfig
+        original_config = AGENT_REGISTRY["hello-world"]
+        AGENT_REGISTRY["hello-world"] = AgentConfig(
+            task_type="hello-world",
+            model_config=original_config.model_config,
+            prompt_path=original_config.prompt_path,
+            skills=["fake-skill"],
+            tools=[],
+        )
+
+        try:
+            from robotina.queue.jobs import run_task
+            run_task(MagicMock(text="test input"))
+        finally:
+            AGENT_REGISTRY["hello-world"] = original_config
+
+    # Verify create_agent was called with a system_prompt containing skill index content
+    assert mock_backend.create_agent.called, "create_agent was not called"
+    call_kwargs = mock_backend.create_agent.call_args
+    system_prompt = call_kwargs.kwargs.get("system_prompt") or call_kwargs.args[0]
+    assert skill_index_content in system_prompt, (
+        f"Skill index content not found in system_prompt.\n"
+        f"Expected to find: {skill_index_content!r}\n"
+        f"Got: {system_prompt!r}"
+    )
