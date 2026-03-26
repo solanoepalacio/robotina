@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-26T00:00:58.958Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-03-26T00:04:42.157Z"
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 04 (llm-module-and-agent-infrastructure) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Plan: 4 of 6
 | Phase 04-llm-module-and-agent-infrastructure P01 | 2 | 2 tasks | 8 files |
 | Phase 04-llm-module-and-agent-infrastructure P03 | 2 | 1 tasks | 2 files |
 | Phase 04-llm-module-and-agent-infrastructure P02 | 5 | 1 tasks | 2 files |
+| Phase 04-llm-module-and-agent-infrastructure P05 | 2 | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 04-llm-module-and-agent-infrastructure]: Use create_react_agent from langgraph.prebuilt despite LangGraphDeprecatedSinceV10 warning — locked per AGENT-11/D-03, API remains functional in v1.1.3
 - [Phase 04-llm-module-and-agent-infrastructure]: ChatOpenAI uses model_name= (not model=) and openai_api_base= — verified against langchain-openai 1.1.12 field names
 - [Phase 04-llm-module-and-agent-infrastructure]: api_key_env in model_config stores env var NAME not token value; resolved via os.environ at adapter instantiation time for clear misconfiguration errors
+- [Phase 04-llm-module-and-agent-infrastructure]: SKILLS_BASE anchored to Path(__file__).parent / 'skills' — absolute path makes SkillSet testable without import manipulation
+- [Phase 04-llm-module-and-agent-infrastructure]: ReadSkillTool inherits BaseTool (not @tool) — needs skill_dirs instance state that @tool cannot hold
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T00:00:58.955Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-26T00:04:42.155Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
