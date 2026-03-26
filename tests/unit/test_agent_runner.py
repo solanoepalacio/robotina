@@ -1,31 +1,131 @@
+"""Tests for run_task() universal job function and AgentLoggingHandler.
+
+Tests verify:
+- AGENT-06: run_task reads task_type from RQ job meta, not from input model
+- AGENT-07: LLM backend is created inside run_task, not at module level
+- AGENT-10: AgentLoggingHandler logs LLM start, tool start, and tool end events
+"""
+import logging
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
 def test_run_task_reads_task_type_from_job_meta():
     """AGENT-06: run_task reads task_type from RQ job meta, not from input model."""
-    pytest.skip("not implemented")
+    mock_job = MagicMock()
+    mock_job.meta = {"task_type": "hello-world"}
+
+    mock_config = MagicMock()
+    mock_config.skills = []
+    mock_config.tools = []
+    mock_config.model_config = {"provider": "ollama", "url": "http://localhost:11434", "model": "llama3.2", "api_key_env": "TEST_TOKEN"}
+    mock_config.prompt_path = "/tmp/test_prompt.md"
+
+    mock_backend = MagicMock()
+    mock_agent = MagicMock()
+    mock_agent.invoke.return_value = {"messages": []}
+    mock_backend.create_agent.return_value = mock_agent
+
+    with patch("rq.get_current_job", return_value=mock_job), \
+         patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config, \
+         patch("robotina.llm.make_backend", return_value=mock_backend), \
+         patch("builtins.open", MagicMock(read_data="system prompt")), \
+         patch("pathlib.Path.read_text", return_value="system prompt"), \
+         patch("robotina.agent.SkillSet", side_effect=Exception("no skills needed")):
+        # Force SkillSet import to fail but ensure no skills are loaded (config.skills = [])
+        with patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config:
+            from robotina.queue.jobs import run_task
+            try:
+                run_task(MagicMock())
+            except Exception:
+                pass  # We only care that get_agent_config was called with the meta task_type
+
+        mock_get_config.assert_called_once_with("hello-world")
 
 
 def test_run_task_raises_if_no_task_type_in_meta():
     """AGENT-06: run_task raises ValueError when task_type missing from job meta."""
-    pytest.skip("not implemented")
+    mock_job = MagicMock()
+    mock_job.meta = {}  # empty meta — no task_type
+
+    with patch("rq.get_current_job", return_value=mock_job):
+        from robotina.queue.jobs import run_task
+        with pytest.raises(ValueError, match="task_type"):
+            run_task(MagicMock())
 
 
 def test_backend_instantiated_per_job_not_module_level():
-    """AGENT-07: LLM backend is created inside run_task, not at import time."""
-    pytest.skip("not implemented")
+    """AGENT-07: LLM backend is created inside run_task, not at import time.
+
+    Verifies that importing robotina.queue.jobs does NOT trigger any LLM model
+    instantiation. The module is imported with LLM constructors patched to raise
+    if called — a module-level call would fail the import itself.
+    """
+    import importlib
+    import sys
+
+    # Remove cached module if already imported
+    for mod_name in list(sys.modules.keys()):
+        if "robotina.queue.jobs" in mod_name:
+            del sys.modules[mod_name]
+
+    called = []
+
+    def raise_if_called(*args, **kwargs):
+        called.append(True)
+        raise AssertionError("LLM model instantiated at module level!")
+
+    # Patch all LLM constructors to raise if called at import time
+    with patch("langchain_ollama.ChatOllama", side_effect=raise_if_called), \
+         patch("langchain_anthropic.ChatAnthropic", side_effect=raise_if_called), \
+         patch("langchain_openai.ChatOpenAI", side_effect=raise_if_called):
+        # This should succeed without calling any LLM constructor
+        import robotina.queue.jobs  # noqa: F401
+
+    assert not called, "LLM model was instantiated at module level during import!"
 
 
-def test_agent_logging_handler_on_llm_start():
+def test_agent_logging_handler_on_llm_start(caplog):
     """AGENT-10: AgentLoggingHandler.on_llm_start logs LLM stream start."""
-    pytest.skip("not implemented")
+    from robotina.queue.jobs import AgentLoggingHandler
+
+    handler = AgentLoggingHandler()
+    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+        handler.on_llm_start({"name": "ChatOllama"}, ["the prompt"])
+
+    assert any("ChatOllama" in record.message for record in caplog.records), \
+        f"Expected 'ChatOllama' in log. Got: {[r.message for r in caplog.records]}"
 
 
-def test_agent_logging_handler_on_tool_start():
+def test_agent_logging_handler_on_tool_start(caplog):
     """AGENT-10: AgentLoggingHandler.on_tool_start logs tool name and input."""
-    pytest.skip("not implemented")
+    from robotina.queue.jobs import AgentLoggingHandler
+
+    handler = AgentLoggingHandler()
+    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+        handler.on_tool_start({"name": "read-skill"}, "household-manager/index.md")
+
+    messages = [r.message for r in caplog.records]
+    assert any("read-skill" in m for m in messages), \
+        f"Expected 'read-skill' in log. Got: {messages}"
+    assert any("household-manager/index.md" in m for m in messages), \
+        f"Expected input path in log. Got: {messages}"
 
 
-def test_agent_logging_handler_on_tool_end():
-    """AGENT-10: AgentLoggingHandler.on_tool_end logs tool output."""
-    pytest.skip("not implemented")
+def test_agent_logging_handler_on_tool_end(caplog):
+    """AGENT-10: AgentLoggingHandler.on_tool_end logs tool output (truncated to 200 chars)."""
+    from robotina.queue.jobs import AgentLoggingHandler
+
+    handler = AgentLoggingHandler()
+    long_output = "x" * 500
+    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+        handler.on_tool_end(long_output)
+
+    messages = [r.message for r in caplog.records]
+    assert len(messages) > 0, "Expected at least one log message"
+    # Verify output is truncated — logged message should not contain more than 200 'x' chars
+    combined = " ".join(messages)
+    assert "x" * 201 not in combined, "Output was not truncated to 200 chars"
+    assert "x" * 200 in combined or "x" * 199 in combined, \
+        f"Expected truncated output in log. Got: {combined[:100]}"
