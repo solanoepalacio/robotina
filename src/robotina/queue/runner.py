@@ -70,6 +70,9 @@ def setup_langwatch() -> None:
 def main() -> None:
     """Entry point for `uv run agent`. Starts the sequential RQ task runner."""
     try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
         configure_logging()
         setup_langwatch()
         from redis import Redis
