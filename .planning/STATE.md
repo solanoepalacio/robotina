@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-03-26T00:00:01.359Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-26T00:00:58.958Z"
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 04 (llm-module-and-agent-infrastructure) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Plan: 3 of 6
 | Phase 03-gateway P02 | 3 | 2 tasks | 5 files |
 | Phase 04-llm-module-and-agent-infrastructure P01 | 2 | 2 tasks | 8 files |
 | Phase 04-llm-module-and-agent-infrastructure P03 | 2 | 1 tasks | 2 files |
+| Phase 04-llm-module-and-agent-infrastructure P02 | 5 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase 04-llm-module-and-agent-infrastructure]: Gateway enqueue string changed from 'robotina.queue.jobs.handle_incoming_message' to 'robotina.queue.jobs.run_task'; meta=task_type unchanged; run_task reads task_type from meta to dispatch to correct agent (D-09 confirmed)
 - [Phase 04-llm-module-and-agent-infrastructure]: AgentConfig uses plain Python dataclass (not Pydantic) — internal config, no external serialization needed
 - [Phase 04-llm-module-and-agent-infrastructure]: get_agent_config() re-reads AGENT_OVERRIDES_FILEPATH JSON on every call (hot-reload) — supports prompt experimentation without restart
+- [Phase 04-llm-module-and-agent-infrastructure]: Use create_react_agent from langgraph.prebuilt despite LangGraphDeprecatedSinceV10 warning — locked per AGENT-11/D-03, API remains functional in v1.1.3
+- [Phase 04-llm-module-and-agent-infrastructure]: ChatOpenAI uses model_name= (not model=) and openai_api_base= — verified against langchain-openai 1.1.12 field names
+- [Phase 04-llm-module-and-agent-infrastructure]: api_key_env in model_config stores env var NAME not token value; resolved via os.environ at adapter instantiation time for clear misconfiguration errors
 
 ### Pending Todos
 
@@ -105,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T00:00:01.357Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-03-26T00:00:58.955Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
