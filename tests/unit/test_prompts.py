@@ -36,11 +36,18 @@ def test_skill_index_appended_to_prompt():
     mock_job = MagicMock()
     mock_job.meta = {"task_type": "hello-world"}
 
+    mock_session = MagicMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+
     with (
         patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
         patch("robotina.llm.make_backend", return_value=mock_backend),
         patch("robotina.agent.SkillSet", return_value=mock_skill),
         patch("robotina.agent.build_read_skill_tool", return_value=MagicMock()),
+        patch("robotina.db.SessionLocal", mock_session_factory),
+        patch("robotina.queue.workflow_runner.on_step_start"),
+        patch("robotina.queue.workflow_runner.on_step_complete"),
+        patch("robotina.queue.workflow_runner.on_step_failed"),
     ):
         # Temporarily give hello-world a skill so skill_index is non-empty
         from robotina.agent.agents import AGENT_REGISTRY, AgentConfig

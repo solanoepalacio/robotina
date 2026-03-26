@@ -63,7 +63,9 @@ def run_task(task_input) -> object:
     7. Create and invoke the ReAct agent with AgentLoggingHandler
     8. Return agent output
 
-    Phase 5 will add workflow state management around this core flow.
+    Phase 5: Workflow state management wraps the agent execution via inline calls
+    to workflow_runner (on_step_start, on_step_complete, on_step_failed). If the
+    job is not part of a workflow (direct task), these are no-ops (D-06).
 
     Args:
         task_input: Pydantic input model for the task (e.g. IncomingMessageInput).
@@ -87,53 +89,82 @@ def run_task(task_input) -> object:
         )
     logger.info("Running Task | Type=%s", task_type)
 
-    # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
-    from robotina.agent.agents import get_agent_config
-    config = get_agent_config(task_type)
+    # Phase 5: Workflow state management setup (D-08)
+    # All per-job objects instantiated here — never at module level (locked Phase 4)
+    from robotina.db import SessionLocal
+    from robotina.queue import workflow_runner
+    from rq import Queue
+    from redis import Redis
+    import os
 
-    # Step 3: Instantiate LLM backend (ALWAYS per-job — never at module level)
-    from robotina.llm import make_backend
-    backend = make_backend(config.model_config)
+    _session = SessionLocal()
+    _queue = Queue(
+        "agent-tasks",
+        connection=Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379")),
+    )
 
-    # Step 4: Build skill context (lazy import — SkillSet defined in Plan 05)
-    from robotina.agent import SkillSet, build_read_skill_tool
-    skill_sets = [SkillSet(s) for s in config.skills]
-    skill_index = "\n\n".join(ss.index_content for ss in skill_sets)
-    tools = list(config.tools)
-    if skill_sets:
-        tools.append(build_read_skill_tool(skill_sets))
-
-    # Step 5 + 6: Load versioned prompt and append skill index
-    prompt_text = Path(config.prompt_path).read_text()
-    if skill_index:
-        prompt_text = prompt_text + "\n\n" + skill_index
-
-    # Step 7: Create and invoke agent
-    # @langwatch.trace() creates the parent trace; get_langchain_callback() captures
-    # LangChain events (LLM calls, tool calls) as child spans under that trace.
-    # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
-    agent = backend.create_agent(system_prompt=prompt_text, tools=tools)
-    user_message = _extract_user_message(task_input)
+    # Workflow hook: mark step RUNNING (no-op for direct tasks — D-06)
+    workflow_runner.on_step_start(job.id, _session)
 
     try:
-        import langwatch
-        import langwatch.langchain
-        from langchain_core.runnables import RunnableConfig
-        with langwatch.trace():
+        # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
+        from robotina.agent.agents import get_agent_config
+        config = get_agent_config(task_type)
+
+        # Step 3: Instantiate LLM backend (ALWAYS per-job — never at module level)
+        from robotina.llm import make_backend
+        backend = make_backend(config.model_config)
+
+        # Step 4: Build skill context (lazy import — SkillSet defined in Plan 05)
+        from robotina.agent import SkillSet, build_read_skill_tool
+        skill_sets = [SkillSet(s) for s in config.skills]
+        skill_index = "\n\n".join(ss.index_content for ss in skill_sets)
+        tools = list(config.tools)
+        if skill_sets:
+            tools.append(build_read_skill_tool(skill_sets))
+
+        # Step 5 + 6: Load versioned prompt and append skill index
+        prompt_text = Path(config.prompt_path).read_text()
+        if skill_index:
+            prompt_text = prompt_text + "\n\n" + skill_index
+
+        # Step 7: Create and invoke agent
+        # @langwatch.trace() creates the parent trace; get_langchain_callback() captures
+        # LangChain events (LLM calls, tool calls) as child spans under that trace.
+        # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
+        agent = backend.create_agent(system_prompt=prompt_text, tools=tools)
+        user_message = _extract_user_message(task_input)
+
+        try:
+            import langwatch
+            import langwatch.langchain
+            from langchain_core.runnables import RunnableConfig
+            with langwatch.trace():
+                result = agent.invoke(
+                    {"messages": [{"role": "user", "content": user_message}]},
+                    config=RunnableConfig(
+                        callbacks=[AgentLoggingHandler(), langwatch.langchain.LangChainTracer()]
+                    ),
+                )
+        except ImportError:
             result = agent.invoke(
                 {"messages": [{"role": "user", "content": user_message}]},
-                config=RunnableConfig(
-                    callbacks=[AgentLoggingHandler(), langwatch.langchain.LangChainTracer()]
-                ),
+                config={"callbacks": [AgentLoggingHandler()]},
             )
-    except ImportError:
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": user_message}]},
-            config={"callbacks": [AgentLoggingHandler()]},
-        )
 
-    logger.info("Agent run complete | task_type=%s", task_type)
-    return result
+        logger.info("Agent run complete | task_type=%s", task_type)
+
+        # Workflow hook: persist artifact + advance to next step or mark WorkflowRun DONE
+        workflow_runner.on_step_complete(job.id, result, _session, _queue)
+        return result
+
+    except Exception:
+        # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
+        workflow_runner.on_step_failed(job.id, _session)
+        raise  # re-raise so RQ moves the job to FailedJobRegistry
+
+    finally:
+        _session.close()
 
 
 def _extract_user_message(task_input) -> str:

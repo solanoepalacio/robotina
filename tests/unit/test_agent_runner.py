@@ -32,10 +32,17 @@ def test_run_task_reads_task_type_from_job_meta():
     mock_agent.invoke.return_value = {"messages": []}
     mock_backend.create_agent.return_value = mock_agent
 
+    mock_session = MagicMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+
     with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
          patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config, \
          patch("robotina.llm.make_backend", return_value=mock_backend), \
-         patch("pathlib.Path.read_text", return_value="system prompt"):
+         patch("pathlib.Path.read_text", return_value="system prompt"), \
+         patch("robotina.db.SessionLocal", mock_session_factory), \
+         patch("robotina.queue.workflow_runner.on_step_start"), \
+         patch("robotina.queue.workflow_runner.on_step_complete"), \
+         patch("robotina.queue.workflow_runner.on_step_failed"):
         from robotina.queue.jobs import run_task
         run_task(MagicMock())
 
