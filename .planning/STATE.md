@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-26T22:15:36.624Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-03-26T22:21:53.435Z"
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -65,6 +65,7 @@ Plan: 4 of 4
 | Phase 05-task-runner-and-workflow-engine P01 | 2min | 2 tasks | 3 files |
 | Phase 05-task-runner-and-workflow-engine P02 | 3min | 1 tasks | 2 files |
 | Phase 05-task-runner-and-workflow-engine P03 | 5min | 1 tasks | 2 files |
+| Phase 05-task-runner-and-workflow-engine P04 | 6min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,8 @@ Recent decisions affecting current work:
 - [Phase 05-task-runner-and-workflow-engine]: workflows.py: Pydantic ConfigDict(arbitrary_types_allowed=True) required for Callable fields in WorkflowStepDef and WorkflowDefinition
 - [Phase 05-task-runner-and-workflow-engine]: workflows.py: load step build_input uses RecipeData(**artifacts['research']['recipe']) to reconstruct from JSON-serialized dict
 - [Phase 05-task-runner-and-workflow-engine]: workflow_runner.py: queue injected (not hardcoded) — testable without live Redis; pre-assigned job_id before Postgres commit (D-07); session.flush() before querying DONE steps
+- [Phase 05-task-runner-and-workflow-engine]: Workflow hooks are three inline calls in run_task() — no dispatcher function (D-08 confirmed)
+- [Phase 05-task-runner-and-workflow-engine]: Unit tests calling run_task() must patch workflow_runner.on_step_* and SessionLocal to avoid live DB queries
 
 ### Pending Todos
 
@@ -127,6 +130,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T22:15:36.622Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-03-26T22:21:53.433Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
