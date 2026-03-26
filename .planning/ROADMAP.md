@@ -106,7 +106,13 @@ Plans:
   3. When a step job starts, its `WorkflowRunStep` transitions to `RUNNING`; on completion, its output is written to `artifact`, accumulated artifacts are built, and the next `PENDING` step is enqueued
   4. When the final step completes, the `WorkflowRun` is marked `DONE`
   5. When a step fails, the failed step is marked `FAILED`, all remaining `PENDING` steps are cancelled, and the `WorkflowRun` is marked `FAILED`; `reply_context` is never present in `RecipeResearchInput` or `RecipeLoadInput`
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Wave 0: test scaffolds (test_workflows.py, test_workflow_runner.py, test_start_workflow_tool.py)
+- [ ] 05-02-PLAN.md — workflows.py: WorkflowStepDef, WorkflowDefinition, WORKFLOW_REGISTRY (add-recipe + hello-world-2step)
+- [ ] 05-03-PLAN.md — queue/workflow_runner.py: start_workflow, on_step_start, on_step_complete, on_step_failed
+- [ ] 05-04-PLAN.md — run_task() workflow hooks + agent/tools/start_workflow.py + integration tests + human checkpoint
 
 ### Phase 6: send-notification Agent
 **Goal**: The notification agent correctly formats and delivers Telegram messages using the `format-telegram-message` skill, with LangWatch traces verified via a standalone experiment script
@@ -162,7 +168,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. Database Models and Queue Layer | 3/3 | Complete   | 2026-03-25 |
 | 3. Gateway | 3/3 | Complete   | 2026-03-25 |
 | 4. LLM Module and Agent Infrastructure | 6/6 | Complete   | 2026-03-26 |
-| 5. Task Runner and Workflow Engine | 0/TBD | Not started | - |
+| 5. Task Runner and Workflow Engine | 0/4 | Not started | - |
 | 6. send-notification Agent | 0/TBD | Not started | - |
 | 7. handle-incoming-message Agent | 0/TBD | Not started | - |
 | 8. recipe-research Agent | 0/TBD | Not started | - |
