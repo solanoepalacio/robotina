@@ -26,7 +26,7 @@ from unittest.mock import patch
 import langwatch
 import langwatch.langchain
 from langchain_core.runnables import RunnableConfig
-from opentelemetry import trace as otel_trace
+from langwatch.client import Client as LangWatchClient
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -148,11 +148,12 @@ def main() -> None:
 
     results_summary = []
 
+    run_name = f"prompt-V001 model={config.model_config.get('model')}"
     try:
-        with langwatch.Experiment(
-            experiment_slug="send-notification",
-            run_name=f"prompt-V001 model={config.model_config.get('model')}",
-        ) as experiment:
+        with langwatch.trace(
+            name=run_name,
+            metadata={"experiment": "send-notification", "prompt_version": "V001"},
+        ) as lw_trace:
             with patch.object(SendNotificationTool, "_run", capture_run):
                 for i, case in enumerate(TEST_CASES, 1):
                     captured_outputs.clear()
@@ -171,14 +172,15 @@ def main() -> None:
                         formatted = captured_outputs[0] if captured_outputs else ""
                         issues = check_escaping(formatted) if formatted else ["tool not called"]
 
-                        status = "PASS" if not issues else f"WARN: {'; '.join(issues)}"
+                        passed = not issues and bool(captured_outputs)
+                        status = "PASS" if passed else f"WARN: {'; '.join(issues)}"
                         print(f"Formatted output:\n{formatted[:300]}")
                         print(f"Result: {status}")
 
-                        experiment.log(
-                            input=case["text"],
-                            output=formatted,
-                            passed=(not issues and bool(captured_outputs)),
+                        lw_trace.add_evaluation(
+                            name=case["label"],
+                            passed=passed,
+                            details=status,
                         )
 
                         results_summary.append({
@@ -190,10 +192,10 @@ def main() -> None:
 
                     except Exception as e:
                         logger.exception("Case %d failed: %s", i, e)
-                        experiment.log(
-                            input=case["text"],
-                            output="",
+                        lw_trace.add_evaluation(
+                            name=case["label"],
                             passed=False,
+                            details=str(e),
                         )
                         results_summary.append({
                             "case": case["label"],
@@ -217,7 +219,8 @@ def main() -> None:
         print("\nAll cases completed. Check LangWatch for traces.")
 
     finally:
-        otel_trace.get_tracer_provider().force_flush()
+        if LangWatchClient._tracer_provider is not None:
+            LangWatchClient._tracer_provider.force_flush()
 
 
 if __name__ == "__main__":
