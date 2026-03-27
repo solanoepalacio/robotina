@@ -60,6 +60,7 @@ class OllamaBackend:
         self._model = ChatOllama(
             model=config["model"],
             base_url=config.get("url"),  # None = default http://localhost:11434
+            reasoning=config.get("reasoning"),  # None = model default; True = separate think content from response
         )
 
     @property

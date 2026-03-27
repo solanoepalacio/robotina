@@ -56,6 +56,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "url": "http://localhost:11434",
             "model": "gpt-oss:20b",
             "api_key_env": "SEND_NOTIFICATION_API_TOKEN",
+            "reasoning": True,  # gpt-oss:20b is a thinking model; separates CoT from tool-call response
         },
         prompt_path="src/robotina/agent/prompts/send-notification/V001.md",
         skills=["format-telegram-message"],
