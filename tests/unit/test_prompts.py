@@ -62,7 +62,7 @@ def test_skill_index_appended_to_prompt():
 
         try:
             from robotina.queue.jobs import run_task
-            run_task(MagicMock(text="test input"))
+            run_task(MagicMock(text="test input", chat_id="123", user_id="456", platform="telegram"))
         finally:
             AGENT_REGISTRY["send-notification"] = original_config
 
