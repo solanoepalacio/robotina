@@ -18,6 +18,15 @@ from robotina.agent.agents import configure_logging
 logger = logging.getLogger(__name__)
 
 
+class _StripTraceback(logging.Filter):
+    """Remove exc_info from rq.worker log records so only the error message is printed."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.exc_info = None
+        record.exc_text = None
+        return True
+
+
 class LoggingWorker(SimpleWorker):
     """RQ SimpleWorker subclass that emits structured log lines for job lifecycle events.
 
@@ -70,6 +79,7 @@ def main() -> None:
 
         load_dotenv()
         configure_logging()
+        logging.getLogger("rq.worker").addFilter(_StripTraceback())
         # SimpleWorker runs in-process — langwatch.setup() is safe here (no fork).
         _setup_langwatch()
         from redis import Redis
