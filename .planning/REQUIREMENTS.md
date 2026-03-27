@@ -72,8 +72,8 @@ Requirements for the initial milestone. All map to roadmap phases.
 ### Robotina Agent
 
 - [ ] **ROBOT-01**: `handle-incoming-message` task type is handled by the Robotina agent
-- [ ] **ROBOT-02**: Robotina agent has access to `household-manager-api` tool (reads/writes household data; auth injected invisibly; `401`/`403` raise hard errors)
-- [ ] **ROBOT-03**: Robotina agent has access to `queue` tool (enqueue a single follow-up task directly, e.g. `send-notification` for direct replies)
+- [x] **ROBOT-02**: Robotina agent has access to `household-manager-api` tool (reads/writes household data; auth injected invisibly; `401`/`403` raise hard errors)
+- [x] **ROBOT-03**: Robotina agent has access to `queue` tool (enqueue a single follow-up task directly, e.g. `send-notification` for direct replies)
 - [ ] **ROBOT-04**: Robotina agent has access to `start-workflow` tool (initiate multi-step workflows)
 - [ ] **ROBOT-05**: `household-manager` skill is updated to remove auth instructions (auth is handled by the tool, not the agent)
 - [ ] **ROBOT-06**: `robotina/V001.md` system prompt exists
@@ -188,8 +188,8 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | OBS-03 | Phase 6 | Complete |
 | OBS-05 | Phase 6 | Complete |
 | ROBOT-01 | Phase 7 | Pending |
-| ROBOT-02 | Phase 7 | Pending |
-| ROBOT-03 | Phase 7 | Pending |
+| ROBOT-02 | Phase 7 | Complete |
+| ROBOT-03 | Phase 7 | Complete |
 | ROBOT-04 | Phase 7 | Pending |
 | ROBOT-05 | Phase 7 | Pending |
 | ROBOT-06 | Phase 7 | Pending |
