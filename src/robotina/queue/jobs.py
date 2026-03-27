@@ -124,6 +124,16 @@ def run_task(task_input) -> object:
         if skill_sets:
             tools.append(build_read_skill_tool(skill_sets))
 
+        # Phase 6: Inject per-job tools that require task_input context (D-05)
+        # SendNotificationTool needs chat_id/user_id/platform from task_input — cannot be in AgentConfig
+        if task_type == "send-notification":
+            from robotina.agent.tools.send_notification import SendNotificationTool
+            tools.append(SendNotificationTool(
+                chat_id=task_input.chat_id,
+                user_id=task_input.user_id,
+                platform=task_input.platform,
+            ))
+
         # Step 5 + 6: Load versioned prompt and append skill index
         prompt_text = Path(config.prompt_path).read_text()
         if skill_index:

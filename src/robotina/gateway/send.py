@@ -24,13 +24,14 @@ from robotina.gateway.models import Conversation, MessageRole, Platform, StoredM
 logger = logging.getLogger(__name__)
 
 
-async def send_message(chat_id: str, text: str, user_id: str) -> str:
+async def send_message(chat_id: str, text: str, user_id: str, parse_mode: str | None = None) -> str:
     """Send a Telegram message and persist it as an ASSISTANT StoredMessage.
 
     Args:
         chat_id: Telegram chat ID (stored as str in DB; cast to int for API call).
         text: Message text to send.
         user_id: Platform user ID (for context; not used in this function directly).
+        parse_mode: Optional Telegram parse mode (e.g. 'MarkdownV2'). Defaults to None (plain text).
 
     Returns:
         platform_message_id: Telegram-assigned message_id as str.
@@ -42,7 +43,7 @@ async def send_message(chat_id: str, text: str, user_id: str) -> str:
     # Send via Telegram Bot API — standalone usage requires async with context manager
     bot = Bot(token=token)
     async with bot:
-        sent = await bot.send_message(chat_id=int(chat_id), text=text)
+        sent = await bot.send_message(chat_id=int(chat_id), text=text, parse_mode=parse_mode)
     platform_message_id = str(sent.message_id)
 
     # Persist outgoing message to Postgres

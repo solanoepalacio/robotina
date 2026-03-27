@@ -35,6 +35,14 @@ def test_run_task_reads_task_type_from_job_meta():
     mock_session = MagicMock()
     mock_session_factory = MagicMock(return_value=mock_session)
 
+    # Provide real string attributes for send-notification task input
+    # (SendNotificationTool injection requires str fields — MagicMock auto-attrs fail Pydantic validation)
+    mock_task_input = MagicMock()
+    mock_task_input.chat_id = "test-chat-1"
+    mock_task_input.user_id = "test-user-1"
+    mock_task_input.platform = "telegram"
+    mock_task_input.text = "test message"
+
     with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
          patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config, \
          patch("robotina.llm.make_backend", return_value=mock_backend), \
@@ -44,7 +52,7 @@ def test_run_task_reads_task_type_from_job_meta():
          patch("robotina.queue.workflow_runner.on_step_complete"), \
          patch("robotina.queue.workflow_runner.on_step_failed"):
         from robotina.queue.jobs import run_task
-        run_task(MagicMock())
+        run_task(mock_task_input)
 
     mock_get_config.assert_called_once_with("send-notification")
 
