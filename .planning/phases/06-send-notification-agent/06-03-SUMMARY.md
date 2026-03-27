@@ -113,3 +113,13 @@ None — all 5 content files are complete and functional.
 ---
 *Phase: 06-send-notification-agent*
 *Completed: 2026-03-27*
+
+## Self-Check: PASSED
+
+- FOUND: src/robotina/agent/skills/format-telegram-message/index.md
+- FOUND: src/robotina/agent/skills/format-telegram-message/escaping.md
+- FOUND: src/robotina/agent/skills/format-telegram-message/formatting.md
+- FOUND: src/robotina/agent/skills/format-telegram-message/examples.md
+- FOUND: src/robotina/agent/prompts/send-notification/V001.md
+- FOUND commit: dc03794
+- FOUND commit: 0e116d3
