@@ -11,6 +11,7 @@ from robotina.db import Base
 
 
 class WorkflowStatus(enum.Enum):
+    PENDING = "pending"
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
@@ -29,7 +30,7 @@ class WorkflowRun(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     workflow_type: Mapped[str] = mapped_column(String, nullable=False)
     household_id: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[WorkflowStatus] = mapped_column(Enum(WorkflowStatus, values_callable=lambda x: [e.value for e in x]), default=WorkflowStatus.RUNNING, nullable=False)
+    status: Mapped[WorkflowStatus] = mapped_column(Enum(WorkflowStatus, values_callable=lambda x: [e.value for e in x]), default=WorkflowStatus.PENDING, nullable=False)
     shared_context: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
