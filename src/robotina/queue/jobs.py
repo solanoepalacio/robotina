@@ -46,7 +46,7 @@ class AgentLoggingHandler(BaseCallbackHandler):
                 msg = getattr(gen, "message", None)
                 thinking = msg and msg.additional_kwargs.get("reasoning_content")
                 if thinking:
-                    logger.info("Thinking | %s", str(thinking)[:200])
+                    logger.info("Thinking | %s", thinking)
 
     def on_tool_start(self, serialized: dict, input_str: str, **kwargs) -> None:
         logger.info(
