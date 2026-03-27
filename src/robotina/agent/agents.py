@@ -115,6 +115,10 @@ def configure_logging() -> None:
 
     Call this once at process startup in runner.main() before any other setup.
     """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     modules = ["gateway", "queue", "agent", "llm"]
     for module in modules:
         env_key = f"ROBOTINA_LOG_LEVEL_{module.upper()}"
