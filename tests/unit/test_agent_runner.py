@@ -100,10 +100,10 @@ def test_backend_instantiated_per_job_not_module_level():
 
 def test_agent_logging_handler_on_llm_start(caplog):
     """AGENT-10: AgentLoggingHandler.on_chat_model_start logs LLM stream start."""
-    from robotina.queue.jobs import AgentLoggingHandler
+    from robotina.agent.callbacks import AgentLoggingHandler
 
     handler = AgentLoggingHandler()
-    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
         handler.on_chat_model_start({"name": "ChatOllama"}, [[]])
 
     assert any("ChatOllama" in record.message for record in caplog.records), \
@@ -112,10 +112,10 @@ def test_agent_logging_handler_on_llm_start(caplog):
 
 def test_agent_logging_handler_on_tool_start(caplog):
     """AGENT-10: AgentLoggingHandler.on_tool_start logs tool name and input."""
-    from robotina.queue.jobs import AgentLoggingHandler
+    from robotina.agent.callbacks import AgentLoggingHandler
 
     handler = AgentLoggingHandler()
-    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
         handler.on_tool_start({"name": "read-skill"}, "household-manager/index.md")
 
     messages = [r.message for r in caplog.records]
@@ -127,11 +127,11 @@ def test_agent_logging_handler_on_tool_start(caplog):
 
 def test_agent_logging_handler_on_tool_end(caplog):
     """AGENT-10: AgentLoggingHandler.on_tool_end logs tool output (truncated to 200 chars)."""
-    from robotina.queue.jobs import AgentLoggingHandler
+    from robotina.agent.callbacks import AgentLoggingHandler
 
     handler = AgentLoggingHandler()
     long_output = "x" * 500
-    with caplog.at_level(logging.INFO, logger="robotina.queue.jobs"):
+    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
         handler.on_tool_end(long_output)
 
     messages = [r.message for r in caplog.records]
