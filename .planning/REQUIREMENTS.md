@@ -101,9 +101,9 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 - [x] **OBS-01**: LangWatch + OpenTelemetry instrumentation is active on all agents
 - [x] **OBS-02**: LangWatch endpoint and API key are read from environment variables
-- [ ] **OBS-03**: The same instrumentation used in production is active during experiment runs; traces appear in the correct LangWatch experiment collection
+- [x] **OBS-03**: The same instrumentation used in production is active during experiment runs; traces appear in the correct LangWatch experiment collection
 - [ ] **OBS-04**: Each experiment script (`recipe-research`, `recipe-load`, `send-notification`) pins prompt version and model config via LangWatch tags/metadata
-- [ ] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
+- [x] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
 
 ## v2 Requirements
 
@@ -185,8 +185,8 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | NOTIF-03 | Phase 6 | Complete |
 | NOTIF-04 | Phase 6 | Complete |
 | NOTIF-05 | Phase 6 | Complete |
-| OBS-03 | Phase 6 | Pending |
-| OBS-05 | Phase 6 | Pending |
+| OBS-03 | Phase 6 | Complete |
+| OBS-05 | Phase 6 | Complete |
 | ROBOT-01 | Phase 7 | Pending |
 | ROBOT-02 | Phase 7 | Pending |
 | ROBOT-03 | Phase 7 | Pending |

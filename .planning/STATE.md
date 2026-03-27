@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 06-send-notification-agent Plan 03 (format-telegram-message skill + send-notification prompt)
-last_updated: "2026-03-27T16:07:56.745Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 06-send-notification-agent Plan 04 (send-notification experiment script)
+last_updated: "2026-03-27T16:12:04.602Z"
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Project State
@@ -70,6 +70,7 @@ Plan: 4 of 4
 | Phase 06-send-notification-agent P01 | 3min | 3 tasks | 6 files |
 | Phase 06-send-notification-agent P02 | 3min | 2 tasks | 5 files |
 | Phase 06-send-notification-agent P03 | 3min | 2 tasks | 6 files |
+| Phase 06-send-notification-agent P04 | 1min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase 06-send-notification-agent]: parse_mode defaults to None in send_message() for backward compatibility; only notification tool passes MarkdownV2
 - [Phase 06-send-notification-agent]: format-telegram-message skill uses 3 sub-files (escaping, formatting, examples) to minimize context load — agent reads only what it needs
 - [Phase 06-send-notification-agent]: Prompt V001 enforces reformat-only constraint with explicit wrong/right examples in Critical Rules section
+- [Phase 06-send-notification-agent]: Experiment uses same LangWatch instrumentation path as run_task() (langwatch.trace + LangChainTracer) — OBS-03 requirement
+- [Phase 06-send-notification-agent]: SendNotificationTool._run mocked via patch.object in experiment to capture formatted output without TELEGRAM_BOT_TOKEN
 
 ### Pending Todos
 
@@ -148,6 +151,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:07:56.742Z
-Stopped at: Completed 06-send-notification-agent Plan 03 (format-telegram-message skill + send-notification prompt)
+Last session: 2026-03-27T16:12:04.600Z
+Stopped at: Completed 06-send-notification-agent Plan 04 (send-notification experiment script)
 Resume file: None
