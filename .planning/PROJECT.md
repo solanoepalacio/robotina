@@ -21,7 +21,7 @@ Families can delegate household tasks to Robotina in natural language and trust 
 - [x] Workflow infrastructure: `WorkflowRun` / `WorkflowRunStep` Postgres models — Validated in Phase 2: Database Models and Queue Layer (registry + task-runner hook pending Phase 5)
 - [x] Workflow registry + task-runner advancement hook + `start-workflow` tool — Validated in Phase 5: task-runner-and-workflow-engine
 - [x] Agent infrastructure: LLM module + adapters (Ollama, Anthropic, OpenAI), `agents.py` scaffold, skill loading, prompt versioning, LangWatch + OTel instrumentation — Validated in Phase 4: llm-module-and-agent-infrastructure
-- [ ] Notification agent (`send-notification`): format-telegram-message skill, prompt, tool, experiment
+- [x] Notification agent (`send-notification`): format-telegram-message skill, prompt, tool, experiment — Validated in Phase 6: send-notification-agent
 - [ ] Robotina agent (`handle-incoming-message`): household-manager skill (auth update), prompt, tools (household-manager-api, queue, start-workflow)
 - [ ] Recipe Research agent (`recipe-research`): skill, prompt, web-search tool, experiment
 - [ ] Recipe Loader agent (`recipe-load`): skill, prompt, household-manager-api tool, experiment
@@ -81,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after Phase 5 completion (task-runner-and-workflow-engine)*
+*Last updated: 2026-03-27 after Phase 6 completion (send-notification-agent)*
