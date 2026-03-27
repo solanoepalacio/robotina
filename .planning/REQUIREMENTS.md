@@ -63,11 +63,11 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Notification Agent
 
-- [ ] **NOTIF-01**: `send-notification` task type is handled by the Notification agent
+- [x] **NOTIF-01**: `send-notification` task type is handled by the Notification agent
 - [ ] **NOTIF-02**: `format-telegram-message` skill exists with `index.md` and sub-files covering Telegram MarkdownV2 formatting rules
 - [ ] **NOTIF-03**: Notification agent applies `format-telegram-message` skill to reformat pre-written text before delivery — it does not compose content
 - [ ] **NOTIF-04**: `send-notification` tool sends the formatted message to the user via the gateway
-- [ ] **NOTIF-05**: `send-notification/V001.md` system prompt exists
+- [x] **NOTIF-05**: `send-notification/V001.md` system prompt exists
 
 ### Robotina Agent
 
@@ -180,11 +180,11 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | WF-07 | Phase 5 | Complete |
 | WF-08 | Phase 5 | Complete |
 | WF-09 | Phase 5 | Complete |
-| NOTIF-01 | Phase 6 | Pending |
+| NOTIF-01 | Phase 6 | Complete |
 | NOTIF-02 | Phase 6 | Pending |
 | NOTIF-03 | Phase 6 | Pending |
 | NOTIF-04 | Phase 6 | Pending |
-| NOTIF-05 | Phase 6 | Pending |
+| NOTIF-05 | Phase 6 | Complete |
 | OBS-03 | Phase 6 | Pending |
 | OBS-05 | Phase 6 | Pending |
 | ROBOT-01 | Phase 7 | Pending |

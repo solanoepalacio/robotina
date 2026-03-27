@@ -126,7 +126,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Wave 0+registry: test stubs (test_send_notification_tool.py) + remove hello-world from AGENT_REGISTRY and WORKFLOW_REGISTRY + update existing tests
+- [x] 06-01-PLAN.md — Wave 0+registry: test stubs (test_send_notification_tool.py) + remove hello-world from AGENT_REGISTRY and WORKFLOW_REGISTRY + update existing tests
 - [ ] 06-02-PLAN.md — SendNotificationTool implementation + send_message() parse_mode fix + run_task() injection
 - [ ] 06-03-PLAN.md — format-telegram-message skill (4 files) + send-notification/V001.md prompt
 - [ ] 06-04-PLAN.md — experiments/send_notification.py full implementation + human LangWatch verification checkpoint
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 3. Gateway | 3/3 | Complete   | 2026-03-25 |
 | 4. LLM Module and Agent Infrastructure | 6/6 | Complete   | 2026-03-26 |
 | 5. Task Runner and Workflow Engine | 5/5 | Complete   | 2026-03-27 |
-| 6. send-notification Agent | 0/4 | Not started | - |
+| 6. send-notification Agent | 1/4 | In Progress|  |
 | 7. handle-incoming-message Agent | 0/TBD | Not started | - |
 | 8. recipe-research Agent | 0/TBD | Not started | - |
 | 9. recipe-load Agent and End-to-End Integration | 0/TBD | Not started | - |
