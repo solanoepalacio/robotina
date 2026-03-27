@@ -8,30 +8,11 @@ Default base URL: `http://localhost:3001`
 
 All paths start with `/api` (e.g., `GET /api/recipes`).
 
-## Authentication
-
-Every request must include the header:
-
-```
-Authorization: Bearer <token>
-```
-
-The token is a raw API key issued by an administrator. Do not hash or encode it.
-
-Example:
-
-```
-GET /api/recipes HTTP/1.1
-Authorization: Bearer abc123def456...
-```
-
 ## Error codes
 
 | Status | Meaning | Action |
 |--------|---------|--------|
 | 400 | Validation error — request body or query params are invalid | Check the `message` field (array of strings) for details |
-| 401 | Not authenticated — token is missing or invalid | Verify the `Authorization` header is present and the token is correct |
-| 403 | Forbidden — authenticated but not authorized for this resource | The resource belongs to a different household |
 | 404 | Not found — the resource does not exist | Verify the ID or path is correct |
 | 422 | Validation error (alternative) — same as 400 | Check the `message` field |
 | 500 | Server error | Do not retry immediately; report the issue |

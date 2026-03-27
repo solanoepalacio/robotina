@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-27T20:17:37.431Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-03-27T20:22:24.547Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 28
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 07 (handle-incoming-message-agent) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Plan: 2 of 4
 | Phase 06-send-notification-agent P03 | 3min | 2 tasks | 6 files |
 | Phase 06-send-notification-agent P04 | 1min | 2 tasks | 1 files |
 | Phase 07-handle-incoming-message-agent P01 | 2min | 2 tasks | 2 files |
+| Phase 07-handle-incoming-message-agent P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 06-send-notification-agent]: Experiment uses same LangWatch instrumentation path as run_task() (langwatch.trace + LangChainTracer) — OBS-03 requirement
 - [Phase 06-send-notification-agent]: SendNotificationTool._run mocked via patch.object in experiment to capture formatted output without TELEGRAM_BOT_TOKEN
 - [Phase 07-handle-incoming-message-agent]: pytest.skip() placed before any from-import in each stub (consistent with Phase 6 pattern)
+- [Phase 07-handle-incoming-message-agent]: household_id stored at construction but NOT auto-injected into request URLs in Phase 7 — agent passes it in path/query where API requires it (D-02 scope deferral)
+- [Phase 07-handle-incoming-message-agent]: QueueTool enqueues at BACK of queue (no at_front=True) — gateway uses at_front because it originates outside the worker; follow-up tasks must not preempt waiting jobs (Pitfall 5)
+- [Phase 07-handle-incoming-message-agent]: Redis/Queue imports at module level in queue.py — lazy imports inside _run() make patch() target non-existent and break mocking
 
 ### Pending Todos
 
@@ -154,6 +158,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T20:17:37.429Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-03-27T20:22:24.545Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None

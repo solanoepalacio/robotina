@@ -144,7 +144,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Wave 0: test stubs for HouseholdManagerApiTool and QueueTool
-- [ ] 07-02-PLAN.md — HouseholdManagerApiTool + QueueTool implementations
+- [x] 07-02-PLAN.md — HouseholdManagerApiTool + QueueTool implementations
 - [ ] 07-03-PLAN.md — household-manager skill auth removal + robotina/V001.md routing prompt
 - [ ] 07-04-PLAN.md — agents.py registry entry + run_task() injection + human checkpoint
 
@@ -182,6 +182,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. LLM Module and Agent Infrastructure | 6/6 | Complete   | 2026-03-26 |
 | 5. Task Runner and Workflow Engine | 5/5 | Complete   | 2026-03-27 |
 | 6. send-notification Agent | 4/4 | Complete   | 2026-03-27 |
-| 7. handle-incoming-message Agent | 1/4 | In Progress|  |
+| 7. handle-incoming-message Agent | 2/4 | In Progress|  |
 | 8. recipe-research Agent | 0/TBD | Not started | - |
 | 9. recipe-load Agent and End-to-End Integration | 0/TBD | Not started | - |

@@ -2,13 +2,13 @@
 
 This bundle teaches an agent to interact with the recipe-manager REST API.
 
-Before any operation, read `shared.md` to set up authentication and understand error handling.
+Before any operation, read `shared.md` to understand base URL, error handling, and pagination.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `shared.md` | Authentication, base URL, error codes, pagination envelope |
+| `shared.md` | Base URL, error codes, pagination envelope |
 | `recipes_search.md` | Search and list recipes with filters, sorting, and pagination |
 | `recipes_get.md` | Fetch full recipe detail including sections, ingredients, steps, and images |
 | `recipes_create.md` | Create a recipe with sections, ingredients, and steps |
