@@ -39,6 +39,7 @@ def test_start_workflow_tool_creates_workflow_run(wf_db_session, redis_conn):
     assert run is not None
     assert run.workflow_type == "hello-world-2step"
     assert run.household_id == "h1"
+    assert run.status == WorkflowStatus.PENDING, f"Expected PENDING, got {run.status}"
 
 
 @pytest.mark.integration

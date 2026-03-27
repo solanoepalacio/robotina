@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from robotina.db import SessionLocal
 from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStatus, WorkflowStepStatus
 from robotina.queue.task_types import RecipeResearchInput, RecipeLoadInput
-from robotina.queue.workflow_runner import start_workflow
+from robotina.queue.workflow_runner import queue_workflow
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ def make_step(
     return step
 
 
-def make_run(workflow_type="hello-world-2step", status=WorkflowStatus.RUNNING, shared_context=None):
+def make_run(workflow_type="hello-world-2step", status=WorkflowStatus.PENDING, shared_context=None):
     run = MagicMock()
     run.workflow_type = workflow_type
     run.status = status
@@ -291,13 +291,13 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     """WF-04 through WF-07: hello-world-2step runs both steps, WorkflowRun ends DONE."""
     import uuid
     from rq import Queue
-    from robotina.queue.runner import LoggingWorker
+    from rq.worker import SimpleWorker
 
     queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
     shared_context = {"household_id": "test-household", "test_run": True}
 
-    # start_workflow creates WorkflowRun + steps + enqueues step1
-    run_id = start_workflow(
+    # queue_workflow creates WorkflowRun as PENDING + steps + enqueues step1
+    run_id = queue_workflow(
         workflow_type="hello-world-2step",
         shared_context=shared_context,
         household_id="test-household",
@@ -305,6 +305,10 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
         session=wf_db_session,
     )
     assert run_id is not None
+
+    # Verify WorkflowRun starts as PENDING (UAT test 5)
+    run_initial = wf_db_session.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
+    assert run_initial.status == WorkflowStatus.PENDING, f"Expected PENDING, got {run_initial.status}"
 
     # Verify initial state: 2 PENDING steps, first has task_job_id set
     steps = (
@@ -328,7 +332,7 @@ def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
     mock_backend = MagicMock()
     mock_backend.create_agent.return_value = mock_agent
     with patch("robotina.llm.make_backend", return_value=mock_backend):
-        worker = LoggingWorker([queue], connection=redis_conn)
+        worker = SimpleWorker([queue], connection=redis_conn)
         worker.work(burst=True)
 
     # Refresh session to see committed state
@@ -355,12 +359,12 @@ def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
     import uuid
     from unittest.mock import patch
     from rq import Queue
-    from robotina.queue.runner import LoggingWorker
+    from rq.worker import SimpleWorker
 
     queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
     shared_context = {"household_id": "test-household", "test_run": True}
 
-    run_id = start_workflow(
+    run_id = queue_workflow(
         workflow_type="hello-world-2step",
         shared_context=shared_context,
         household_id="test-household",
@@ -370,7 +374,7 @@ def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
 
     # Make get_agent_config raise so the agent execution fails
     with patch("robotina.agent.agents.get_agent_config", side_effect=RuntimeError("forced failure")):
-        worker = LoggingWorker([queue], connection=redis_conn)
+        worker = SimpleWorker([queue], connection=redis_conn)
         worker.work(burst=True)
 
     wf_db_session.expire_all()
