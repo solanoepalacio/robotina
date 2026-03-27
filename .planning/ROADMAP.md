@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: LLM Module and Agent Infrastructure** - LLMBackend abstraction, adapters, agent runner, skill loading, prompt versioning, and LangWatch instrumentation (completed 2026-03-26)
 - [x] **Phase 5: Task Runner and Workflow Engine** - Sequential RQ worker with workflow state transitions, artifact persistence, and next-step advancement (completed 2026-03-26)
 - [x] **Phase 6: send-notification Agent** - Notification agent formats and delivers Telegram messages with LangWatch traces verified (completed 2026-03-27)
-- [ ] **Phase 7: handle-incoming-message Agent** - Robotina routing agent handles direct replies and initiates multi-step workflows end-to-end
+- [x] **Phase 7: handle-incoming-message Agent** - Robotina routing agent handles direct replies and initiates multi-step workflows end-to-end (completed 2026-03-27)
 - [ ] **Phase 8: recipe-research Agent** - Recipe research agent performs structured web search and produces typed RecipeData output
 - [ ] **Phase 9: recipe-load Agent and End-to-End Integration** - Recipe loader resolves food/unit names and creates recipes; full add-recipe workflow works end-to-end
 
@@ -146,7 +146,7 @@ Plans:
 - [x] 07-01-PLAN.md — Wave 0: test stubs for HouseholdManagerApiTool and QueueTool
 - [x] 07-02-PLAN.md — HouseholdManagerApiTool + QueueTool implementations
 - [x] 07-03-PLAN.md — household-manager skill auth removal + robotina/V001.md routing prompt
-- [ ] 07-04-PLAN.md — agents.py registry entry + run_task() injection + human checkpoint
+- [x] 07-04-PLAN.md — agents.py registry entry + run_task() injection + human checkpoint
 
 ### Phase 8: recipe-research Agent
 **Goal**: The recipe research agent performs structured multi-site web search via Tavily and produces a fully populated `RecipeData` output, with traces pinned to LangWatch experiment collections
@@ -182,6 +182,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. LLM Module and Agent Infrastructure | 6/6 | Complete   | 2026-03-26 |
 | 5. Task Runner and Workflow Engine | 5/5 | Complete   | 2026-03-27 |
 | 6. send-notification Agent | 4/4 | Complete   | 2026-03-27 |
-| 7. handle-incoming-message Agent | 3/4 | In Progress|  |
+| 7. handle-incoming-message Agent | 4/4 | Complete   | 2026-03-27 |
 | 8. recipe-research Agent | 0/TBD | Not started | - |
 | 9. recipe-load Agent and End-to-End Integration | 0/TBD | Not started | - |
