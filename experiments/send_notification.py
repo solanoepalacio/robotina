@@ -23,6 +23,11 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import langwatch
+import langwatch.langchain
+from langchain_core.runnables import RunnableConfig
+from opentelemetry import trace as otel_trace
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -61,26 +66,17 @@ def run_experiment_case(
     model_config: dict,
     prompt_version: str = "V001",
 ) -> dict:
-    """Run one experiment case with LangWatch tracing. Returns result dict."""
-    import langwatch
-    import langwatch.langchain
-    from langchain_core.runnables import RunnableConfig
+    """Run one experiment case. Returns result dict.
 
-    with langwatch.trace() as trace:
-        trace.update(metadata={
-            "prompt_version": prompt_version,
-            "model": model_config.get("model", "unknown"),
-            "provider": model_config.get("provider", "unknown"),
-            "experiment": "send-notification",
-            "case_label": label,
-        })
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": text}]},
-            config=RunnableConfig(
-                callbacks=[langwatch.langchain.LangChainTracer()]
-            ),
-        )
-
+    LangWatch tracing is handled by the Experiment context manager in main();
+    LangChainTracer is passed via RunnableConfig to instrument LangChain calls.
+    """
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": text}]},
+        config=RunnableConfig(
+            callbacks=[langwatch.langchain.LangChainTracer()]
+        ),
+    )
     return result
 
 
@@ -152,57 +148,76 @@ def main() -> None:
 
     results_summary = []
 
-    with patch.object(SendNotificationTool, "_run", capture_run):
-        for i, case in enumerate(TEST_CASES, 1):
-            captured_outputs.clear()
-            print(f"\n--- {case['label']} ---")
-            print(f"Input: {case['text']}")
-            print(f"({case['description']})")
+    try:
+        with langwatch.Experiment(
+            experiment_slug="send-notification",
+            run_name=f"prompt-V001 model={config.model_config.get('model')}",
+        ) as experiment:
+            with patch.object(SendNotificationTool, "_run", capture_run):
+                for i, case in enumerate(TEST_CASES, 1):
+                    captured_outputs.clear()
+                    print(f"\n--- {case['label']} ---")
+                    print(f"Input: {case['text']}")
+                    print(f"({case['description']})")
 
-            try:
-                result = run_experiment_case(
-                    agent=agent,
-                    text=case["text"],
-                    label=case["label"],
-                    model_config=config.model_config,
-                )
+                    try:
+                        result = run_experiment_case(
+                            agent=agent,
+                            text=case["text"],
+                            label=case["label"],
+                            model_config=config.model_config,
+                        )
 
-                formatted = captured_outputs[0] if captured_outputs else ""
-                issues = check_escaping(formatted) if formatted else ["tool not called"]
+                        formatted = captured_outputs[0] if captured_outputs else ""
+                        issues = check_escaping(formatted) if formatted else ["tool not called"]
 
-                status = "PASS" if not issues else f"WARN: {'; '.join(issues)}"
-                print(f"Formatted output:\n{formatted[:300]}")
-                print(f"Result: {status}")
+                        status = "PASS" if not issues else f"WARN: {'; '.join(issues)}"
+                        print(f"Formatted output:\n{formatted[:300]}")
+                        print(f"Result: {status}")
 
-                results_summary.append({
-                    "case": case["label"],
-                    "status": status,
-                    "formatted_len": len(formatted),
-                    "tool_called": bool(captured_outputs),
-                })
+                        experiment.log(
+                            input=case["text"],
+                            output=formatted,
+                            passed=(not issues and bool(captured_outputs)),
+                        )
 
-            except Exception as e:
-                logger.exception("Case %d failed: %s", i, e)
-                results_summary.append({
-                    "case": case["label"],
-                    "status": f"ERROR: {e}",
-                    "formatted_len": 0,
-                    "tool_called": False,
-                })
+                        results_summary.append({
+                            "case": case["label"],
+                            "status": status,
+                            "formatted_len": len(formatted),
+                            "tool_called": bool(captured_outputs),
+                        })
 
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    for r in results_summary:
-        tool_status = "tool called" if r["tool_called"] else "tool NOT called"
-        print(f"  {r['case']}: {r['status']} ({tool_status}, {r['formatted_len']} chars)")
+                    except Exception as e:
+                        logger.exception("Case %d failed: %s", i, e)
+                        experiment.log(
+                            input=case["text"],
+                            output="",
+                            passed=False,
+                        )
+                        results_summary.append({
+                            "case": case["label"],
+                            "status": f"ERROR: {e}",
+                            "formatted_len": 0,
+                            "tool_called": False,
+                        })
 
-    errors = [r for r in results_summary if r["status"].startswith("ERROR")]
-    if errors:
-        print(f"\n{len(errors)} case(s) failed with errors.")
-        raise SystemExit(1)
+        print("\n" + "=" * 60)
+        print("SUMMARY")
+        print("=" * 60)
+        for r in results_summary:
+            tool_status = "tool called" if r["tool_called"] else "tool NOT called"
+            print(f"  {r['case']}: {r['status']} ({tool_status}, {r['formatted_len']} chars)")
 
-    print("\nAll cases completed. Check LangWatch for traces.")
+        errors = [r for r in results_summary if r["status"].startswith("ERROR")]
+        if errors:
+            print(f"\n{len(errors)} case(s) failed with errors.")
+            raise SystemExit(1)
+
+        print("\nAll cases completed. Check LangWatch for traces.")
+
+    finally:
+        otel_trace.get_tracer_provider().force_flush()
 
 
 if __name__ == "__main__":
