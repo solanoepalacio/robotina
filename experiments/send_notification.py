@@ -178,6 +178,7 @@ def main() -> None:
                         print(f"Result: {status}")
 
                         lw_trace.add_evaluation(
+                            span=lw_trace.root_span,
                             name=case["label"],
                             passed=passed,
                             details=status,
