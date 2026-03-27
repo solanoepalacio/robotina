@@ -8,8 +8,7 @@ IMPORTANT: build_input callables receive:
   - accumulated_artifacts: dict[str, dict] — keyed by step_key, values are the
     step output dicts (model.model_dump(mode='json') from each completed step)
 
-The 'hello-world-2step' entry and the 'hello-world' agent config are Phase 5
-test scaffolding. Both MUST be removed when 'send-notification' is added in Phase 6.
+The 'hello-world-2step' entry was removed in Phase 6.
 """
 from __future__ import annotations
 
@@ -85,26 +84,6 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     **ctx["reply_context"],
                     text=f"Recipe added: {artifacts['load']['recipe_name']}",
                 ),
-            ),
-        ],
-    ),
-    # PHASE 5 TEST WORKFLOW — Remove alongside hello-world agent config in Phase 6.
-    # Two hello-world steps exercise step-to-step advancement and final-step WorkflowRun DONE.
-    "hello-world-2step": WorkflowDefinition(
-        workflow_type="hello-world-2step",
-        steps=[
-            WorkflowStepDef(
-                step_key="step1",
-                task_type="hello-world",
-                build_input=lambda ctx, _: {"message": "hello from step1"},
-            ),
-            WorkflowStepDef(
-                step_key="step2",
-                task_type="hello-world",
-                build_input=lambda ctx, artifacts: {
-                    "message": "hello from step2",
-                    "prev": artifacts.get("step1"),
-                },
             ),
         ],
     ),

@@ -3,8 +3,8 @@
 AgentConfig dataclass + AGENT_REGISTRY dict + get_agent_config() with hot-reload
 override via AGENT_OVERRIDES_FILEPATH env var.
 
-IMPORTANT: The 'hello-world' entry is a Phase 4 placeholder to prove the pipeline
-end-to-end. It MUST be removed when send-notification is added in Phase 6. See D-06.
+Registry contains all active agent configurations. The 'send-notification' entry was
+added in Phase 6; 'hello-world' placeholder was removed.
 
 API token strategy (D-07): model_config stores the env var NAME (api_key_env field),
 not the resolved token. The LLM adapter reads os.environ[api_key_env] at job
@@ -48,21 +48,18 @@ class AgentConfig:
 # Registry
 # ---------------------------------------------------------------------------
 
-# PHASE 4 PLACEHOLDER — Remove this entry when send-notification is added in Phase 6 (D-06).
-# The hello-world entry exists only to prove the full pipeline:
-#   agents.py lookup → LLM adapter instantiation → agent invocation → output logged.
 AGENT_REGISTRY: dict[str, AgentConfig] = {
-    "hello-world": AgentConfig(
-        task_type="hello-world",
+    "send-notification": AgentConfig(
+        task_type="send-notification",
         model_config={
             "provider": "ollama",
             "url": "http://localhost:11434",
             "model": "gpt-oss:20b",
-            "api_key_env": "HELLO_WORLD_API_TOKEN",
+            "api_key_env": "SEND_NOTIFICATION_API_TOKEN",
         },
-        prompt_path="src/robotina/agent/prompts/hello-world/V001.md",
-        skills=[],
-        tools=[],
+        prompt_path="src/robotina/agent/prompts/send-notification/V001.md",
+        skills=["format-telegram-message"],
+        tools=[],  # SendNotificationTool is injected per-job in run_task() — see D-05
     ),
 }
 
