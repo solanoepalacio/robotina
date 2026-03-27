@@ -108,6 +108,17 @@ def run_task(task_input) -> object:
                 user_id=task_input.user_id,
                 platform=task_input.platform,
             ))
+        elif task_type == "handle-incoming-message":
+            from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+            from robotina.agent.tools.queue import QueueTool
+            from robotina.agent.tools.start_workflow import StartWorkflowTool
+            tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
+            tools.append(QueueTool(
+                chat_id=task_input.chat_id,
+                user_id=task_input.user_id,
+                platform=task_input.platform,
+            ))
+            tools.append(StartWorkflowTool())
 
         # Step 5 + 6: Load versioned prompt and append skill index
         prompt_text = Path(config.prompt_path).read_text()

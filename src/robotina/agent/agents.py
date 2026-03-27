@@ -62,6 +62,19 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         skills=["format-telegram-message"],
         tools=[],  # SendNotificationTool is injected per-job in run_task() — see D-05
     ),
+    "handle-incoming-message": AgentConfig(
+        task_type="handle-incoming-message",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/robotina/V001.md",
+        skills=["household-manager"],
+        tools=[],  # HouseholdManagerApiTool, QueueTool, StartWorkflowTool injected per-job in run_task()
+    ),
 }
 
 

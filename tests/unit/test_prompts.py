@@ -21,6 +21,16 @@ def test_prompt_loaded_from_agent_config_path():
     assert prompt_text.strip(), "Prompt file must not be empty"
 
 
+def test_prompt_file_exists_for_robotina():
+    """ROBOT-06: src/robotina/agent/prompts/robotina/V001.md exists."""
+    from pathlib import Path
+    prompt_path = Path("src/robotina/agent/prompts/robotina/V001.md")
+    assert prompt_path.exists(), (
+        f"Expected prompt file at {prompt_path} — run from project root"
+    )
+    assert prompt_path.read_text().strip(), "Prompt file must not be empty"
+
+
 def test_skill_index_appended_to_prompt():
     """AGENT-11: Skill index.md content is appended to system prompt before agent invocation."""
     skill_index_content = "## Skill Index\nThis is the skill index content."

@@ -125,6 +125,83 @@ def test_agent_logging_handler_on_tool_start(caplog):
         f"Expected input path in log. Got: {messages}"
 
 
+def test_run_task_injects_all_three_tools_for_handle_incoming_message():
+    """ROBOT-01/D-04: run_task() injects HouseholdManagerApiTool, QueueTool, StartWorkflowTool
+    for task_type == 'handle-incoming-message'."""
+    from unittest.mock import MagicMock, patch
+
+    mock_job = MagicMock()
+    mock_job.id = "job-hm-001"
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+
+    mock_config = MagicMock()
+    mock_config.skills = []
+    mock_config.tools = []
+    mock_config.model_config = {
+        "provider": "ollama",
+        "url": "http://localhost:11434",
+        "model": "gpt-oss:20b",
+        "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
+    }
+    mock_config.prompt_path = "/tmp/test_prompt.md"
+
+    mock_backend = MagicMock()
+    mock_agent = MagicMock()
+    mock_agent.invoke.return_value = {"messages": []}
+    mock_backend.create_agent.return_value = mock_agent
+
+    mock_session = MagicMock()
+
+    # Task input with all fields needed for tool construction
+    task_input = MagicMock()
+    task_input.chat_id = "chat-hm-1"
+    task_input.user_id = "user-hm-1"
+    task_input.platform = "telegram"
+    task_input.household_id = "household-abc"
+    task_input.text = "What's on the meal plan?"
+
+    injected_tools = []
+
+    def capture_tools(**kwargs):
+        injected_tools.extend(kwargs.get("tools", []))
+        return mock_agent
+
+    mock_backend.create_agent.side_effect = capture_tools
+
+    with (
+        patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
+        patch("robotina.agent.agents.get_agent_config", return_value=mock_config),
+        patch("robotina.llm.make_backend", return_value=mock_backend),
+        patch("pathlib.Path.read_text", return_value="system prompt"),
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("robotina.queue.workflow_runner.on_step_start"),
+        patch("robotina.queue.workflow_runner.on_step_complete"),
+        patch("robotina.queue.workflow_runner.on_step_failed"),
+    ):
+        from robotina.queue.jobs import run_task
+        run_task(task_input)
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+    from robotina.agent.tools.queue import QueueTool
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    hm_tools = [t for t in injected_tools if isinstance(t, HouseholdManagerApiTool)]
+    q_tools = [t for t in injected_tools if isinstance(t, QueueTool)]
+    sw_tools = [t for t in injected_tools if isinstance(t, StartWorkflowTool)]
+
+    assert len(hm_tools) == 1, f"Expected 1 HouseholdManagerApiTool, got {injected_tools}"
+    assert hm_tools[0].household_id == "household-abc"
+
+    assert len(q_tools) == 1, f"Expected 1 QueueTool, got {injected_tools}"
+    assert q_tools[0].chat_id == "chat-hm-1"
+    assert q_tools[0].user_id == "user-hm-1"
+
+    assert len(sw_tools) == 1, f"Expected 1 StartWorkflowTool, got {injected_tools}"
+
+    # Verify AgentConfig.tools was NOT mutated
+    assert mock_config.tools == []
+
+
 def test_agent_logging_handler_on_tool_end(caplog):
     """AGENT-10: AgentLoggingHandler.on_tool_end logs tool output (truncated to 200 chars)."""
     from robotina.agent.callbacks import AgentLoggingHandler

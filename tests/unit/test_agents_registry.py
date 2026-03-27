@@ -79,3 +79,19 @@ def test_hello_world_removed_from_registry():
     """NOTIF-01: hello-world placeholder removed from AGENT_REGISTRY in Phase 6 (D-03)."""
     with pytest.raises(KeyError):
         get_agent_config("hello-world")
+
+
+def test_handle_incoming_message_registered_in_agent_registry():
+    """ROBOT-01: handle-incoming-message is registered in AGENT_REGISTRY."""
+    config = get_agent_config("handle-incoming-message")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "handle-incoming-message"
+    assert config.skills == ["household-manager"]
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V001.md"
+    assert config.tools == []  # tools are injected per-job, not stored in registry
+
+
+def test_handle_incoming_message_api_token_env_var():
+    """ROBOT-01/D-03: handle-incoming-message uses HANDLE_INCOMING_MESSAGE_API_TOKEN env var."""
+    config = get_agent_config("handle-incoming-message")
+    assert config.model_config["api_key_env"] == "HANDLE_INCOMING_MESSAGE_API_TOKEN"
