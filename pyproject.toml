@@ -56,3 +56,8 @@ asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (require live Postgres + Redis)",
 ]
+
+[dependency-groups]
+dev = [
+    "pandas>=3.0.1",
+]
