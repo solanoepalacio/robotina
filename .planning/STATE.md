@@ -148,9 +148,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260327-gio | Commit uncommitted files | 2026-03-27 | 95a8a54 | [260327-gio-commit-uncommitted-files](./quick/260327-gio-commit-uncommitted-files/) |
 | 260327-gs5 | Switch LoggingWorker to SimpleWorker, simplify LangWatch setup | 2026-03-27 | ea3c177 | [260327-gs5-switch-loggingworker-to-simpleworker-and](./quick/260327-gs5-switch-loggingworker-to-simpleworker-and/) |
+| 260327-j4k | Fix send-notification experiment to use LangWatch Experiment API | 2026-03-27 | c5645b7 | [260327-j4k-fix-send-notification-experiment-use-lan](./quick/260327-j4k-fix-send-notification-experiment-use-lan/) |
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:12:04.600Z
-Stopped at: Completed 06-send-notification-agent Plan 04 (send-notification experiment script)
+Last session: 2026-03-27T16:47:48Z
+Stopped at: Completed quick-260327-j4k (fix send-notification experiment to use LangWatch Experiment API)
 Resume file: None
