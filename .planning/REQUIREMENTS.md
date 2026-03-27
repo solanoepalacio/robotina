@@ -75,9 +75,9 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **ROBOT-02**: Robotina agent has access to `household-manager-api` tool (reads/writes household data; auth injected invisibly; `401`/`403` raise hard errors)
 - [x] **ROBOT-03**: Robotina agent has access to `queue` tool (enqueue a single follow-up task directly, e.g. `send-notification` for direct replies)
 - [ ] **ROBOT-04**: Robotina agent has access to `start-workflow` tool (initiate multi-step workflows)
-- [ ] **ROBOT-05**: `household-manager` skill is updated to remove auth instructions (auth is handled by the tool, not the agent)
-- [ ] **ROBOT-06**: `robotina/V001.md` system prompt exists
-- [ ] **ROBOT-07**: Robotina agent correctly distinguishes direct-reply intent (→ `queue` tool) from multi-step workflow intent (→ `start-workflow` tool)
+- [x] **ROBOT-05**: `household-manager` skill is updated to remove auth instructions (auth is handled by the tool, not the agent)
+- [x] **ROBOT-06**: `robotina/V001.md` system prompt exists
+- [x] **ROBOT-07**: Robotina agent correctly distinguishes direct-reply intent (→ `queue` tool) from multi-step workflow intent (→ `start-workflow` tool)
 
 ### Recipe Research Agent
 
@@ -191,9 +191,9 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | ROBOT-02 | Phase 7 | Complete |
 | ROBOT-03 | Phase 7 | Complete |
 | ROBOT-04 | Phase 7 | Pending |
-| ROBOT-05 | Phase 7 | Pending |
-| ROBOT-06 | Phase 7 | Pending |
-| ROBOT-07 | Phase 7 | Pending |
+| ROBOT-05 | Phase 7 | Complete |
+| ROBOT-06 | Phase 7 | Complete |
+| ROBOT-07 | Phase 7 | Complete |
 | RRECIPE-01 | Phase 8 | Pending |
 | RRECIPE-02 | Phase 8 | Pending |
 | RRECIPE-03 | Phase 8 | Pending |
