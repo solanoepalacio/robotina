@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 06-send-notification-agent Plan 01 (Wave 0 registry cleanup + test stubs)
-last_updated: "2026-03-27T16:01:55.549Z"
+stopped_at: Completed 06-send-notification-agent Plan 02 (SendNotificationTool + parse_mode + run_task injection)
+last_updated: "2026-03-27T16:06:39.589Z"
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 24
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 06 (send-notification-agent) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Plan: 2 of 4
 | Phase 05-task-runner-and-workflow-engine P04 | 6min | 2 tasks | 7 files |
 | Phase 05-task-runner-and-workflow-engine P05 | 3min | 3 tasks | 6 files |
 | Phase 06-send-notification-agent P01 | 3min | 3 tasks | 6 files |
+| Phase 06-send-notification-agent P02 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,8 @@ Recent decisions affecting current work:
 - [Phase 05-task-runner-and-workflow-engine]: queue_workflow is the canonical name for workflow initiation; on_step_start is the single PENDING->RUNNING transition point for WorkflowRun
 - [Phase 06-send-notification-agent]: pytest.skip() must come before import in stub functions — placing it after causes ImportError before skip, resulting in FAILED not SKIPPED
 - [Phase 06-send-notification-agent]: test_prompts.py: 3 failures for missing send-notification/V001.md are intentional — Plan 06-03 creates the prompt file
+- [Phase 06-send-notification-agent]: asyncio.run() bridge in SendNotificationTool._run() safe in RQ worker subprocess (no event loop running, D-02)
+- [Phase 06-send-notification-agent]: parse_mode defaults to None in send_message() for backward compatibility; only notification tool passes MarkdownV2
 
 ### Pending Todos
 
@@ -142,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:01:55.546Z
-Stopped at: Completed 06-send-notification-agent Plan 01 (Wave 0 registry cleanup + test stubs)
+Last session: 2026-03-27T16:06:39.586Z
+Stopped at: Completed 06-send-notification-agent Plan 02 (SendNotificationTool + parse_mode + run_task injection)
 Resume file: None
