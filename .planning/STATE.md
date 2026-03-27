@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-03-26T22:39:03.033Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-03-27T14:28:04.906Z"
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # Project State
@@ -66,6 +66,7 @@ Plan: Not started
 | Phase 05-task-runner-and-workflow-engine P02 | 3min | 1 tasks | 2 files |
 | Phase 05-task-runner-and-workflow-engine P03 | 5min | 1 tasks | 2 files |
 | Phase 05-task-runner-and-workflow-engine P04 | 6min | 2 tasks | 7 files |
+| Phase 05-task-runner-and-workflow-engine P05 | 3min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,7 @@ Recent decisions affecting current work:
 - [Phase 05-task-runner-and-workflow-engine]: workflow_runner.py: queue injected (not hardcoded) — testable without live Redis; pre-assigned job_id before Postgres commit (D-07); session.flush() before querying DONE steps
 - [Phase 05-task-runner-and-workflow-engine]: Workflow hooks are three inline calls in run_task() — no dispatcher function (D-08 confirmed)
 - [Phase 05-task-runner-and-workflow-engine]: Unit tests calling run_task() must patch workflow_runner.on_step_* and SessionLocal to avoid live DB queries
+- [Phase 05-task-runner-and-workflow-engine]: queue_workflow is the canonical name for workflow initiation; on_step_start is the single PENDING->RUNNING transition point for WorkflowRun
 
 ### Pending Todos
 
@@ -130,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T22:21:53.433Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-03-27T14:28:04.904Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None
