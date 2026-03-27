@@ -2,9 +2,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
-def test_prompt_file_exists_for_hello_world():
-    """AGENT-08: src/robotina/agent/prompts/hello-world/V001.md exists."""
-    prompt_path = Path("src/robotina/agent/prompts/hello-world/V001.md")
+def test_prompt_file_exists_for_send_notification():
+    """AGENT-08/NOTIF-05: src/robotina/agent/prompts/send-notification/V001.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/send-notification/V001.md")
     assert prompt_path.exists(), (
         f"Expected prompt file at {prompt_path} — run from project root"
     )
@@ -14,8 +14,8 @@ def test_prompt_loaded_from_agent_config_path():
     """AGENT-08: Prompt text is loaded from the path in AgentConfig.prompt_path."""
     from robotina.agent.agents import get_agent_config
 
-    config = get_agent_config("hello-world")
-    assert config.prompt_path == "src/robotina/agent/prompts/hello-world/V001.md"
+    config = get_agent_config("send-notification")
+    assert config.prompt_path == "src/robotina/agent/prompts/send-notification/V001.md"
 
     prompt_text = Path(config.prompt_path).read_text()
     assert prompt_text.strip(), "Prompt file must not be empty"
@@ -34,7 +34,7 @@ def test_skill_index_appended_to_prompt():
     mock_agent.invoke.return_value = {"messages": []}
 
     mock_job = MagicMock()
-    mock_job.meta = {"task_type": "hello-world"}
+    mock_job.meta = {"task_type": "send-notification"}
 
     mock_session = MagicMock()
     mock_session_factory = MagicMock(return_value=mock_session)
@@ -49,11 +49,11 @@ def test_skill_index_appended_to_prompt():
         patch("robotina.queue.workflow_runner.on_step_complete"),
         patch("robotina.queue.workflow_runner.on_step_failed"),
     ):
-        # Temporarily give hello-world a skill so skill_index is non-empty
+        # Temporarily give send-notification a skill so skill_index is non-empty
         from robotina.agent.agents import AGENT_REGISTRY, AgentConfig
-        original_config = AGENT_REGISTRY["hello-world"]
-        AGENT_REGISTRY["hello-world"] = AgentConfig(
-            task_type="hello-world",
+        original_config = AGENT_REGISTRY["send-notification"]
+        AGENT_REGISTRY["send-notification"] = AgentConfig(
+            task_type="send-notification",
             model_config=original_config.model_config,
             prompt_path=original_config.prompt_path,
             skills=["fake-skill"],
@@ -64,7 +64,7 @@ def test_skill_index_appended_to_prompt():
             from robotina.queue.jobs import run_task
             run_task(MagicMock(text="test input"))
         finally:
-            AGENT_REGISTRY["hello-world"] = original_config
+            AGENT_REGISTRY["send-notification"] = original_config
 
     # Verify create_agent was called with a system_prompt containing skill index content
     assert mock_backend.create_agent.called, "create_agent was not called"

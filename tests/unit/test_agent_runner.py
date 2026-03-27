@@ -14,7 +14,7 @@ import pytest
 def test_run_task_reads_task_type_from_job_meta():
     """AGENT-06: run_task reads task_type from RQ job meta, not from input model."""
     mock_job = MagicMock()
-    mock_job.meta = {"task_type": "hello-world"}
+    mock_job.meta = {"task_type": "send-notification"}
 
     mock_config = MagicMock()
     mock_config.skills = []
@@ -46,7 +46,7 @@ def test_run_task_reads_task_type_from_job_meta():
         from robotina.queue.jobs import run_task
         run_task(MagicMock())
 
-    mock_get_config.assert_called_once_with("hello-world")
+    mock_get_config.assert_called_once_with("send-notification")
 
 
 def test_run_task_raises_if_no_task_type_in_meta():
