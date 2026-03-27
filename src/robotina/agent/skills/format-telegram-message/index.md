@@ -14,8 +14,8 @@ Apply formatting rules exactly as taught in the sub-files.
 
 ## Usage
 
-Read escaping.md first — escaping is the most common source of errors.
-Read formatting.md for structural formatting (bold, lists, etc.).
-Read examples.md if you are unsure how to handle a specific pattern.
+Read format-telegram-message/escaping.md first — escaping is the most common source of errors.
+Read format-telegram-message/formatting.md for structural formatting (bold, lists, etc.).
+Read format-telegram-message/examples.md if you are unsure how to handle a specific pattern.
 
 Do not load all files at once. Load only what you need for the current message.
