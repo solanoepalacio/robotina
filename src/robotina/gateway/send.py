@@ -14,9 +14,16 @@ Env vars consumed:
 """
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from telegram import Bot
+
+
+@dataclass
+class SendResult:
+    """Structured result returned by send_message()."""
+    message_id: str
 
 from robotina.db import SessionLocal
 from robotina.gateway.models import Conversation, MessageRole, Platform, StoredMessage
@@ -24,7 +31,7 @@ from robotina.gateway.models import Conversation, MessageRole, Platform, StoredM
 logger = logging.getLogger(__name__)
 
 
-async def send_message(chat_id: str, text: str, user_id: str, parse_mode: str | None = None) -> str:
+async def send_message(chat_id: str, text: str, user_id: str, parse_mode: str | None = None) -> SendResult:
     """Send a Telegram message and persist it as an ASSISTANT StoredMessage.
 
     Args:
@@ -34,7 +41,7 @@ async def send_message(chat_id: str, text: str, user_id: str, parse_mode: str | 
         parse_mode: Optional Telegram parse mode (e.g. 'MarkdownV2'). Defaults to None (plain text).
 
     Returns:
-        platform_message_id: Telegram-assigned message_id as str.
+        SendResult with the Telegram-assigned message_id.
 
     Called by: Phase 6 send-notification tool
     """
@@ -77,4 +84,4 @@ async def send_message(chat_id: str, text: str, user_id: str, parse_mode: str | 
         chat_id,
         platform_message_id,
     )
-    return platform_message_id
+    return SendResult(message_id=platform_message_id)

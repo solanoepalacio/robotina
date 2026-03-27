@@ -134,7 +134,7 @@ def main() -> None:
     def capture_run(self, formatted_text: str) -> str:
         captured_outputs.append(formatted_text)
         logger.info("Captured formatted output (%d chars)", len(formatted_text))
-        return "experiment-msg-id"
+        return "Notification Successfully Delivered. Notification ID = experiment-msg-id"
 
     tools.append(mock_tool)
     agent = backend.create_agent(system_prompt=prompt_text, tools=tools)

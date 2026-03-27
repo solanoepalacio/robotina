@@ -40,7 +40,7 @@ class StartWorkflowTool(BaseTool):
     name: str = "start-workflow"
     description: str = (
         "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues the first step. "
-        "Returns the workflow_run_id. Use this for complex multi-step tasks like adding a recipe."
+        "When this tool returns, the task is done — do not call it again. "
         "\n\nArgs:\n"
         "  workflow_type (str): Workflow name, e.g. 'add-recipe'.\n"
         "  shared_context (dict): Context dict with reply_context, household_id, and task-specific fields."
@@ -79,7 +79,7 @@ class StartWorkflowTool(BaseTool):
                 workflow_type,
                 workflow_run_id,
             )
-            return workflow_run_id
+            return f"Workflow started successfully. Workflow ID = {workflow_run_id}"
         finally:
             session.close()
 

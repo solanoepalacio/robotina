@@ -29,10 +29,11 @@ def test_send_notification_tool_name_and_description():
 def test_send_notification_tool_run_calls_send_message():
     """NOTIF-04: _run(formatted_text) calls send_message with chat_id, text, user_id, parse_mode."""
     from robotina.agent.tools.send_notification import SendNotificationTool
+    from robotina.gateway.send import SendResult
 
     tool = SendNotificationTool(chat_id="123", user_id="456", platform="telegram")
 
-    mock_coro = AsyncMock(return_value="msg-001")
+    mock_coro = AsyncMock(return_value=SendResult(message_id="msg-001"))
     with patch("robotina.gateway.send.send_message", mock_coro):
         result = tool._run("*formatted text*")
 
@@ -44,17 +45,18 @@ def test_send_notification_tool_run_calls_send_message():
     )
 
 
-def test_send_notification_tool_run_returns_platform_message_id():
-    """NOTIF-04: _run() returns the platform_message_id string from send_message()."""
+def test_send_notification_tool_run_returns_delivery_confirmation():
+    """NOTIF-04: _run() returns a clear stop signal with the Notification ID."""
     from robotina.agent.tools.send_notification import SendNotificationTool
+    from robotina.gateway.send import SendResult
 
     tool = SendNotificationTool(chat_id="123", user_id="456", platform="telegram")
 
-    mock_coro = AsyncMock(return_value="telegram-msg-999")
+    mock_coro = AsyncMock(return_value=SendResult(message_id="telegram-msg-999"))
     with patch("robotina.gateway.send.send_message", mock_coro):
         result = tool._run("hello")
 
-    assert result == "telegram-msg-999"
+    assert result == "Notification Successfully Delivered. Notification ID = telegram-msg-999"
 
 
 def test_send_notification_tool_run_uses_asyncio_run():
@@ -71,7 +73,8 @@ def test_send_notification_tool_run_uses_asyncio_run():
         calls.append(coro)
         return original_run(coro, **kwargs)
 
-    mock_send = AsyncMock(return_value="msg-abc")
+    from robotina.gateway.send import SendResult
+    mock_send = AsyncMock(return_value=SendResult(message_id="msg-abc"))
     with (
         patch("robotina.gateway.send.send_message", mock_send),
         patch("asyncio.run", side_effect=capture_run),

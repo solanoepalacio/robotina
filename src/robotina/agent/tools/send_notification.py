@@ -31,13 +31,14 @@ class SendNotificationTool(BaseTool):
         formatted_text: The MarkdownV2-formatted message text to send.
 
     Returns:
-        platform_message_id: Telegram-assigned message_id as str.
+        Delivery confirmation string with the Notification ID. Stop after receiving this.
     """
 
     name: str = "send-notification"
     description: str = (
         "Send the formatted message to the user via the gateway. "
         "Call this after applying the format-telegram-message skill to reformat the text. "
+        "When this tool returns, the task is done — do not call it again. "
         "Args: formatted_text (str) — the MarkdownV2-formatted message to send."
     )
 
@@ -47,10 +48,13 @@ class SendNotificationTool(BaseTool):
     platform: str  # always "telegram" for Phase 1
 
     def _run(self, formatted_text: str) -> str:
-        """Send formatted_text via the Telegram gateway. Returns platform_message_id."""
+        """Send formatted_text via the Telegram gateway.
+
+        Returns a clear completion signal so the agent stops after one call.
+        """
         from robotina.gateway.send import send_message
 
-        platform_message_id = asyncio.run(
+        result = asyncio.run(
             send_message(
                 chat_id=self.chat_id,
                 text=formatted_text,
@@ -61,9 +65,9 @@ class SendNotificationTool(BaseTool):
         logger.info(
             "send-notification tool | chat_id=%s message_id=%s",
             self.chat_id,
-            platform_message_id,
+            result.message_id,
         )
-        return platform_message_id
+        return f"Notification Successfully Delivered. Notification ID = {result.message_id}"
 
     async def _arun(self, formatted_text: str) -> str:
         return self._run(formatted_text)
