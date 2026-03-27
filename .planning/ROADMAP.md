@@ -140,7 +140,13 @@ Plans:
   2. A Telegram message requesting a multi-step task (e.g., "add a recipe for X") results in a `WorkflowRun` being created via the `start-workflow` tool with the correct initial step enqueued
   3. The `household-manager-api` tool is used to read household data; a `401` or `403` response raises a hard error that stops the agent loop rather than being retried as a recoverable error
   4. The `household-manager` skill no longer contains auth instructions (auth is injected by the tool, not the agent)
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Wave 0: test stubs for HouseholdManagerApiTool and QueueTool
+- [ ] 07-02-PLAN.md — HouseholdManagerApiTool + QueueTool implementations
+- [ ] 07-03-PLAN.md — household-manager skill auth removal + robotina/V001.md routing prompt
+- [ ] 07-04-PLAN.md — agents.py registry entry + run_task() injection + human checkpoint
 
 ### Phase 8: recipe-research Agent
 **Goal**: The recipe research agent performs structured multi-site web search via Tavily and produces a fully populated `RecipeData` output, with traces pinned to LangWatch experiment collections
