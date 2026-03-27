@@ -7,20 +7,19 @@ import inspect
 
 
 def test_logging_worker_is_worker_subclass():
-    """LoggingWorker must be a subclass of rq.Worker."""
-    from rq import Worker
+    """LoggingWorker must be a subclass of rq.worker.SimpleWorker."""
+    from rq.worker import SimpleWorker
     from robotina.queue.runner import LoggingWorker
-    assert issubclass(LoggingWorker, Worker), (
-        "LoggingWorker must subclass rq.Worker — single Worker instance = concurrency=1 (QUEUE-02)"
+    assert issubclass(LoggingWorker, SimpleWorker), (
+        "LoggingWorker must subclass rq.worker.SimpleWorker — runs in-process without os.fork() (QUEUE-02)"
     )
 
 
 def test_logging_worker_overrides_perform_job():
-    """LoggingWorker must override perform_job (not inherit it from Worker)."""
-    from rq import Worker
+    """LoggingWorker must override perform_job (not inherit it from SimpleWorker)."""
     from robotina.queue.runner import LoggingWorker
     assert "perform_job" in LoggingWorker.__dict__, (
-        "LoggingWorker must override perform_job — inherited Worker.perform_job has no lifecycle logging"
+        "LoggingWorker must override perform_job — inherited SimpleWorker.perform_job has no lifecycle logging"
     )
 
 
