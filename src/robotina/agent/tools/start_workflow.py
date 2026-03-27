@@ -67,7 +67,7 @@ class StartWorkflowTool(BaseTool):
                     os.environ.get("REDIS_URL", "redis://localhost:6379")
                 ),
             )
-            workflow_run_id = workflow_runner.start_workflow(
+            workflow_run_id = workflow_runner.queue_workflow(
                 workflow_type=workflow_type,
                 shared_context=shared_context,
                 household_id=household_id,
@@ -75,7 +75,7 @@ class StartWorkflowTool(BaseTool):
                 session=session,
             )
             logger.info(
-                "start-workflow tool | workflow_type=%s run_id=%s",
+                "queue-workflow tool | workflow_type=%s run_id=%s",
                 workflow_type,
                 workflow_run_id,
             )

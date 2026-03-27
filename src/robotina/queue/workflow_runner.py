@@ -25,14 +25,17 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
-def start_workflow(
+def queue_workflow(
     workflow_type: str,
     shared_context: dict,
     household_id: str,
     queue,
     session: Session,
 ) -> str:
-    """Create a WorkflowRun and all WorkflowRunStep records, enqueue the first step.
+    """Create a WorkflowRun as PENDING and all WorkflowRunStep records, enqueue the first step.
+
+    The WorkflowRun is created with status=PENDING. It transitions to RUNNING
+    when the worker begins executing the first step (on_step_start).
 
     Args:
         workflow_type: Key in WORKFLOW_REGISTRY (e.g. "add-recipe").
@@ -50,15 +53,16 @@ def start_workflow(
         KeyError: If workflow_type not in WORKFLOW_REGISTRY.
     """
     from robotina.agent.workflows import WORKFLOW_REGISTRY
-    from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStepStatus
+    from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStatus, WorkflowStepStatus
 
     workflow_def = WORKFLOW_REGISTRY[workflow_type]
 
-    # Create the WorkflowRun
+    # Create the WorkflowRun as PENDING (transitions to RUNNING when first step begins)
     run = WorkflowRun(
         workflow_type=workflow_type,
         household_id=household_id,
         shared_context=shared_context,
+        status=WorkflowStatus.PENDING,
     )
     session.add(run)
     session.flush()  # get run.id before creating steps
@@ -95,7 +99,7 @@ def start_workflow(
     session.commit()
 
     logger.info(
-        "Workflow started | workflow_type=%s run_id=%s first_job_id=%s",
+        "Workflow queued | workflow_type=%s run_id=%s first_job_id=%s",
         workflow_type,
         run.id,
         first_job_id,
@@ -114,7 +118,7 @@ def on_step_start(job_id: str, session: Session) -> None:
         job_id: RQ job ID of the currently executing job.
         session: SQLAlchemy session.
     """
-    from robotina.queue.models import WorkflowRunStep, WorkflowStepStatus
+    from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStatus, WorkflowStepStatus
 
     step = (
         session.query(WorkflowRunStep)
@@ -127,6 +131,10 @@ def on_step_start(job_id: str, session: Session) -> None:
 
     step.status = WorkflowStepStatus.RUNNING
     step.started_at = datetime.now(timezone.utc)
+    # Transition WorkflowRun from PENDING → RUNNING when first step begins
+    run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
+    if run is not None and run.status == WorkflowStatus.PENDING:
+        run.status = WorkflowStatus.RUNNING
     session.commit()
     logger.info(
         "Step started | run_id=%s step_key=%s job_id=%s",
