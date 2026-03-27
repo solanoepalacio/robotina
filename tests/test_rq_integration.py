@@ -19,11 +19,11 @@ def _redis_conn():
 
 
 def _run_worker_once(queue_name: str, conn) -> None:
-    """Start a LoggingWorker and process jobs until the queue is empty."""
-    from robotina.queue.runner import LoggingWorker
+    """Process all queued jobs once using SimpleWorker (no fork — safe in multi-threaded pytest)."""
     from rq import Queue
+    from rq.worker import SimpleWorker
     q = Queue(queue_name, connection=conn)
-    worker = LoggingWorker([q], connection=conn)
+    worker = SimpleWorker([q], connection=conn)
     # burst=True: process all queued jobs then exit — safe for tests
     worker.work(burst=True)
 
