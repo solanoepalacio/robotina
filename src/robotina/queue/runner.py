@@ -98,6 +98,11 @@ def main() -> None:
         queue = Queue("agent-tasks", connection=redis_conn)
         worker = LoggingWorker([queue], connection=redis_conn)
         logger.info("Starting task runner worker (concurrency=1)...")
+        logger.info(
+            "NOTE: This process handles job execution only. "
+            "Telegram bot polling must be started separately via `uv run gateway`, "
+            "or start both together with `uv run all`."
+        )
         # IMPORTANT: All jobs enqueued to this worker MUST set result_ttl=-1 and
         # failure_ttl=-1 (CLAUDE.md requirement — no tasks lost on crash/reboot).
         worker.work()

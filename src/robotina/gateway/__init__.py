@@ -19,6 +19,9 @@ def main() -> None:
     run_polling() is synchronous and manages its own asyncio event loop.
     Do NOT wrap in asyncio.run().
     """
+    from dotenv import load_dotenv
+
+    load_dotenv()
     logging.basicConfig(level=logging.INFO)
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     app = ApplicationBuilder().token(token).build()

@@ -37,11 +37,29 @@ uv run migrate
 
 ## Running
 
-**Task runner (agent worker)**
+**Full system (Telegram gateway + task runner worker)**
+
+```bash
+uv run all
+```
+
+This launches both the Telegram bot polling loop and the RQ task runner as concurrent child processes. Use this command for end-to-end operation. Stop with Ctrl+C.
+
+**Task runner only**
 
 ```bash
 uv run agent
 ```
+
+Starts the sequential RQ worker on the `agent-tasks` queue. Does NOT start Telegram polling. Use this when running the gateway separately or when processing queued jobs without an active bot session.
+
+**Telegram gateway only**
+
+```bash
+uv run gateway
+```
+
+Starts the Telegram bot in polling mode. Incoming messages are persisted and enqueued to `agent-tasks`. Requires `TELEGRAM_BOT_TOKEN` env var. Does NOT process the queue — requires `uv run agent` running concurrently.
 
 **Run experiments**
 
