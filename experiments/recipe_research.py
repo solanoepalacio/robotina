@@ -124,7 +124,10 @@ def extract_json_output(result: dict) -> dict:
                 json_lines.append(line)
             text = "\n".join(json_lines)
         try:
-            return json.loads(text)
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return {"recipes": parsed}
+            return parsed
         except json.JSONDecodeError:
             continue
     logger.warning("Could not extract JSON from agent output, returning raw messages")
