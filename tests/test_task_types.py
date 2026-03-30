@@ -130,3 +130,97 @@ def test_recipe_data_empty_lists_pickle_round_trip():
     )
     restored = pickle.loads(pickle.dumps(model))
     assert restored == model
+
+
+# ---------------------------------------------------------------------------
+# recipe-research sub-task I/O model tests (RRECIPE-04)
+# ---------------------------------------------------------------------------
+
+
+def test_recipe_research_gather_input_round_trip():
+    """RRECIPE-04: RecipeResearchGatherInput is pickle-serializable."""
+    from robotina.queue.task_types import RecipeResearchGatherInput
+    m = RecipeResearchGatherInput(query="Pasta Bolognesa", household_id="h1")
+    assert m.to_user_message() == "Pasta Bolognesa"
+    assert pickle.loads(pickle.dumps(m)) == m
+
+
+def test_recipe_research_gather_output_accepts_list_of_dicts():
+    """RRECIPE-04: RecipeResearchGatherOutput stores list[dict]."""
+    from robotina.queue.task_types import RecipeResearchGatherOutput
+    m = RecipeResearchGatherOutput(recipes=[{"title": "test", "url": "http://x.com"}])
+    assert len(m.recipes) == 1
+
+
+def test_recipe_research_instructions_input_round_trip():
+    from robotina.queue.task_types import RecipeResearchInstructionsInput
+    m = RecipeResearchInstructionsInput(query="Pasta", gathered_recipes=[{"title": "t"}])
+    assert "Pasta" in m.to_user_message()
+    assert pickle.loads(pickle.dumps(m)) == m
+
+
+def test_recipe_research_instructions_output_has_draft_fields():
+    from robotina.queue.task_types import RecipeResearchInstructionsOutput, RecipeStep
+    m = RecipeResearchInstructionsOutput(
+        draft_name="Pasta Bolognesa",
+        draft_description="Classic pasta dish",
+        draft_instructions=[RecipeStep(body="Cook pasta", title=None)],
+    )
+    assert m.draft_name == "Pasta Bolognesa"
+    assert len(m.draft_instructions) == 1
+
+
+def test_recipe_research_ingredients_input_round_trip():
+    from robotina.queue.task_types import RecipeResearchIngredientsInput, RecipeStep
+    m = RecipeResearchIngredientsInput(
+        query="Pasta",
+        draft_instructions=[RecipeStep(body="Cook", title=None)],
+        gathered_recipes=[],
+        household_id="h1",
+    )
+    assert "Pasta" in m.to_user_message()
+    assert pickle.loads(pickle.dumps(m)) == m
+
+
+def test_recipe_research_ingredients_output_has_ingredients():
+    from robotina.queue.task_types import RecipeResearchIngredientsOutput, RecipeIngredient
+    m = RecipeResearchIngredientsOutput(
+        ingredients=[RecipeIngredient(food_name="cebolla", unit_name="unidad", quantity=1.0, note=None)]
+    )
+    assert len(m.ingredients) == 1
+    assert m.ingredients[0].food_name == "cebolla"
+
+
+def test_recipe_research_metadata_input_round_trip():
+    from robotina.queue.task_types import RecipeResearchMetadataInput, RecipeStep, RecipeIngredient
+    m = RecipeResearchMetadataInput(
+        query="Pasta",
+        draft_name="Pasta Bolognesa",
+        draft_description="Desc",
+        draft_instructions=[RecipeStep(body="Cook", title=None)],
+        ingredients=[RecipeIngredient(food_name="pasta", unit_name="g", quantity=500.0, note=None)],
+        gathered_recipes=[],
+    )
+    assert "Pasta" in m.to_user_message()
+    assert pickle.loads(pickle.dumps(m)) == m
+
+
+def test_recipe_research_metadata_output_conforms_to_recipe_data():
+    """RRECIPE-04: Final metadata output uses RecipeData model."""
+    from robotina.queue.task_types import RecipeResearchMetadataOutput, RecipeData
+    m = RecipeResearchMetadataOutput(
+        recipe=RecipeData(
+            name="Pasta Bolognesa",
+            description="Classic",
+            servings_qty=4,
+            servings_unit="porciones",
+            prep_time=15,
+            cook_time=30,
+            total_time=45,
+            source_url="http://example.com",
+            ingredients=[],
+            steps=[],
+        )
+    )
+    assert m.recipe.name == "Pasta Bolognesa"
+    assert m.recipe.servings_qty == 4

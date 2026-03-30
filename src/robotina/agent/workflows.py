@@ -18,8 +18,13 @@ from pydantic import BaseModel, ConfigDict
 
 from robotina.queue.task_types import (
     RecipeData,
+    RecipeIngredient,
     RecipeLoadInput,
-    RecipeResearchInput,
+    RecipeResearchGatherInput,
+    RecipeResearchIngredientsInput,
+    RecipeResearchInstructionsInput,
+    RecipeResearchMetadataInput,
+    RecipeStep,
     SendNotificationInput,
 )
 
@@ -60,20 +65,57 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
         workflow_type="add-recipe",
         steps=[
             WorkflowStepDef(
-                step_key="research",
-                task_type="recipe-research",
-                build_input=lambda ctx, _: RecipeResearchInput(
+                step_key="gather",
+                task_type="recipe-research-gather",
+                build_input=lambda ctx, _: RecipeResearchGatherInput(
                     query=ctx["recipe_query"],
                     household_id=ctx["household_id"],
                 ),
             ),
             WorkflowStepDef(
+                step_key="instructions",
+                task_type="recipe-research-instructions",
+                build_input=lambda ctx, artifacts: RecipeResearchInstructionsInput(
+                    query=ctx["recipe_query"],
+                    gathered_recipes=artifacts["gather"]["recipes"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="ingredients",
+                task_type="recipe-research-ingredients",
+                build_input=lambda ctx, artifacts: RecipeResearchIngredientsInput(
+                    query=ctx["recipe_query"],
+                    draft_instructions=[
+                        RecipeStep(**s) for s in artifacts["instructions"]["draft_instructions"]
+                    ],
+                    gathered_recipes=artifacts["gather"]["recipes"],
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="metadata",
+                task_type="recipe-research-metadata",
+                build_input=lambda ctx, artifacts: RecipeResearchMetadataInput(
+                    query=ctx["recipe_query"],
+                    draft_name=artifacts["instructions"]["draft_name"],
+                    draft_description=artifacts["instructions"]["draft_description"],
+                    draft_instructions=[
+                        RecipeStep(**s) for s in artifacts["instructions"]["draft_instructions"]
+                    ],
+                    ingredients=[
+                        RecipeIngredient(**i) for i in artifacts["ingredients"]["ingredients"]
+                    ],
+                    gathered_recipes=artifacts["gather"]["recipes"],
+                    source_url=artifacts["gather"]["recipes"][0].get("url") if artifacts["gather"]["recipes"] else None,
+                ),
+            ),
+            WorkflowStepDef(
                 step_key="load",
                 task_type="recipe-load",
-                # artifacts["research"] is a dict from model_dump(mode='json')
-                # — must reconstruct RecipeData before passing to RecipeLoadInput
+                # artifacts["metadata"]["recipe"] is a dict from model_dump(mode='json')
+                # -- must reconstruct RecipeData before passing to RecipeLoadInput
                 build_input=lambda ctx, artifacts: RecipeLoadInput(
-                    recipe=RecipeData(**artifacts["research"]["recipe"]),
+                    recipe=RecipeData(**artifacts["metadata"]["recipe"]),
                     household_id=ctx["household_id"],
                 ),
             ),
