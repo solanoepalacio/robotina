@@ -135,7 +135,7 @@ def run_task(task_input) -> object:
         # LangChain events (LLM calls, tool calls) as child spans under that trace.
         # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
         agent = backend.create_agent(system_prompt=prompt_text, tools=tools)
-        user_message = _extract_user_message(task_input)
+        user_message = task_input.to_user_message()
 
         try:
             import langwatch
@@ -169,14 +169,3 @@ def run_task(task_input) -> object:
         _session.close()
 
 
-def _extract_user_message(task_input) -> str:
-    """Extract the user-facing message text from any task input model.
-
-    For Phase 4 hello-world testing, accepts any input and returns a default.
-    Phase 5+ agents will use properly typed inputs with specific fields.
-    """
-    # IncomingMessageInput has a 'text' field
-    if hasattr(task_input, "text"):
-        return str(task_input.text)
-    # Fallback for hello-world placeholder and unknown types
-    return str(task_input)

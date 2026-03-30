@@ -76,6 +76,9 @@ class IncomingMessageInput(BaseModel):
     text: str                     # raw message text
     history: list[Message]        # last X messages, ordered oldest to newest
 
+    def to_user_message(self) -> str:
+        return self.text
+
 
 class IncomingMessageOutput(BaseModel):
     action: Literal["replied", "started_workflow"]
@@ -92,6 +95,9 @@ class RecipeResearchInput(BaseModel):
     query: str            # e.g. "spaghetti carbonara"
     household_id: str
 
+    def to_user_message(self) -> str:
+        return self.query
+
 
 class RecipeResearchOutput(BaseModel):
     recipe: RecipeData    # persisted to WorkflowRunStep.artifact by the task runner
@@ -105,6 +111,9 @@ class RecipeResearchOutput(BaseModel):
 class RecipeLoadInput(BaseModel):
     recipe: RecipeData    # resolved from prior step's artifact by the task runner
     household_id: str
+
+    def to_user_message(self) -> str:
+        return f"Load recipe: {self.recipe.name}"
 
 
 class RecipeLoadOutput(BaseModel):
@@ -121,6 +130,9 @@ class SendNotificationInput(BaseModel):
     chat_id: str
     user_id: str
     text: str             # pre-written text; agent reformats for Telegram, does not compose
+
+    def to_user_message(self) -> str:
+        return self.text
 
 
 class SendNotificationOutput(BaseModel):
