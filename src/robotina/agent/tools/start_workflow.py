@@ -27,11 +27,15 @@ class StartWorkflowTool(BaseTool):
     enqueues the first step to the agent-tasks queue, and returns the
     workflow_run_id string.
 
+    Recipient context (chat_id, user_id, platform, household_id) is injected at
+    construction time by run_task() and auto-merged into shared_context as
+    ``reply_context`` — the LLM never needs to know these values.
+
     Args (via _run):
         workflow_type: Workflow identifier (e.g. "add-recipe"). Must exist in WORKFLOW_REGISTRY.
-        shared_context: Dict containing everything steps need but shouldn't own:
-                        reply_context, household_id, recipe_query, etc.
-                        Stored immutably on WorkflowRun — never modified by steps.
+        shared_context: Dict containing task-specific fields the workflow needs
+                        (e.g. recipe_query). reply_context and household_id are
+                        injected automatically — the agent does not need to provide them.
 
     Returns:
         workflow_run_id: UUID string identifying the created WorkflowRun.
@@ -43,8 +47,15 @@ class StartWorkflowTool(BaseTool):
         "When this tool returns, the task is done — do not call it again. "
         "\n\nArgs:\n"
         "  workflow_type (str): Workflow name, e.g. 'add-recipe'.\n"
-        "  shared_context (dict): Context dict with reply_context, household_id, and task-specific fields."
+        "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
+        "reply_context and household_id are injected automatically."
     )
+
+    # Injected by run_task() at construction time
+    chat_id: str = ""
+    user_id: str = ""
+    platform: str = ""
+    household_id: str = ""
 
     def _run(self, workflow_type: str, shared_context: dict) -> str:
         """Create and enqueue a workflow. Returns workflow_run_id.
@@ -57,6 +68,15 @@ class StartWorkflowTool(BaseTool):
 
         from robotina.db import SessionLocal
         from robotina.queue import workflow_runner
+
+        # Auto-inject reply_context and household_id from constructor fields
+        # so the LLM never needs to know about chat_id/user_id/platform.
+        shared_context.setdefault("reply_context", {
+            "platform": self.platform,
+            "chat_id": self.chat_id,
+            "user_id": self.user_id,
+        })
+        shared_context.setdefault("household_id", self.household_id)
 
         household_id = shared_context.get("household_id", "")
         session = SessionLocal()

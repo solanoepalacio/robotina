@@ -197,6 +197,10 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     assert q_tools[0].user_id == "user-hm-1"
 
     assert len(sw_tools) == 1, f"Expected 1 StartWorkflowTool, got {injected_tools}"
+    assert sw_tools[0].chat_id == "chat-hm-1"
+    assert sw_tools[0].user_id == "user-hm-1"
+    assert sw_tools[0].platform == "telegram"
+    assert sw_tools[0].household_id == "household-abc"
 
     # Verify AgentConfig.tools was NOT mutated
     assert mock_config.tools == []
