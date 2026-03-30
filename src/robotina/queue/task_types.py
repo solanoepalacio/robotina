@@ -132,7 +132,8 @@ class SendNotificationInput(BaseModel):
     text: str             # pre-written text; agent reformats for Telegram, does not compose
 
     def to_user_message(self) -> str:
-        return self.text
+        return f"""Format and send the following message:
+{self.text}"""
 
 
 class SendNotificationOutput(BaseModel):
