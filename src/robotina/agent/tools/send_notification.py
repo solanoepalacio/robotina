@@ -51,17 +51,27 @@ class SendNotificationTool(BaseTool):
         """Send formatted_text via the Telegram gateway.
 
         Returns a clear completion signal so the agent stops after one call.
+        Telegram errors (e.g. MarkdownV2 parse failures) are returned as error
+        messages so the LLM can fix formatting and retry instead of failing the task.
         """
         from robotina.gateway.send import send_message
 
-        result = asyncio.run(
-            send_message(
-                chat_id=self.chat_id,
-                text=formatted_text,
-                user_id=self.user_id,
-                parse_mode="MarkdownV2",
+        try:
+            result = asyncio.run(
+                send_message(
+                    chat_id=self.chat_id,
+                    text=formatted_text,
+                    user_id=self.user_id,
+                    parse_mode="MarkdownV2",
+                )
             )
-        )
+        except Exception as exc:
+            logger.warning(
+                "send-notification tool failed | chat_id=%s error=%s",
+                self.chat_id,
+                exc,
+            )
+            return f"ERROR: {exc}"
         logger.info(
             "send-notification tool | chat_id=%s message_id=%s",
             self.chat_id,

@@ -36,30 +36,52 @@ def test_read_skill_tool_valid_path(tmp_path):
 
 
 def test_read_skill_tool_blocks_path_traversal(tmp_path):
-    """AGENT-09: read-skill tool raises ValueError for paths containing '..'."""
+    """AGENT-09: read-skill tool returns error for paths containing '..'."""
     skill_dir = tmp_path / "my-skill"
     skill_dir.mkdir()
 
     tool = ReadSkillTool(skill_dirs={"my-skill": skill_dir})
-    with pytest.raises(ValueError, match="traversal"):
-        tool._run("my-skill/../../../etc/passwd")
+    result = tool._run("my-skill/../../../etc/passwd")
+    assert result.startswith("ERROR:")
+    assert "traversal" in result.lower()
 
 
 def test_read_skill_tool_blocks_absolute_path(tmp_path):
-    """AGENT-09: read-skill tool raises ValueError for absolute paths."""
+    """AGENT-09: read-skill tool returns error for absolute paths."""
     skill_dir = tmp_path / "my-skill"
     skill_dir.mkdir()
 
     tool = ReadSkillTool(skill_dirs={"my-skill": skill_dir})
-    with pytest.raises(ValueError):
-        tool._run("/etc/passwd")
+    result = tool._run("/etc/passwd")
+    assert result.startswith("ERROR:")
 
 
 def test_read_skill_tool_unknown_skill_raises(tmp_path):
-    """AGENT-09: read-skill tool raises ValueError for unknown skill name."""
+    """AGENT-09: read-skill tool returns error for unknown skill name."""
     tool = ReadSkillTool(skill_dirs={})
-    with pytest.raises(ValueError, match="Unknown skill"):
-        tool._run("nonexistent/file.md")
+    result = tool._run("nonexistent/file.md")
+    assert result.startswith("ERROR:")
+    assert "Unknown skill" in result
+
+
+def test_read_skill_tool_missing_skill_prefix(tmp_path):
+    """read-skill tool returns helpful error when skill-name prefix is omitted."""
+    tool = ReadSkillTool(skill_dirs={"household-manager": tmp_path})
+    result = tool._run("meal_plan.md")
+    assert result.startswith("ERROR:")
+    assert "skill-name/subfile.md" in result
+    assert "household-manager" in result
+
+
+def test_read_skill_tool_file_not_found(tmp_path):
+    """read-skill tool returns error when sub-file does not exist."""
+    skill_dir = tmp_path / "my-skill"
+    skill_dir.mkdir()
+
+    tool = ReadSkillTool(skill_dirs={"my-skill": skill_dir})
+    result = tool._run("my-skill/nonexistent.md")
+    assert result.startswith("ERROR:")
+    assert "not found" in result.lower()
 
 
 def test_household_manager_shared_md_has_no_authentication_section():

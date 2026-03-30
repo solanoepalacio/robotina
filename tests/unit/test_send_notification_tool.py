@@ -84,6 +84,25 @@ def test_send_notification_tool_run_uses_asyncio_run():
     assert len(calls) == 1, "asyncio.run() must be called exactly once"
 
 
+def test_send_notification_tool_returns_error_on_failure():
+    """SendNotificationTool returns error string instead of raising, so the LLM can retry."""
+    from robotina.agent.tools.send_notification import SendNotificationTool
+
+    tool = SendNotificationTool(chat_id="123", user_id="456", platform="telegram")
+
+    mock_coro = AsyncMock(
+        side_effect=Exception(
+            "Can't parse entities: character '-' is reserved and must be "
+            "escaped with the preceding '\\'"
+        )
+    )
+    with patch("robotina.gateway.send.send_message", mock_coro):
+        result = tool._run("bad - markdown")
+
+    assert result.startswith("ERROR: ")
+    assert "parse entities" in result
+
+
 def test_run_task_injects_send_notification_tool_for_task_type():
     """NOTIF-04/D-05: run_task() creates SendNotificationTool with task_input fields
     when task_type == 'send-notification', without mutating AgentConfig."""

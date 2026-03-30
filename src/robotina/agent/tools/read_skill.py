@@ -14,10 +14,13 @@ symlinks and '..' segments before comparison.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from langchain_core.tools import BaseTool
 from pydantic import Field
+
+logger = logging.getLogger(__name__)
 
 # Canonical skills directory — anchored relative to this file's location
 SKILLS_BASE = Path(__file__).resolve().parent.parent / "skills"
@@ -56,8 +59,9 @@ class ReadSkillTool(BaseTool):
 
     name: str = "read-skill"
     description: str = (
-        "Load a skill sub-file. Accept path in 'skill-name/subfile.md' format "
-        "(e.g. 'household-manager/api-endpoints.md'). "
+        "Load a skill sub-file. The path MUST include the skill name as a prefix: "
+        "'skill-name/subfile.md' (e.g. 'household-manager/meal_plan.md'). "
+        "WRONG: 'meal_plan.md'. CORRECT: 'household-manager/meal_plan.md'. "
         "Returns the full text content of the requested file."
     )
     skill_dirs: dict[str, Path] = Field(default_factory=dict)
@@ -65,24 +69,28 @@ class ReadSkillTool(BaseTool):
     def _run(self, path: str) -> str:
         """Load a skill sub-file by 'skill-name/subfile.md' path.
 
-        Raises:
-            ValueError: For invalid format, unknown skill, or path traversal.
-            FileNotFoundError: If the sub-file does not exist.
+        Errors are returned as strings so the LLM can fix its input and retry
+        instead of crashing the task.
         """
         # Validate path format: must contain exactly one '/' splitting into 2 parts
         parts = path.split("/", 1)
         if len(parts) != 2 or not parts[0] or not parts[1]:
-            raise ValueError(
-                f"Invalid skill path format: {path!r}. "
-                "Expected 'skill-name/subfile.md' format."
+            available = list(self.skill_dirs.keys())
+            logger.warning("read-skill invalid path format: %r", path)
+            return (
+                f"ERROR: Invalid path format: {path!r}. "
+                f"You must include the skill name prefix: 'skill-name/subfile.md'. "
+                f"Available skills: {available}"
             )
         skill_name, subfile = parts
 
         # Validate skill name is known
         if skill_name not in self.skill_dirs:
-            raise ValueError(
-                f"Unknown skill: {skill_name!r}. "
-                f"Available skills: {list(self.skill_dirs.keys())}"
+            available = list(self.skill_dirs.keys())
+            logger.warning("read-skill unknown skill: %r", skill_name)
+            return (
+                f"ERROR: Unknown skill: {skill_name!r}. "
+                f"Available skills: {available}"
             )
 
         base = self.skill_dirs[skill_name].resolve()
@@ -90,11 +98,14 @@ class ReadSkillTool(BaseTool):
 
         # Block path traversal (resolve() defeats '..' and symlinks)
         if not str(target).startswith(str(base) + "/") and target != base:
-            raise ValueError(
-                f"Path traversal outside skill directory is not allowed: {path!r}"
-            )
+            logger.warning("read-skill path traversal attempt: %r", path)
+            return f"ERROR: Path traversal outside skill directory is not allowed: {path!r}"
 
-        return target.read_text()
+        try:
+            return target.read_text()
+        except FileNotFoundError:
+            logger.warning("read-skill file not found: %r", path)
+            return f"ERROR: File not found: {path!r}"
 
     async def _arun(self, path: str) -> str:
         return self._run(path)
