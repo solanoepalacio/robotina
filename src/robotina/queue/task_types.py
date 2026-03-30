@@ -104,6 +104,92 @@ class RecipeResearchOutput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# recipe-research-gather (Step 1 of recipe research pipeline)
+# ---------------------------------------------------------------------------
+
+class RecipeResearchGatherInput(BaseModel):
+    query: str            # meal name, e.g. "Pasta Bolognesa"
+    household_id: str
+
+    def to_user_message(self) -> str:
+        return self.query
+
+
+class RecipeResearchGatherOutput(BaseModel):
+    recipes: list[dict]   # list of scraped/extracted recipe dicts from web search
+
+
+# ---------------------------------------------------------------------------
+# recipe-research-instructions (Step 2 of recipe research pipeline)
+# ---------------------------------------------------------------------------
+
+class RecipeResearchInstructionsInput(BaseModel):
+    query: str
+    gathered_recipes: list[dict]  # from gather step artifact
+
+    def to_user_message(self) -> str:
+        import json
+        return f"Create baseline instructions for: {self.query}\n\nGathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
+
+
+class RecipeResearchInstructionsOutput(BaseModel):
+    draft_name: str
+    draft_description: str
+    draft_instructions: list[RecipeStep]
+
+
+# ---------------------------------------------------------------------------
+# recipe-research-ingredients (Step 3 of recipe research pipeline)
+# ---------------------------------------------------------------------------
+
+class RecipeResearchIngredientsInput(BaseModel):
+    query: str
+    draft_instructions: list[RecipeStep]
+    gathered_recipes: list[dict]  # for substitute lookup (D-15)
+    household_id: str
+
+    def to_user_message(self) -> str:
+        import json
+        instructions_text = "\n".join(f"- {s.body}" for s in self.draft_instructions)
+        return f"Extract and verify ingredients for: {self.query}\n\nDraft instructions:\n{instructions_text}\n\nGathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
+
+
+class RecipeResearchIngredientsOutput(BaseModel):
+    ingredients: list[RecipeIngredient]
+
+
+# ---------------------------------------------------------------------------
+# recipe-research-metadata (Step 4 of recipe research pipeline)
+# ---------------------------------------------------------------------------
+
+class RecipeResearchMetadataInput(BaseModel):
+    query: str
+    draft_name: str
+    draft_description: str
+    draft_instructions: list[RecipeStep]
+    ingredients: list[RecipeIngredient]
+    gathered_recipes: list[dict]  # for metadata hints
+    source_url: str | None = None
+
+    def to_user_message(self) -> str:
+        import json
+        instructions_text = "\n".join(f"- {s.body}" for s in self.draft_instructions)
+        ingredients_text = "\n".join(f"- {i.food_name}: {i.quantity} {i.unit_name}" for i in self.ingredients)
+        return (
+            f"Estimate metadata for: {self.query}\n\n"
+            f"Name: {self.draft_name}\n"
+            f"Description: {self.draft_description}\n\n"
+            f"Instructions:\n{instructions_text}\n\n"
+            f"Ingredients:\n{ingredients_text}\n\n"
+            f"Gathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
+        )
+
+
+class RecipeResearchMetadataOutput(BaseModel):
+    recipe: RecipeData    # final fully-populated RecipeData (D-19)
+
+
+# ---------------------------------------------------------------------------
 # recipe-load
 # reply_context is NOT here — it lives in WorkflowRun.shared_context
 # ---------------------------------------------------------------------------
