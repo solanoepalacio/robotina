@@ -57,6 +57,20 @@ class WorkflowDefinition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _recipes(gather_artifact) -> list:
+    """Extract recipe list from a gather artifact.
+
+    The gather agent may return {"recipes": [...]} or a bare list.
+    """
+    if isinstance(gather_artifact, list):
+        return gather_artifact
+    return gather_artifact.get("recipes", [])
+
+
+# ---------------------------------------------------------------------------
 # Workflow Registry
 # ---------------------------------------------------------------------------
 
@@ -77,7 +91,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 task_type="recipe-research-instructions",
                 build_input=lambda ctx, artifacts: RecipeResearchInstructionsInput(
                     query=ctx["recipe_query"],
-                    gathered_recipes=artifacts["gather"]["recipes"],
+                    gathered_recipes=_recipes(artifacts["gather"]),
                 ),
             ),
             WorkflowStepDef(
@@ -88,7 +102,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     draft_instructions=[
                         RecipeStep(**s) for s in artifacts["instructions"]["draft_instructions"]
                     ],
-                    gathered_recipes=artifacts["gather"]["recipes"],
+                    gathered_recipes=_recipes(artifacts["gather"]),
                     household_id=ctx["household_id"],
                 ),
             ),
@@ -105,8 +119,8 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     ingredients=[
                         RecipeIngredient(**i) for i in artifacts["ingredients"]["ingredients"]
                     ],
-                    gathered_recipes=artifacts["gather"]["recipes"],
-                    source_url=artifacts["gather"]["recipes"][0].get("url") if artifacts["gather"]["recipes"] else None,
+                    gathered_recipes=_recipes(artifacts["gather"]),
+                    source_url=_recipes(artifacts["gather"])[0].get("url") if _recipes(artifacts["gather"]) else None,
                 ),
             ),
             WorkflowStepDef(

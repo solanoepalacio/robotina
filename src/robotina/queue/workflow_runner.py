@@ -32,7 +32,11 @@ def _extract_task_output(result: dict) -> dict:
     Reads the last message content and parses it as JSON.
     Strips markdown code fences (```...```) if present.
     """
-    content = result["messages"][-1].content.strip()
+    raw = result["messages"][-1].content
+    # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
+    if isinstance(raw, list):
+        raw = " ".join(b.get("text", "") for b in raw if isinstance(b, dict) and b.get("type") == "text")
+    content = raw.strip()
     if content.startswith("```"):
         lines = content.split("\n")
         json_lines = []

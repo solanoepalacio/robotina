@@ -109,9 +109,14 @@ def extract_json_output(result: dict) -> dict:
     messages = result.get("messages", [])
     for msg in reversed(messages):
         content = getattr(msg, "content", None) or ""
+        # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
+        if isinstance(content, list):
+            content = " ".join(
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
         if not content:
             continue
-        # Try to parse JSON from the content
         # Handle markdown code blocks: ```json ... ```
         text = content.strip()
         if text.startswith("```"):
@@ -131,6 +136,14 @@ def extract_json_output(result: dict) -> dict:
     return {"raw_messages": [str(m) for m in messages[-3:]]}
 
 
+def _gathered_recipes(artifacts: dict) -> list:
+    """Extract recipe list from gather artifact (list or {"recipes": [...]})."""
+    gather = artifacts.get("gather", [])
+    if isinstance(gather, list):
+        return gather
+    return gather.get("recipes", [])
+
+
 def build_user_message(step_index: int, artifacts: dict) -> str:
     """Build the user message for each step based on accumulated artifacts."""
     if step_index == 0:
@@ -138,7 +151,7 @@ def build_user_message(step_index: int, artifacts: dict) -> str:
         return TEST_RECIPE
     elif step_index == 1:
         # Instructions: query + gathered recipes
-        gathered = artifacts.get("gather", {}).get("recipes", [])
+        gathered = _gathered_recipes(artifacts)
         return (
             f"Create baseline instructions for: {TEST_RECIPE}\n\n"
             f"Gathered recipes:\n{json.dumps(gathered, ensure_ascii=False, indent=2)}"
@@ -146,7 +159,7 @@ def build_user_message(step_index: int, artifacts: dict) -> str:
     elif step_index == 2:
         # Ingredients: query + draft instructions + gathered recipes
         instructions = artifacts.get("instructions", {}).get("draft_instructions", [])
-        gathered = artifacts.get("gather", {}).get("recipes", [])
+        gathered = _gathered_recipes(artifacts)
         instructions_text = "\n".join(
             f"- {s.get('body', s) if isinstance(s, dict) else s}" for s in instructions
         )
@@ -159,7 +172,7 @@ def build_user_message(step_index: int, artifacts: dict) -> str:
         # Metadata: query + all prior artifacts
         instr = artifacts.get("instructions", {})
         ingr = artifacts.get("ingredients", {})
-        gathered = artifacts.get("gather", {}).get("recipes", [])
+        gathered = _gathered_recipes(artifacts)
         instructions_text = "\n".join(
             f"- {s.get('body', s) if isinstance(s, dict) else s}"
             for s in instr.get("draft_instructions", [])
@@ -227,19 +240,20 @@ def main() -> None:
                 output = extract_json_output(result)
                 accumulated_artifacts[step_key] = output
 
-                print(f"Output keys: {list(output.keys())}")
+                output_keys = list(output.keys()) if isinstance(output, dict) else f"<list len={len(output)}>"
+                print(f"Output: {output_keys}")
                 print(f"Output preview: {json.dumps(output, ensure_ascii=False)[:500]}")
 
                 with tracer.trace.span(type="evaluation", name=label) as eval_span:
                     eval_span.update(
-                        passed=bool(output and "raw_messages" not in output),
-                        details=f"Output keys: {list(output.keys())}",
+                        passed=bool(output and (not isinstance(output, dict) or "raw_messages" not in output)),
+                        details=f"Output: {output_keys}",
                     )
 
                 results_summary.append({
                     "step": label,
-                    "status": "OK" if "raw_messages" not in output else "WARN: no JSON extracted",
-                    "output_keys": list(output.keys()),
+                    "status": "OK" if not isinstance(output, dict) or "raw_messages" not in output else "WARN: no JSON extracted",
+                    "output_keys": output_keys,
                 })
 
             except Exception as e:
