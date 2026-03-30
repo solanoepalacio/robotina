@@ -15,6 +15,7 @@ IMPORTANT: All RQ enqueue calls must use:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -23,6 +24,24 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_task_output(result: dict) -> dict:
+    """Extract the agent's final JSON output from a LangGraph result.
+
+    Reads the last message content and parses it as JSON.
+    Strips markdown code fences (```...```) if present.
+    """
+    content = result["messages"][-1].content.strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        json_lines = []
+        for line in lines[1:]:
+            if line.strip() == "```":
+                break
+            json_lines.append(line)
+        content = "\n".join(json_lines)
+    return json.loads(content)
 
 
 def queue_workflow(
@@ -186,8 +205,10 @@ def on_step_complete(
         logger.debug("on_step_complete: no workflow step found for job_id=%s (direct task)", job_id)
         return
 
-    # Serialize output to JSON-safe dict
-    if hasattr(output, "model_dump"):
+    # Extract JSON artifact from agent output
+    if isinstance(output, dict) and "messages" in output:
+        artifact = _extract_task_output(output)
+    elif hasattr(output, "model_dump"):
         artifact = output.model_dump(mode="json")
     elif isinstance(output, dict):
         artifact = output
