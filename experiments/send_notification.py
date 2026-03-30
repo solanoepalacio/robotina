@@ -35,25 +35,25 @@ logger = logging.getLogger(__name__)
 TEST_CASES = [
     {
         "label": "Case 1: Baseline plain text",
-        "text": "The recipe has been saved successfully.",
-        "description": "Simple confirmation — minimal escaping needed (just the period)",
+        "text": "La receta se ha guardado correctamente.",
+        "description": "Simple confirmation in Spanish — minimal escaping needed (just the period)",
     },
     {
         "label": "Case 2: Structured data",
-        "text": "Recipe added: Spaghetti Carbonara. Servings: 4, prep 10 min, cook 20 min.",
+        "text": "Receta agregada: Espaguetis a la Carbonara. Porciones: 4, preparacion 10 min, coccion 20 min.",
         "description": "Multiple periods and colon — tests period escaping in structured data",
     },
     {
         "label": "Case 3: Bullet list",
         "text": (
-            "This week's meal plan: Monday pasta, Tuesday soup, Wednesday salad, "
-            "Thursday stir fry, Friday pizza."
+            "Menu de la semana: lunes pasta, martes sopa, miercoles ensalada, "
+            "jueves salteado, viernes pizza."
         ),
         "description": "Long list — tests bullet list formatting and trailing period",
     },
     {
         "label": "Case 4: Special characters stress test",
-        "text": "Ready in 30 min! (serves 4) — cost: ~€8.50",
+        "text": "Listo en 30 min! (4 porciones) — costo: ~8.50 EUR",
         "description": "!, (, ), ~, . all require escaping — Telegram BadRequest if missed",
     },
 ]
