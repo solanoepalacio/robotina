@@ -81,12 +81,12 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Recipe Research Agent
 
-- [ ] **RRECIPE-01**: `recipe-research` task type is handled by the Recipe Research agent
-- [ ] **RRECIPE-02**: `recipe-research` skill exists with instructions for multi-site web search and structured recipe extraction
-- [ ] **RRECIPE-03**: `web-search` tool is implemented via the Tavily API
-- [ ] **RRECIPE-04**: Agent produces a `RecipeData` output with all fields populated (name, description, servings, times, ingredients with human-readable names, steps, source_url)
-- [ ] **RRECIPE-05**: `recipe-research/V001.md` system prompt exists
-- [ ] **RRECIPE-06**: A standalone experiment script (`experiments/recipe_research.py`) runs the agent against hardcoded representative inputs and sends traces to LangWatch
+- [x] **RRECIPE-01**: `recipe-research` task type is handled by the Recipe Research agent
+- [x] **RRECIPE-02**: `recipe-research` skill exists with instructions for multi-site web search and structured recipe extraction
+- [x] **RRECIPE-03**: `web-search` tool is implemented via the Tavily API
+- [x] **RRECIPE-04**: Agent produces a `RecipeData` output with all fields populated (name, description, servings, times, ingredients with human-readable names, steps, source_url)
+- [x] **RRECIPE-05**: `recipe-research/V001.md` system prompt exists
+- [x] **RRECIPE-06**: A standalone experiment script (`experiments/recipe_research.py`) runs the agent against hardcoded representative inputs and sends traces to LangWatch
 
 ### Recipe Loader Agent
 
@@ -102,7 +102,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **OBS-01**: LangWatch + OpenTelemetry instrumentation is active on all agents
 - [x] **OBS-02**: LangWatch endpoint and API key are read from environment variables
 - [x] **OBS-03**: The same instrumentation used in production is active during experiment runs; traces appear in the correct LangWatch experiment collection
-- [ ] **OBS-04**: Each experiment script (`recipe-research`, `recipe-load`, `send-notification`) pins prompt version and model config via LangWatch tags/metadata
+- [x] **OBS-04**: Each experiment script (`recipe-research`, `recipe-load`, `send-notification`) pins prompt version and model config via LangWatch tags/metadata
 - [x] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
 
 ## v2 Requirements
@@ -194,13 +194,13 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | ROBOT-05 | Phase 7 | Complete |
 | ROBOT-06 | Phase 7 | Complete |
 | ROBOT-07 | Phase 7 | Complete |
-| RRECIPE-01 | Phase 8 | Pending |
-| RRECIPE-02 | Phase 8 | Pending |
-| RRECIPE-03 | Phase 8 | Pending |
-| RRECIPE-04 | Phase 8 | Pending |
-| RRECIPE-05 | Phase 8 | Pending |
-| RRECIPE-06 | Phase 8 | Pending |
-| OBS-04 | Phase 8 | Pending |
+| RRECIPE-01 | Phase 8 | Complete |
+| RRECIPE-02 | Phase 8 | Complete |
+| RRECIPE-03 | Phase 8 | Complete |
+| RRECIPE-04 | Phase 8 | Complete |
+| RRECIPE-05 | Phase 8 | Complete |
+| RRECIPE-06 | Phase 8 | Complete |
+| OBS-04 | Phase 8 | Complete |
 | RLOAD-01 | Phase 9 | Pending |
 | RLOAD-02 | Phase 9 | Pending |
 | RLOAD-03 | Phase 9 | Pending |

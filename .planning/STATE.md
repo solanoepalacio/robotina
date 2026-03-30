@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase complete — ready for verification
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-30T16:53:46.163Z"
+stopped_at: Completed 08-04-PLAN.md
+last_updated: "2026-03-30T17:49:59.171Z"
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 32
+  completed_plans: 30
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 07 — handle-incoming-message-agent
+**Current focus:** Phase 08 — recipe-research-agent
 
 ## Current Position
 
-Phase: 07 (handle-incoming-message-agent) — EXECUTING
+Phase: 08 (recipe-research-agent) — EXECUTING
 Plan: 4 of 4
 
 ## Performance Metrics
@@ -75,6 +75,10 @@ Plan: 4 of 4
 | Phase 07-handle-incoming-message-agent P02 | 3min | 2 tasks | 4 files |
 | Phase 07 P03 | 5min | 2 tasks | 3 files |
 | Phase 07-handle-incoming-message-agent P04 | 2min | 1 tasks | 6 files |
+| Phase 08-recipe-research-agent P02 | 3min | 2 tasks | 11 files |
+| Phase 08-recipe-research-agent P01 | 3min | 2 tasks | 6 files |
+| Phase 08 P03 | 3min | 2 tasks | 5 files |
+| Phase 08-recipe-research-agent P04 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -142,6 +146,13 @@ Recent decisions affecting current work:
 - [Phase 07-handle-incoming-message-agent]: Routing prompt does NOT enumerate workflow type names — agent discovers available types from start-workflow tool description (Pitfall 4 avoidance)
 - [Phase 07-handle-incoming-message-agent]: shared.md auth section fully removed; household-manager-api tool handles Authorization header transparently
 - [Phase 07-handle-incoming-message-agent]: handle-incoming-message uses HANDLE_INCOMING_MESSAGE_API_TOKEN env var; all three tools injected in elif block inside run_task() — never at module level
+- [Phase 08-recipe-research-agent]: WebSearchTool uses lazy TavilyClient import inside _run(); include_raw_content=True for HTML to support recipe-scrapers; TAVILY_API_KEY via standard Tavily env var name
+- [Phase 08-recipe-research-agent]: Keep old RecipeResearchInput/Output models for backward compat while adding 8 new sub-task I/O models (Pitfall 6)
+- [Phase 08-recipe-research-agent]: All build_input lambdas use dict key access on accumulated_artifacts; RecipeStep/RecipeIngredient reconstructed from dicts with **spread
+- [Phase 08]: recipe-research-instructions and recipe-research-metadata need no elif blocks in run_task() -- they only use generic read-skill tool injection
+- [Phase 08]: WebSearchTool() takes no constructor args (TAVILY_API_KEY read at execution time); HouseholdManagerApiTool needs household_id from task_input
+- [Phase 08-recipe-research-agent]: Experiment threads outputs between steps via in-memory accumulated_artifacts dict (no DB/RQ needed)
+- [Phase 08-recipe-research-agent]: extract_json_output() handles markdown code blocks and raw JSON from create_react_agent responses (Pitfall 4)
 
 ### Pending Todos
 
@@ -161,9 +172,12 @@ None yet.
 | 260327-gs5 | Switch LoggingWorker to SimpleWorker, simplify LangWatch setup | 2026-03-27 | ea3c177 | [260327-gs5-switch-loggingworker-to-simpleworker-and](./quick/260327-gs5-switch-loggingworker-to-simpleworker-and/) |
 | 260327-j4k | Fix send-notification experiment to use LangWatch Experiment API | 2026-03-27 | c5645b7 | [260327-j4k-fix-send-notification-experiment-use-lan](./quick/260327-j4k-fix-send-notification-experiment-use-lan/) |
 | 260330-ggw | Add Spanish language support to Robotina | 2026-03-30 | 128efe8 | [260330-ggw-add-spanish-language-support-to-robotina](./quick/260330-ggw-add-spanish-language-support-to-robotina/) |
+| 260330-mgk | Fix recipe-research-gather prompt step 6 to explicitly specify recipes output format instead of ambiguous JSON array | 2026-03-30 | 0b0ed36 | [260330-mgk-fix-recipe-research-gather-prompt-step-6](./quick/260330-mgk-fix-recipe-research-gather-prompt-step-6/) |
 
 ## Session Continuity
 
-Last session: 2026-03-30T16:53:46.161Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-recipe-research-agent/08-CONTEXT.md
+Last activity: 2026-03-30 - Completed quick task 260330-mgk: Fix recipe-research-gather prompt step 6 to explicitly specify recipes output format instead of ambiguous JSON array
+
+Last session: 2026-03-30T17:49:59.169Z
+Stopped at: Completed 08-04-PLAN.md
+Resume file: None

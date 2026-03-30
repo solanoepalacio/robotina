@@ -161,8 +161,8 @@ Plans:
 
 Plans:
 - [ ] 08-01-PLAN.md -- I/O models (8 new Pydantic classes) + workflow registry update (6-step add-recipe) + recipe-scrapers dependency
-- [ ] 08-02-PLAN.md -- WebSearchTool implementation + recipe-research skill (5 files) + 4 system prompt files
-- [ ] 08-03-PLAN.md -- 4 AgentConfig registry entries + run_task() elif tool injection + unit tests
+- [x] 08-02-PLAN.md -- WebSearchTool implementation + recipe-research skill (5 files) + 4 system prompt files
+- [x] 08-03-PLAN.md -- 4 AgentConfig registry entries + run_task() elif tool injection + unit tests
 - [ ] 08-04-PLAN.md -- Combined experiment script (experiments/recipe_research.py) + human pipeline verification
 
 ### Phase 9: recipe-load Agent and End-to-End Integration

@@ -5,5 +5,40 @@
       "model": "gpt-4o-mini",
       "api_key_env": "SEND_NOTIFICATION_API_TOKEN_OPENAI"
     }
+  },
+  "handle-incoming-message": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN_OPENAI"
+    }
+  },
+  "recipe-research-gather": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "RECIPE_RESEARCH_GATHER_API_TOKEN_OPENAI"
+    }
+  },
+  "recipe-research-instructions": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "RECIPE_RESEARCH_INSTRUCTIONS_API_TOKEN_OPENAI"
+    }
+  },
+  "recipe-research-ingredients": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "RECIPE_RESEARCH_INGREDIENTS_API_TOKEN_OPENAI"
+    }
+  },
+  "recipe-research-metadata": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "RECIPE_RESEARCH_METADATA_API_TOKEN_OPENAI"
+    }
   }
 }
