@@ -100,7 +100,16 @@ class HouseholdManagerApiTool(BaseTool):
                     return {"error": resp.status_code, "message": resp.text}
                 return resp.json()
 
-        result = asyncio.run(_call())
+        try:
+            result = asyncio.run(_call())
+        except RuntimeError:
+            raise  # 401/403 must propagate (hard stop)
+        except Exception as exc:
+            logger.error(
+                "household-manager-api | method=%s path=%s error=%s",
+                method.upper(), path, exc,
+            )
+            return {"error": "request_failed", "message": str(exc)}
         logger.info(
             "household-manager-api | method=%s path=%s",
             method.upper(),
