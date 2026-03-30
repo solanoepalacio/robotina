@@ -35,7 +35,7 @@ def test_migration_creates_all_tables():
 @pytest.mark.integration
 def test_all_tables_exist_in_postgres():
     """All four tables must exist in Postgres after migration."""
-    from robotina.db import engine
+    from robotina.db import _get_engine; engine = _get_engine()
     insp = inspect(engine)
     tables = set(insp.get_table_names())
     required = {"conversations", "stored_messages", "workflow_runs", "workflow_run_steps"}
@@ -46,7 +46,7 @@ def test_all_tables_exist_in_postgres():
 @pytest.mark.integration
 def test_conversation_unique_constraint():
     """Conversation must have a unique constraint on (platform, chat_id)."""
-    from robotina.db import engine
+    from robotina.db import _get_engine; engine = _get_engine()
     insp = inspect(engine)
     unique_constraints = insp.get_unique_constraints("conversations")
     constraint_columns = [set(uc["column_names"]) for uc in unique_constraints]
@@ -58,7 +58,7 @@ def test_conversation_unique_constraint():
 @pytest.mark.integration
 def test_workflow_run_step_unique_constraint():
     """WorkflowRunStep must have unique constraint on (workflow_run_id, step_key)."""
-    from robotina.db import engine
+    from robotina.db import _get_engine; engine = _get_engine()
     insp = inspect(engine)
     unique_constraints = insp.get_unique_constraints("workflow_run_steps")
     constraint_columns = [set(uc["column_names"]) for uc in unique_constraints]
