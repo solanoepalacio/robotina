@@ -31,6 +31,34 @@ def test_prompt_file_exists_for_robotina():
     assert prompt_path.read_text().strip(), "Prompt file must not be empty"
 
 
+def test_prompt_file_exists_for_recipe_research_gather():
+    """RRECIPE-05: src/robotina/agent/prompts/recipe-research-gather/V001.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/recipe-research-gather/V001.md")
+    assert prompt_path.exists(), f"Expected prompt file at {prompt_path}"
+    assert prompt_path.read_text().strip(), "Prompt file must not be empty"
+
+
+def test_prompt_file_exists_for_recipe_research_instructions():
+    """RRECIPE-05: src/robotina/agent/prompts/recipe-research-instructions/V001.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/recipe-research-instructions/V001.md")
+    assert prompt_path.exists(), f"Expected prompt file at {prompt_path}"
+    assert prompt_path.read_text().strip(), "Prompt file must not be empty"
+
+
+def test_prompt_file_exists_for_recipe_research_ingredients():
+    """RRECIPE-05: src/robotina/agent/prompts/recipe-research-ingredients/V001.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/recipe-research-ingredients/V001.md")
+    assert prompt_path.exists(), f"Expected prompt file at {prompt_path}"
+    assert prompt_path.read_text().strip(), "Prompt file must not be empty"
+
+
+def test_prompt_file_exists_for_recipe_research_metadata():
+    """RRECIPE-05: src/robotina/agent/prompts/recipe-research-metadata/V001.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/recipe-research-metadata/V001.md")
+    assert prompt_path.exists(), f"Expected prompt file at {prompt_path}"
+    assert prompt_path.read_text().strip(), "Prompt file must not be empty"
+
+
 def test_skill_index_appended_to_prompt():
     """AGENT-11: Skill index.md content is appended to system prompt before agent invocation."""
     skill_index_content = "## Skill Index\nThis is the skill index content."

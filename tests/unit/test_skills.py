@@ -112,6 +112,25 @@ def test_household_manager_shared_md_has_no_401_or_403_rows():
         )
 
 
+def test_recipe_research_skill_index_exists():
+    """RRECIPE-02: recipe-research skill has index.md."""
+    from pathlib import Path
+    index_path = Path("src/robotina/agent/skills/recipe-research/index.md")
+    assert index_path.exists(), f"Expected skill index at {index_path}"
+    content = index_path.read_text()
+    assert "recipe-research" in content.lower()
+
+
+def test_recipe_research_skill_has_subfiles():
+    """RRECIPE-02/D-22: recipe-research skill has gather.md, instructions.md, ingredients.md, metadata.md."""
+    from pathlib import Path
+    skill_dir = Path("src/robotina/agent/skills/recipe-research")
+    for subfile in ["gather.md", "instructions.md", "ingredients.md", "metadata.md"]:
+        path = skill_dir / subfile
+        assert path.exists(), f"Expected skill sub-file at {path}"
+        assert path.read_text().strip(), f"Skill sub-file {subfile} must not be empty"
+
+
 def test_build_read_skill_tool(tmp_path):
     """build_read_skill_tool() constructs ReadSkillTool from SkillSet list."""
     import robotina.agent.tools.read_skill as read_skill_module
