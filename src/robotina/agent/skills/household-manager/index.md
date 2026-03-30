@@ -1,6 +1,6 @@
-# recipe-manager skill bundle
+# household-manager skill bundle
 
-This bundle teaches an agent to interact with the recipe-manager REST API.
+This bundle teaches an agent to interact with the household-manager REST API.
 
 Before any operation, read `shared.md` to understand base URL, error handling, and pagination.
 
