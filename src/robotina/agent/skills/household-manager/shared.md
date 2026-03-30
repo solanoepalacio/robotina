@@ -83,3 +83,7 @@ Response:
 ```
 
 Use the returned `id` as `foodId` when creating ingredients. This replaces the need to fetch the entire foods list and scan it client-side.
+
+## Data language
+
+All user-facing data returned by the household-manager API — recipe names, food names, unit names, descriptions, meal plan entries — is stored in Spanish. Use these values as-is in your responses without translating them.
