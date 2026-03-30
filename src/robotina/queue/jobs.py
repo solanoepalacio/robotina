@@ -92,7 +92,7 @@ def run_task(task_input) -> object:
         backend = make_backend(config.model_config)
 
         # Step 4: Build skill context (lazy import — SkillSet defined in Plan 05)
-        from robotina.agent import SkillSet, build_read_skill_tool
+        from robotina.agent.tools.read_skill import SkillSet, build_read_skill_tool
         skill_sets = [SkillSet(s) for s in config.skills]
         skill_index = "\n\n".join(ss.index_content for ss in skill_sets)
         tools = list(config.tools)

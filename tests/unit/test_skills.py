@@ -1,26 +1,26 @@
 import pytest
 
-from robotina.agent import ReadSkillTool, SkillSet, build_read_skill_tool
+from robotina.agent.tools.read_skill import ReadSkillTool, SkillSet, build_read_skill_tool
 
 
 def test_skill_set_loads_index_md(tmp_path):
     """AGENT-08: SkillSet reads index.md at construction and exposes index_content."""
-    import robotina.agent as agent_module
+    import robotina.agent.tools.read_skill as read_skill_module
 
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()
     index_file = skill_dir / "index.md"
     index_file.write_text("# Test Skill\nThis is the index content.")
 
-    original_skills_base = agent_module.SKILLS_BASE
-    agent_module.SKILLS_BASE = tmp_path
+    original_skills_base = read_skill_module.SKILLS_BASE
+    read_skill_module.SKILLS_BASE = tmp_path
     try:
         ss = SkillSet("test-skill")
         assert ss.index_content == "# Test Skill\nThis is the index content."
         assert ss.skill_name == "test-skill"
         assert ss.skill_dir == tmp_path / "test-skill"
     finally:
-        agent_module.SKILLS_BASE = original_skills_base
+        read_skill_module.SKILLS_BASE = original_skills_base
 
 
 def test_read_skill_tool_valid_path(tmp_path):
@@ -92,18 +92,18 @@ def test_household_manager_shared_md_has_no_401_or_403_rows():
 
 def test_build_read_skill_tool(tmp_path):
     """build_read_skill_tool() constructs ReadSkillTool from SkillSet list."""
-    import robotina.agent as agent_module
+    import robotina.agent.tools.read_skill as read_skill_module
 
     skill_dir = tmp_path / "my-skill"
     skill_dir.mkdir()
     (skill_dir / "index.md").write_text("index")
 
-    original_skills_base = agent_module.SKILLS_BASE
-    agent_module.SKILLS_BASE = tmp_path
+    original_skills_base = read_skill_module.SKILLS_BASE
+    read_skill_module.SKILLS_BASE = tmp_path
     try:
         ss = SkillSet("my-skill")
         tool = build_read_skill_tool([ss])
         assert isinstance(tool, ReadSkillTool)
         assert "my-skill" in tool.skill_dirs
     finally:
-        agent_module.SKILLS_BASE = original_skills_base
+        read_skill_module.SKILLS_BASE = original_skills_base

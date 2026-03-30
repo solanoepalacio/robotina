@@ -105,7 +105,7 @@ def main() -> None:
     """Run all 4 experiment cases and print summary."""
     # Build agent using the same infrastructure as run_task()
     from robotina.agent.agents import get_agent_config
-    from robotina.agent import SkillSet, build_read_skill_tool
+    from robotina.agent.tools.read_skill import SkillSet, build_read_skill_tool
     from robotina.llm import make_backend
 
     config = get_agent_config("send-notification")
