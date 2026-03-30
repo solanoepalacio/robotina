@@ -75,6 +75,58 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         skills=["household-manager"],
         tools=[],  # HouseholdManagerApiTool, QueueTool, StartWorkflowTool injected per-job in run_task()
     ),
+    "recipe-research-gather": AgentConfig(
+        task_type="recipe-research-gather",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "RECIPE_RESEARCH_GATHER_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V001.md",
+        skills=["recipe-research"],
+        tools=[],  # WebSearchTool injected per-job in run_task()
+    ),
+    "recipe-research-instructions": AgentConfig(
+        task_type="recipe-research-instructions",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "RECIPE_RESEARCH_INSTRUCTIONS_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/recipe-research-instructions/V001.md",
+        skills=["recipe-research"],
+        tools=[],  # only read-skill (generic injection)
+    ),
+    "recipe-research-ingredients": AgentConfig(
+        task_type="recipe-research-ingredients",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "RECIPE_RESEARCH_INGREDIENTS_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V001.md",
+        skills=["recipe-research"],
+        tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
+    ),
+    "recipe-research-metadata": AgentConfig(
+        task_type="recipe-research-metadata",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "RECIPE_RESEARCH_METADATA_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V001.md",
+        skills=["recipe-research"],
+        tools=[],  # only read-skill (generic injection)
+    ),
 }
 
 

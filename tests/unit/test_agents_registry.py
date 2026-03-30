@@ -95,3 +95,44 @@ def test_handle_incoming_message_api_token_env_var():
     """ROBOT-01/D-03: handle-incoming-message uses HANDLE_INCOMING_MESSAGE_API_TOKEN env var."""
     config = get_agent_config("handle-incoming-message")
     assert config.model_config["api_key_env"] == "HANDLE_INCOMING_MESSAGE_API_TOKEN"
+
+
+def test_recipe_research_gather_registered():
+    """RRECIPE-01/D-25: recipe-research-gather is registered in AGENT_REGISTRY."""
+    config = get_agent_config("recipe-research-gather")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "recipe-research-gather"
+    assert config.skills == ["recipe-research"]
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-gather/V001.md"
+    assert config.tools == []
+    assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_GATHER_API_TOKEN"
+
+
+def test_recipe_research_instructions_registered():
+    """RRECIPE-01/D-25: recipe-research-instructions is registered."""
+    config = get_agent_config("recipe-research-instructions")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "recipe-research-instructions"
+    assert config.skills == ["recipe-research"]
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-instructions/V001.md"
+    assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_INSTRUCTIONS_API_TOKEN"
+
+
+def test_recipe_research_ingredients_registered():
+    """RRECIPE-01/D-25: recipe-research-ingredients is registered."""
+    config = get_agent_config("recipe-research-ingredients")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "recipe-research-ingredients"
+    assert config.skills == ["recipe-research"]
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-ingredients/V001.md"
+    assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_INGREDIENTS_API_TOKEN"
+
+
+def test_recipe_research_metadata_registered():
+    """RRECIPE-01/D-25: recipe-research-metadata is registered."""
+    config = get_agent_config("recipe-research-metadata")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "recipe-research-metadata"
+    assert config.skills == ["recipe-research"]
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-metadata/V001.md"
+    assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_METADATA_API_TOKEN"
