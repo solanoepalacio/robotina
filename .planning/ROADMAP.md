@@ -178,7 +178,7 @@ Plans:
 
 Plans:
 - [x] 09-01-PLAN.md -- Core recipe-load agent wiring: RecipeLoadOutput extension, AGENT_REGISTRY entry, run_task() elif, V001.md prompt, workflow notify update, unit tests
-- [ ] 09-02-PLAN.md -- Experiment script (experiments/recipe_load.py) with 4 edge cases + human verification checkpoint
+- [x] 09-02-PLAN.md -- Experiment script (experiments/recipe_load.py) with 4 edge cases + human verification checkpoint
 
 ## Progress
 

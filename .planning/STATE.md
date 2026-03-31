@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-31T01:44:41.875Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-31T01:50:03.722Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 34
-  completed_plans: 31
+  completed_plans: 32
 ---
 
 # Project State
@@ -81,6 +81,7 @@ Plan: 2 of 2
 | Phase 08 P03 | 3min | 2 tasks | 5 files |
 | Phase 08-recipe-research-agent P04 | 2min | 2 tasks | 1 files |
 | Phase 09 P01 | 2min | 2 tasks | 8 files |
+| Phase 09 P02 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,7 @@ Recent decisions affecting current work:
 - [Phase 08-recipe-research-agent]: extract_json_output() handles markdown code blocks and raw JSON from create_react_agent responses (Pitfall 4)
 - [Phase 09]: Notification text in Spanish with recipe description and app link via HOUSEHOLD_MANAGER_BASE_URL
 - [Phase 09]: Reuse household-manager skill for recipe-load -- no dedicated skill directory (D-08)
+- [Phase 09]: Full recipe data included in experiment user message via _build_user_message() so agent can resolve names
 
 ### Pending Todos
 
@@ -182,6 +184,6 @@ None yet.
 
 Last activity: 2026-03-31
 
-Last session: 2026-03-31T01:44:41.873Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-03-31T01:50:03.719Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
