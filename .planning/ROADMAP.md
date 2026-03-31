@@ -174,6 +174,11 @@ Plans:
   2. The agent handles partial and zero name matches gracefully (does not crash; surfaces the issue to the workflow)
   3. Running `experiments/recipe_load.py` completes without error, a trace appears in the correct LangWatch experiment collection, and the experiment script pins prompt version and model config
   4. Sending "add a recipe for carbonara" to the Telegram bot results in a `WorkflowRun` progressing through all three steps (`research` -> `load` -> `notify`) and a formatted recipe confirmation message delivered back to the user
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- Core recipe-load agent wiring: RecipeLoadOutput extension, AGENT_REGISTRY entry, run_task() elif, V001.md prompt, workflow notify update, unit tests
+- [ ] 09-02-PLAN.md -- Experiment script (experiments/recipe_load.py) with 4 edge cases + human verification checkpoint
 
 ## Progress
 
@@ -190,4 +195,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. send-notification Agent | 4/4 | Complete   | 2026-03-27 |
 | 7. handle-incoming-message Agent | 4/4 | Complete   | 2026-03-27 |
 | 8. recipe-research Agent | 0/4 | Not started | - |
-| 9. recipe-load Agent and End-to-End Integration | 0/TBD | Not started | - |
+| 9. recipe-load Agent and End-to-End Integration | 0/2 | Not started | - |

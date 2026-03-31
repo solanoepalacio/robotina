@@ -127,6 +127,19 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         skills=["recipe-research"],
         tools=[],  # only read-skill (generic injection)
     ),
+    "recipe-load": AgentConfig(
+        task_type="recipe-load",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "RECIPE_LOAD_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/recipe-load/V001.md",
+        skills=["household-manager"],
+        tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
+    ),
 }
 
 

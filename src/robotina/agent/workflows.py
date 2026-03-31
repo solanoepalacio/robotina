@@ -12,6 +12,7 @@ The 'hello-world-2step' entry was removed in Phase 6.
 """
 from __future__ import annotations
 
+import os
 from typing import Callable
 
 from pydantic import BaseModel, ConfigDict
@@ -68,6 +69,28 @@ def _recipes(gather_artifact) -> list:
     if isinstance(gather_artifact, list):
         return gather_artifact
     return gather_artifact.get("recipes", [])
+
+
+# ---------------------------------------------------------------------------
+# Notification helpers
+# ---------------------------------------------------------------------------
+
+def _build_notify_text(load_artifact: dict) -> str:
+    """Compose notification text from recipe-load step artifact (D-07)."""
+    base_url = os.environ.get("HOUSEHOLD_MANAGER_BASE_URL", "http://localhost:3001")
+    name = load_artifact.get("recipe_name", "Unknown recipe")
+    description = load_artifact.get("recipe_description")
+    slug = load_artifact.get("recipe_slug", "")
+    missing = load_artifact.get("missing_ingredients", [])
+
+    parts = [f"Receta agregada: {name}"]
+    if description:
+        parts.append(description)
+    if slug:
+        parts.append(f"{base_url}/recipe/{slug}")
+    if missing:
+        parts.append(f"Ingredientes no encontrados: {', '.join(missing)}")
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +161,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 task_type="send-notification",
                 build_input=lambda ctx, artifacts: SendNotificationInput(
                     **ctx["reply_context"],
-                    text=f"Recipe added: {artifacts['load']['recipe_name']}",
+                    text=_build_notify_text(artifacts["load"]),
                 ),
             ),
         ],

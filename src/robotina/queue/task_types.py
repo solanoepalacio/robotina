@@ -205,6 +205,9 @@ class RecipeLoadInput(BaseModel):
 class RecipeLoadOutput(BaseModel):
     recipe_id: str
     recipe_name: str      # persisted to WorkflowRunStep.artifact by the task runner
+    recipe_description: str | None = None
+    recipe_slug: str = ""
+    missing_ingredients: list[str] = []
 
 
 # ---------------------------------------------------------------------------
