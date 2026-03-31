@@ -32,7 +32,9 @@ def _extract_task_output(result: dict) -> dict:
     Reads the last message content and parses it as JSON.
     Strips markdown code fences (```...```) if present.
     """
-    raw = result["messages"][-1].content
+    # Find the last AI message (LangGraph always ends with one, but be explicit)
+    ai_messages = [m for m in result["messages"] if getattr(m, "type", None) == "ai"]
+    raw = ai_messages[-1].content if ai_messages else result["messages"][-1].content
     # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
     if isinstance(raw, list):
         raw = " ".join(b.get("text", "") for b in raw if isinstance(b, dict) and b.get("type") == "text")
@@ -45,7 +47,22 @@ def _extract_task_output(result: dict) -> dict:
                 break
             json_lines.append(line)
         content = "\n".join(json_lines)
-    return json.loads(content)
+    parsed = None
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        # Scan for first JSON object or array in case of leading prose
+        for start_char in ('{', '['):
+            idx = content.find(start_char)
+            if idx != -1:
+                try:
+                    parsed = json.loads(content[idx:])
+                    break
+                except json.JSONDecodeError:
+                    pass
+    if parsed is None:
+        raise ValueError(f"Could not parse JSON from agent output: {content[:200]!r}")
+    return parsed
 
 
 def queue_workflow(

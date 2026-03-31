@@ -108,6 +108,9 @@ def extract_json_output(result: dict) -> dict:
     """
     messages = result.get("messages", [])
     for msg in reversed(messages):
+        # Only inspect AI messages — skip tool responses which also contain JSON
+        if getattr(msg, "type", None) not in ("ai", "AIMessageChunk"):
+            continue
         content = getattr(msg, "content", None) or ""
         # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
         if isinstance(content, list):
@@ -131,7 +134,16 @@ def extract_json_output(result: dict) -> dict:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            continue
+            pass
+        # Scan for first JSON object or array in case of leading prose
+        for start_char in ('{', '['):
+            idx = text.find(start_char)
+            if idx != -1:
+                try:
+                    return json.loads(text[idx:])
+                except json.JSONDecodeError:
+                    pass
+        continue
     logger.warning("Could not extract JSON from agent output, returning raw messages")
     return {"raw_messages": [str(m) for m in messages[-3:]]}
 
@@ -142,6 +154,11 @@ def _gathered_recipes(artifacts: dict) -> list:
     if isinstance(gather, list):
         return gather
     return gather.get("recipes", [])
+
+
+def _as_dict(artifact) -> dict:
+    """Return artifact as dict, wrapping a bare list as an empty dict fallback."""
+    return artifact if isinstance(artifact, dict) else {}
 
 
 def build_user_message(step_index: int, artifacts: dict) -> str:
@@ -170,8 +187,8 @@ def build_user_message(step_index: int, artifacts: dict) -> str:
         )
     elif step_index == 3:
         # Metadata: query + all prior artifacts
-        instr = artifacts.get("instructions", {})
-        ingr = artifacts.get("ingredients", {})
+        instr = _as_dict(artifacts.get("instructions", {}))
+        ingr = _as_dict(artifacts.get("ingredients", {}))
         gathered = _gathered_recipes(artifacts)
         instructions_text = "\n".join(
             f"- {s.get('body', s) if isinstance(s, dict) else s}"
