@@ -136,3 +136,19 @@ def test_recipe_research_metadata_registered():
     assert config.skills == ["recipe-research"]
     assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-metadata/V001.md"
     assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_METADATA_API_TOKEN"
+
+
+def test_recipe_load_registered():
+    """RLOAD-01: recipe-load is registered in AGENT_REGISTRY."""
+    config = get_agent_config("recipe-load")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "recipe-load"
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-load/V001.md"
+    assert config.tools == []
+    assert config.model_config["api_key_env"] == "RECIPE_LOAD_API_TOKEN"
+
+
+def test_recipe_load_uses_household_manager_skill():
+    """RLOAD-02: recipe-load uses household-manager skill (D-08)."""
+    config = get_agent_config("recipe-load")
+    assert config.skills == ["household-manager"]
