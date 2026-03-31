@@ -90,11 +90,11 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Recipe Loader Agent
 
-- [ ] **RLOAD-01**: `recipe-load` task type is handled by the Recipe Loader agent
-- [ ] **RLOAD-02**: `recipe-load` skill exists with instructions for resolving food/unit names to IDs via `GET /api/foods?name=` and `GET /api/units?name=` and creating the recipe via `POST /api/recipes`
-- [ ] **RLOAD-03**: Agent resolves human-readable ingredient names to `foodId` and `unitId` before creating the recipe
-- [ ] **RLOAD-04**: Agent uses `household-manager-api` tool to create the recipe; returns `recipe_id` and `recipe_name`
-- [ ] **RLOAD-05**: `recipe-load/V001.md` system prompt exists
+- [x] **RLOAD-01**: `recipe-load` task type is handled by the Recipe Loader agent
+- [x] **RLOAD-02**: `recipe-load` skill exists with instructions for resolving food/unit names to IDs via `GET /api/foods?name=` and `GET /api/units?name=` and creating the recipe via `POST /api/recipes`
+- [x] **RLOAD-03**: Agent resolves human-readable ingredient names to `foodId` and `unitId` before creating the recipe
+- [x] **RLOAD-04**: Agent uses `household-manager-api` tool to create the recipe; returns `recipe_id` and `recipe_name`
+- [x] **RLOAD-05**: `recipe-load/V001.md` system prompt exists
 - [ ] **RLOAD-06**: A standalone experiment script (`experiments/recipe_load.py`) runs the agent against hardcoded representative inputs and sends traces to LangWatch
 
 ### Observability
@@ -201,11 +201,11 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RRECIPE-05 | Phase 8 | Complete |
 | RRECIPE-06 | Phase 8 | Complete |
 | OBS-04 | Phase 8 | Complete |
-| RLOAD-01 | Phase 9 | Pending |
-| RLOAD-02 | Phase 9 | Pending |
-| RLOAD-03 | Phase 9 | Pending |
-| RLOAD-04 | Phase 9 | Pending |
-| RLOAD-05 | Phase 9 | Pending |
+| RLOAD-01 | Phase 9 | Complete |
+| RLOAD-02 | Phase 9 | Complete |
+| RLOAD-03 | Phase 9 | Complete |
+| RLOAD-04 | Phase 9 | Complete |
+| RLOAD-05 | Phase 9 | Complete |
 | RLOAD-06 | Phase 9 | Pending |
 
 **Coverage:**
