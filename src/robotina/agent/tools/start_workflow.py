@@ -100,6 +100,13 @@ class StartWorkflowTool(BaseTool):
                 workflow_run_id,
             )
             return f"Workflow started successfully. Workflow ID = {workflow_run_id}"
+        except Exception as exc:
+            logger.error(
+                "start-workflow tool | workflow_type=%s error=%s",
+                workflow_type,
+                exc,
+            )
+            return {"error": "workflow_failed", "message": str(exc)}
         finally:
             session.close()
 
