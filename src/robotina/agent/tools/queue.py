@@ -13,9 +13,8 @@ Per-job injection pattern (locked Phase 4 constraint):
         platform=task_input.platform,
     ))
 
-IMPORTANT: Enqueues at BACK of queue (no at_front=True). The gateway uses
-at_front=True because it originates from outside the worker. Follow-up tasks
-enqueued by agents go to the back so they don't preempt other waiting jobs.
+Enqueues at FRONT of queue (at_front=True). Notification replies to the user
+should always be delivered before other pending jobs like research or loading.
 """
 from __future__ import annotations
 
@@ -44,10 +43,9 @@ class QueueTool(BaseTool):
 
     name: str = "queue"
     description: str = (
-        "Enqueue a send-notification task to deliver a direct reply to the user. "
-        "Use this when the user's request can be answered directly — questions "
-        "about household data, current meal plan, recipe lookup, etc. "
-        "When this tool returns, the task is done — do not call it again. "
+        "Enqueue a send-notification task to deliver a reply to the user. "
+        "Use this for direct replies (answers to questions) or for acknowledgment "
+        "messages before starting a workflow. "
         "Args: text (str) — the reply text to send to the user."
     )
 
@@ -78,7 +76,7 @@ class QueueTool(BaseTool):
             result_ttl=-1,
             failure_ttl=-1,
             meta={"task_type": "send-notification"},
-            # NOTE: NO at_front=True — follow-up tasks go to back of queue
+            at_front=True,
         )
         logger.info("queue tool | enqueued send-notification | job_id=%s", job.id)
         return job.id

@@ -41,8 +41,8 @@ def test_queue_tool_enqueues_send_notification_with_correct_meta():
     assert call_kwargs.kwargs.get("meta") == {"task_type": "send-notification"}
 
 
-def test_queue_tool_enqueues_at_back_of_queue():
-    """ROBOT-03: _run() does NOT pass at_front=True — follow-up tasks go to back of queue."""
+def test_queue_tool_enqueues_at_front_of_queue():
+    """ROBOT-03: _run() passes at_front=True — notification replies take priority."""
     from robotina.agent.tools.queue import QueueTool
 
     tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
@@ -57,9 +57,8 @@ def test_queue_tool_enqueues_at_back_of_queue():
         tool._run("reply text")
 
     call_kwargs = mock_queue.enqueue.call_args
-    at_front = call_kwargs.kwargs.get("at_front", False)
-    assert at_front is False, (
-        "QueueTool must NOT use at_front=True — follow-up tasks go to back of queue (Pitfall 5)"
+    assert call_kwargs.kwargs.get("at_front") is True, (
+        "QueueTool must use at_front=True — notification replies take priority"
     )
 
 
