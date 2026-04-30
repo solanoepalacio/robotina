@@ -109,7 +109,7 @@ To achieve this workflows we'll create:
     - format-telegram-message (new)
     - household-manager (already implemented, minor update to remove auth instructions)
 4. Workflow infrastructure:
-    - `WorkflowRun` / `WorkflowRunStep` Prisma models (Postgres)
+    - `WorkflowRun` / `WorkflowRunStep` SQLAlchemy models (Postgres)
     - `workflows.py` registry — defines multi-step workflow types alongside `agents.py`
     - `start-workflow` tool — used by agents to initiate a named workflow
 **Workflow 1: user asks a question about their household**
