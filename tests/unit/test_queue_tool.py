@@ -62,8 +62,14 @@ def test_queue_tool_enqueues_at_front_of_queue():
     )
 
 
-def test_queue_tool_returns_job_id_string():
-    """ROBOT-03: _run(text) returns the job.id string (used for IncomingMessageOutput.queued_task_ids)."""
+def test_queue_tool_returns_stop_signal_with_job_id():
+    """ROBOT-03: _run(text) returns a stop-signal string containing job.id.
+
+    A bare UUID return caused the routing LLM to interpret the result as
+    incomplete and re-call the tool, producing duplicate replies. The
+    return value must (a) include the job_id and (b) explicitly tell the
+    LLM not to call the tool again.
+    """
     from robotina.agent.tools.queue import QueueTool
 
     tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
@@ -77,4 +83,5 @@ def test_queue_tool_returns_job_id_string():
          patch("robotina.agent.tools.queue.Redis"):
         result = tool._run("some reply")
 
-    assert result == "expected-job-id-999"
+    assert "expected-job-id-999" in result
+    assert "do not call this tool again" in result.lower()

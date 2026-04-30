@@ -38,7 +38,9 @@ class QueueTool(BaseTool):
         text: The reply text to deliver to the user.
 
     Returns:
-        job_id string (UUID) — use for IncomingMessageOutput.queued_task_ids.
+        Confirmation string containing the job_id. The explicit "task is done"
+        wording is required: a bare UUID return value caused the routing LLM
+        to re-call the tool, sending duplicate replies to the user.
     """
 
     name: str = "queue"
@@ -46,6 +48,7 @@ class QueueTool(BaseTool):
         "Enqueue a send-notification task to deliver a reply to the user. "
         "Use this for direct replies (answers to questions) or for acknowledgment "
         "messages before starting a workflow. "
+        "When this tool returns, the reply has been queued — do not call it again. "
         "Args: text (str) — the reply text to send to the user."
     )
 
@@ -55,7 +58,7 @@ class QueueTool(BaseTool):
     platform: str  # always "telegram" for Phase 1
 
     def _run(self, text: str) -> str:
-        """Enqueue a send-notification task. Returns job.id string."""
+        """Enqueue a send-notification task. Returns a stop-signal string with job_id."""
         from robotina.queue.task_types import SendNotificationInput
 
         task_input = SendNotificationInput(
@@ -79,7 +82,10 @@ class QueueTool(BaseTool):
             at_front=True,
         )
         logger.info("queue tool | enqueued send-notification | job_id=%s", job.id)
-        return job.id
+        return (
+            f"Reply queued for delivery. Notification job ID = {job.id}. "
+            "The task is done — do not call this tool again."
+        )
 
     async def _arun(self, text: str) -> str:
         return self._run(text)
