@@ -1,0 +1,58 @@
+{
+  "send-notification": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "handle-incoming-message": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-gather": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-instructions": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-ingredients": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-metadata": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  },
+  "recipe-load": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://192.168.68.109:11434",
+      "model": "gpt-oss:20b",
+      "reasoning": true
+    }
+  }
+}
