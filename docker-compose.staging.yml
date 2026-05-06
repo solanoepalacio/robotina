@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile.agent
     env_file:
       - .env
+    volumes:
+      - ./overrides:/app/overrides:ro
     restart: unless-stopped
 
   gateway:
