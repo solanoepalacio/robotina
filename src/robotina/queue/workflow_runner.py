@@ -75,6 +75,14 @@ def _extract_task_output(result: dict) -> dict:
                 except json.JSONDecodeError:
                     pass
     if parsed is None:
+        # TEMP DIAGNOSTIC (remove once recipe-research-gather parse failure is understood):
+        # Dump the full content (and length) so we can tell whether the failure is
+        # trailing prose vs. mid-JSON truncation.
+        logger.error(
+            "extract_task_output | parse failed | length=%d | full_content=%r",
+            len(content),
+            content,
+        )
         raise ValueError(f"Could not parse JSON from agent output: {content[:200]!r}")
     return parsed
 
