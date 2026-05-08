@@ -49,19 +49,10 @@ class AgentConfig:
 # ---------------------------------------------------------------------------
 
 AGENT_REGISTRY: dict[str, AgentConfig] = {
-    "send-notification": AgentConfig(
-        task_type="send-notification",
-        model_config={
-            "provider": "ollama",
-            "url": "http://localhost:11434",
-            "model": "gpt-oss:20b",
-            "api_key_env": "SEND_NOTIFICATION_API_TOKEN",
-            "reasoning": True,  # gpt-oss:20b is a thinking model; separates CoT from tool-call response
-        },
-        prompt_path="src/robotina/agent/prompts/send-notification/V001.md",
-        skills=["format-telegram-message"],
-        tools=[],  # SendNotificationTool is injected per-job in run_task() — see D-05
-    ),
+    # Phase 07.1: send-notification is no longer an LLM agent. It runs as a
+    # deterministic Python path inside run_task() (jobs.py). Removed from registry
+    # to ensure get_agent_config("send-notification") raises KeyError if anything
+    # accidentally tries to take the agent path.
     "handle-incoming-message": AgentConfig(
         task_type="handle-incoming-message",
         model_config={

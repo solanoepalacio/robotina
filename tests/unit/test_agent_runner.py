@@ -12,9 +12,15 @@ import pytest
 
 
 def test_run_task_reads_task_type_from_job_meta():
-    """AGENT-06: run_task reads task_type from RQ job meta, not from input model."""
+    """AGENT-06: run_task reads task_type from RQ job meta, not from input model.
+
+    Uses recipe-load (a real LLM agent task type). send-notification can't be used
+    here since Phase 07.1 — it takes the deterministic non-LLM branch and never
+    calls get_agent_config.
+    """
     mock_job = MagicMock()
-    mock_job.meta = {"task_type": "send-notification"}
+    mock_job.id = "job-rl-001"
+    mock_job.meta = {"task_type": "recipe-load", "queue_name": "agent-tasks"}
 
     mock_config = MagicMock()
     mock_config.skills = []
@@ -35,13 +41,12 @@ def test_run_task_reads_task_type_from_job_meta():
     mock_session = MagicMock()
     mock_session_factory = MagicMock(return_value=mock_session)
 
-    # Provide real string attributes for send-notification task input
-    # (SendNotificationTool injection requires str fields — MagicMock auto-attrs fail Pydantic validation)
     mock_task_input = MagicMock()
     mock_task_input.chat_id = "test-chat-1"
     mock_task_input.user_id = "test-user-1"
     mock_task_input.platform = "telegram"
-    mock_task_input.text = "test message"
+    mock_task_input.household_id = "household-1"
+    mock_task_input.to_user_message.return_value = "test message"
 
     with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
          patch("robotina.agent.agents.get_agent_config", return_value=mock_config) as mock_get_config, \
@@ -54,7 +59,53 @@ def test_run_task_reads_task_type_from_job_meta():
         from robotina.queue.jobs import run_task
         run_task(mock_task_input)
 
-    mock_get_config.assert_called_once_with("send-notification")
+    mock_get_config.assert_called_once_with("recipe-load")
+
+
+def test_run_task_send_notification_takes_deterministic_path():
+    """Phase 07.1: send-notification is delivered via direct send_message() call,
+    no LLM agent invocation.
+    """
+    mock_job = MagicMock()
+    mock_job.id = "job-sn-1"
+    mock_job.meta = {"task_type": "send-notification", "queue_name": "agent-tasks"}
+
+    mock_session = MagicMock()
+    mock_send_result = MagicMock(message_id="42")
+
+    mock_task_input = MagicMock()
+    mock_task_input.chat_id = "chat-1"
+    mock_task_input.user_id = "user-1"
+    mock_task_input.platform = "telegram"
+    mock_task_input.text = "hola"
+
+    with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
+         patch("robotina.gateway.send.send_message", return_value=mock_send_result) as mock_send, \
+         patch("robotina.db.SessionLocal", return_value=mock_session), \
+         patch("robotina.queue.workflow_runner.on_step_start"), \
+         patch("robotina.queue.workflow_runner.on_step_complete") as mock_complete, \
+         patch("robotina.queue.workflow_runner.on_step_failed"), \
+         patch("robotina.agent.agents.get_agent_config") as mock_get_config, \
+         patch("robotina.llm.make_backend") as mock_make_backend:
+        from robotina.queue.jobs import run_task
+        result = run_task(mock_task_input)
+
+    # send_message called exactly once with parse_mode=None (plain text).
+    mock_send.assert_called_once()
+    call_kwargs = mock_send.call_args.kwargs
+    assert call_kwargs["parse_mode"] is None
+    assert call_kwargs["chat_id"] == "chat-1"
+    assert call_kwargs["text"] == "hola"
+
+    # No LLM machinery touched.
+    mock_get_config.assert_not_called()
+    mock_make_backend.assert_not_called()
+
+    # Workflow hook invoked with a plain dict artifact (not an agent message list).
+    assert mock_complete.called
+    artifact = mock_complete.call_args.args[1]
+    assert artifact == {"message_id": "42"}
+    assert result == {"message_id": "42"}
 
 
 def test_run_task_raises_if_no_task_type_in_meta():

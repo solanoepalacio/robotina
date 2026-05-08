@@ -148,5 +148,5 @@ def test_add_recipe_build_input_notify_returns_send_notification_input():
     artifacts = {"load": {"recipe_name": "Pasta"}}
     result = WORKFLOW_REGISTRY["add-recipe"].steps[5].build_input(ctx, artifacts)
     assert result == SendNotificationInput(
-        platform="telegram", chat_id="c1", user_id="u1", text="Recipe added: Pasta"
+        platform="telegram", chat_id="c1", user_id="u1", text="Receta agregada: Pasta"
     )

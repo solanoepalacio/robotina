@@ -43,7 +43,7 @@ def test_script_migrate_declared():
 def test_experiment_scripts_declared():
     data = load_pyproject()
     scripts = data["project"]["scripts"]
-    for name in ("experiments.recipe_research", "experiments.recipe_load", "experiments.send_notification"):
+    for name in ("experiments.recipe_research", "experiments.recipe_load"):
         assert name in scripts, f"Script '{name}' must be declared in [project.scripts]"
 
 
@@ -63,7 +63,7 @@ def test_experiments_package_importable():
 def test_experiment_mains_importable():
     """Each experiment module must export a main() callable."""
     import importlib
-    for mod_name in ("experiments.recipe_research", "experiments.recipe_load", "experiments.send_notification"):
+    for mod_name in ("experiments.recipe_research", "experiments.recipe_load"):
         mod = importlib.import_module(mod_name)
         assert callable(getattr(mod, "main", None)), f"{mod_name}.main must be a callable"
 

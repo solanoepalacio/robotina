@@ -82,6 +82,34 @@ def run_task(task_input) -> object:
     # Workflow hook: mark step RUNNING (no-op for direct tasks — D-06)
     workflow_runner.on_step_start(job.id, _session)
 
+    # Phase 07.1: deterministic non-LLM path for send-notification.
+    # send-notification is a pure delivery call (escape + send_message); wrapping
+    # it in a ReAct agent loop is what allowed the duplicate-message and
+    # infinite-loop bugs. Plain text — no MarkdownV2 escaping.
+    if task_type == "send-notification":
+        from robotina.gateway.send import send_message
+        import asyncio
+        try:
+            result = asyncio.run(send_message(
+                chat_id=task_input.chat_id,
+                text=task_input.text,
+                user_id=task_input.user_id,
+                parse_mode=None,
+            ))
+            artifact = {"message_id": result.message_id}
+            logger.info(
+                "send-notification delivered | chat_id=%s message_id=%s",
+                task_input.chat_id,
+                result.message_id,
+            )
+            workflow_runner.on_step_complete(job.id, artifact, _session, _queue)
+            return artifact
+        except Exception:
+            workflow_runner.on_step_failed(job.id, _session)
+            raise
+        finally:
+            _session.close()
+
     try:
         # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
         from robotina.agent.agents import get_agent_config
@@ -99,16 +127,10 @@ def run_task(task_input) -> object:
         if skill_sets:
             tools.append(build_read_skill_tool(skill_sets))
 
-        # Phase 6: Inject per-job tools that require task_input context (D-05)
-        # SendNotificationTool needs chat_id/user_id/platform from task_input — cannot be in AgentConfig
-        if task_type == "send-notification":
-            from robotina.agent.tools.send_notification import SendNotificationTool
-            tools.append(SendNotificationTool(
-                chat_id=task_input.chat_id,
-                user_id=task_input.user_id,
-                platform=task_input.platform,
-            ))
-        elif task_type == "handle-incoming-message":
+        # Phase 6: Inject per-job tools that require task_input context (D-05).
+        # send-notification is handled by the deterministic branch above (Phase 07.1)
+        # and never reaches this point.
+        if task_type == "handle-incoming-message":
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
             from robotina.agent.tools.queue import QueueTool
             from robotina.agent.tools.start_workflow import StartWorkflowTool
