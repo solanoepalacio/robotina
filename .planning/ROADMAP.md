@@ -148,6 +148,24 @@ Plans:
 - [x] 07-03-PLAN.md -- household-manager skill auth removal + robotina/V001.md routing prompt
 - [x] 07-04-PLAN.md -- agents.py registry entry + run_task() injection + human checkpoint
 
+### Phase 07.1: Deterministic Agent Termination (INSERTED)
+
+**Goal:** Make agent termination a runtime guarantee, not a prompt request — eliminates the duplicate-message bug and the (rare) infinite-loop bug captured in `infinite-loop-messages.log`. After this phase, every agent run that successfully emits a side-effecting tool call ends in exactly one round.
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Success Criteria** (what must be TRUE):
+  1. `send-notification` task type runs without invoking any LLM (no `LLM stream start` log line for it)
+  2. Routing agent emits exactly one tool call per request and terminates immediately after via engine-enforced `Command(goto=END)`
+  3. Per-workflow ack agent (`acknowledge-add-recipe`) emits exactly one `queue` call and terminates
+  4. `add-recipe` workflow runs end-to-end with one ack at the start and one final notification — no duplicates anywhere
+  5. `uv run pytest` is green
+**Plans:** 3 plans
+
+Plans:
+- [ ] 07.1-01-PLAN.md -- Wave 0: replace send-notification agent with deterministic Python (plain text)
+- [ ] 07.1-02-PLAN.md -- Wave 1: per-workflow acknowledge-add-recipe agent + routing-prompt simplification
+- [ ] 07.1-03-PLAN.md -- Wave 2: terminal queue and start-workflow tools via Command(goto=END)
+
 ### Phase 8: recipe-research Agent
 **Goal**: The recipe research pipeline performs structured multi-site web search via Tavily across 4 sequential sub-tasks (gather, instructions, ingredients, metadata) and produces a fully populated `RecipeData` output, with traces pinned to LangWatch experiment collections
 **Depends on**: Phase 7
