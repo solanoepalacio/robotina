@@ -1,20 +1,11 @@
 """Tests for queue/workflow_runner.py — workflow lifecycle (WF-04 through WF-09).
 
 Unit tests: mocked session + queue (D-13).
-Integration tests: real Redis + Postgres via fixtures (D-12).
 """
-import os
-import uuid
+from unittest.mock import MagicMock
 
-import pytest
-from sqlalchemy import text
-from unittest.mock import MagicMock, call
-from datetime import datetime, timezone
-
-from robotina.db import SessionLocal
-from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStatus, WorkflowStepStatus
+from robotina.queue.models import WorkflowStatus, WorkflowStepStatus
 from robotina.queue.task_types import RecipeResearchInput, RecipeLoadInput
-from robotina.queue.workflow_runner import queue_workflow
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +44,7 @@ def make_step(
     return step
 
 
-def make_run(workflow_type="hello-world-2step", status=WorkflowStatus.PENDING, shared_context=None):
+def make_run(workflow_type="add-recipe", status=WorkflowStatus.PENDING, shared_context=None):
     run = MagicMock()
     run.workflow_type = workflow_type
     run.status = status
@@ -147,9 +138,25 @@ def test_on_step_complete_enqueues_next_step():
     """WF-06: on_step_complete enqueues the next PENDING step with a pre-assigned job_id."""
     from robotina.queue.workflow_runner import on_step_complete
 
-    step = make_step(step_key="step1", status=WorkflowStepStatus.RUNNING)
-    next_step = make_step(step_key="step2", task_type="hello-world", task_job_id=None)
-    run = make_run(workflow_type="hello-world-2step", shared_context={"household_id": "hh-1"})
+    # Use add-recipe acknowledge -> gather transition. The gather step's
+    # build_input only needs shared_context (recipe_query, household_id),
+    # so we don't have to seed any prior step artifacts.
+    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
+    next_step = make_step(
+        step_key="gather", task_type="recipe-research-gather", task_job_id=None
+    )
+    run = make_run(
+        workflow_type="add-recipe",
+        shared_context={
+            "household_id": "hh-1",
+            "recipe_query": "spaghetti",
+            "reply_context": {
+                "platform": "telegram",
+                "chat_id": "c1",
+                "user_id": "u1",
+            },
+        },
+    )
 
     session = MagicMock()
     query_mock = MagicMock()
@@ -161,7 +168,7 @@ def test_on_step_complete_enqueues_next_step():
     session.query.return_value = query_mock
 
     queue = MagicMock()
-    output = {"result": "step1_done"}
+    output = {"result": "acknowledged"}
 
     on_step_complete("test-job-id", output, session, queue)
 
@@ -179,8 +186,8 @@ def test_on_step_complete_marks_workflow_done_when_final_step():
     """WF-07: on_step_complete marks WorkflowRun.status=DONE when no PENDING steps remain."""
     from robotina.queue.workflow_runner import on_step_complete
 
-    step = make_step(step_key="step2", status=WorkflowStepStatus.RUNNING)
-    run = make_run(workflow_type="hello-world-2step", shared_context={})
+    step = make_step(step_key="notify", status=WorkflowStepStatus.RUNNING)
+    run = make_run(workflow_type="add-recipe", shared_context={})
 
     session = MagicMock()
     query_mock = MagicMock()
@@ -270,128 +277,8 @@ def test_reply_context_not_in_recipe_load_input():
 
 
 # ---------------------------------------------------------------------------
-# Integration tests — require live Redis + Postgres (D-12)
+# Integration tests for hello-world-2step removed in Phase 6 cleanup —
+# the workflow itself was removed from WORKFLOW_REGISTRY (see
+# src/robotina/agent/workflows.py:11). End-to-end coverage of the workflow
+# runner now lives in add-recipe integration tests.
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def wf_db_session():
-    """Live Postgres session that cleans workflow tables after each test."""
-    with SessionLocal() as session:
-        try:
-            yield session
-        finally:
-            session.execute(text("DELETE FROM workflow_run_steps"))
-            session.execute(text("DELETE FROM workflow_runs"))
-            session.commit()
-
-
-@pytest.mark.integration
-def test_hello_world_2step_workflow_happy_path(wf_db_session, redis_conn):
-    """WF-04 through WF-07: hello-world-2step runs both steps, WorkflowRun ends DONE."""
-    import uuid
-    from rq import Queue
-    from rq.worker import SimpleWorker
-
-    queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
-    shared_context = {"household_id": "test-household", "test_run": True}
-
-    # queue_workflow creates WorkflowRun as PENDING + steps + enqueues step1
-    run_id = queue_workflow(
-        workflow_type="hello-world-2step",
-        shared_context=shared_context,
-        household_id="test-household",
-        queue=queue,
-        session=wf_db_session,
-    )
-    assert run_id is not None
-
-    # Verify WorkflowRun starts as PENDING (UAT test 5)
-    run_initial = wf_db_session.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-    assert run_initial.status == WorkflowStatus.PENDING, f"Expected PENDING, got {run_initial.status}"
-
-    # Verify initial state: 2 PENDING steps, first has task_job_id set
-    steps = (
-        wf_db_session.query(WorkflowRunStep)
-        .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.step_order)
-        .all()
-    )
-    assert len(steps) == 2
-    assert steps[0].step_key == "step1"
-    assert steps[0].status == WorkflowStepStatus.PENDING
-    assert steps[0].task_job_id is not None
-    assert steps[1].step_key == "step2"
-    assert steps[1].status == WorkflowStepStatus.PENDING
-    assert steps[1].task_job_id is None
-
-    # Run the worker with agent mocked — avoids real LLM calls, tests state transitions only
-    from unittest.mock import MagicMock, patch
-    mock_agent = MagicMock()
-    mock_agent.invoke.return_value = {"messages": [], "result": "ok"}
-    mock_backend = MagicMock()
-    mock_backend.create_agent.return_value = mock_agent
-    with patch("robotina.llm.make_backend", return_value=mock_backend):
-        worker = SimpleWorker([queue], connection=redis_conn)
-        worker.work(burst=True)
-
-    # Refresh session to see committed state
-    wf_db_session.expire_all()
-
-    steps_after = (
-        wf_db_session.query(WorkflowRunStep)
-        .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.step_order)
-        .all()
-    )
-    assert steps_after[0].status == WorkflowStepStatus.DONE
-    assert steps_after[0].artifact is not None
-    assert steps_after[1].status == WorkflowStepStatus.DONE
-    assert steps_after[1].artifact is not None
-
-    run = wf_db_session.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-    assert run.status == WorkflowStatus.DONE
-
-
-@pytest.mark.integration
-def test_hello_world_2step_workflow_failure_path(wf_db_session, redis_conn):
-    """WF-08: step1 failure marks step1 FAILED, step2 CANCELLED, WorkflowRun FAILED."""
-    import uuid
-    from unittest.mock import patch
-    from rq import Queue
-    from rq.worker import SimpleWorker
-
-    queue = Queue(f"test-wf-{uuid.uuid4().hex[:8]}", connection=redis_conn)
-    shared_context = {"household_id": "test-household", "test_run": True}
-
-    run_id = queue_workflow(
-        workflow_type="hello-world-2step",
-        shared_context=shared_context,
-        household_id="test-household",
-        queue=queue,
-        session=wf_db_session,
-    )
-
-    # Make get_agent_config raise so the agent execution fails
-    with patch("robotina.agent.agents.get_agent_config", side_effect=RuntimeError("forced failure")):
-        worker = SimpleWorker([queue], connection=redis_conn)
-        worker.work(burst=True)
-
-    wf_db_session.expire_all()
-
-    steps_after = (
-        wf_db_session.query(WorkflowRunStep)
-        .filter(WorkflowRunStep.workflow_run_id == run_id)
-        .order_by(WorkflowRunStep.step_order)
-        .all()
-    )
-
-    # step1 should be FAILED, step2 should be CANCELLED
-    assert steps_after[0].step_key == "step1"
-    assert steps_after[0].status == WorkflowStepStatus.FAILED
-
-    assert steps_after[1].step_key == "step2"
-    assert steps_after[1].status == WorkflowStepStatus.CANCELLED
-
-    run = wf_db_session.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-    assert run.status == WorkflowStatus.FAILED
