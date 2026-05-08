@@ -98,6 +98,7 @@ async def test_message_enqueued_at_front(db_session, redis_conn, make_update):
     assert task_input.text == "Enqueue me"
 
 
+@pytest.mark.integration
 async def test_send_message_persists(db_session, make_update):
     """GW-05: send_message() returns platform_message_id str; persists ASSISTANT StoredMessage."""
     from robotina.gateway.send import send_message
