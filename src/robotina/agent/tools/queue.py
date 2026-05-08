@@ -15,13 +15,21 @@ Per-job injection pattern (locked Phase 4 constraint):
 
 Enqueues at FRONT of queue (at_front=True). Notification replies to the user
 should always be delivered before other pending jobs like research or loading.
+
+Phase 07.1: returns Command(goto=END) so the LangGraph state machine cannot
+loop after the tool succeeds. Termination is enforced by the engine, not by
+prompt-level pleading.
 """
 from __future__ import annotations
 
 import logging
 import os
+from typing import Annotated
 
-from langchain_core.tools import BaseTool
+from langchain_core.messages import ToolMessage
+from langchain_core.tools import BaseTool, InjectedToolCallId
+from langgraph.graph import END
+from langgraph.types import Command
 from redis import Redis
 from rq import Queue
 
@@ -38,17 +46,14 @@ class QueueTool(BaseTool):
         text: The reply text to deliver to the user.
 
     Returns:
-        Confirmation string containing the job_id. The explicit "task is done"
-        wording is required: a bare UUID return value caused the routing LLM
-        to re-call the tool, sending duplicate replies to the user.
+        Command(goto=END) carrying a ToolMessage with the enqueued job_id.
+        The agent graph routes to END immediately — no further model invocation.
     """
 
     name: str = "queue"
     description: str = (
         "Enqueue a send-notification task to deliver a reply to the user. "
-        "Use this for direct replies (answers to questions) or for acknowledgment "
-        "messages before starting a workflow. "
-        "When this tool returns, the reply has been queued — do not call it again. "
+        "Use this for direct replies (answers to questions). "
         "Args: text (str) — the reply text to send to the user."
     )
 
@@ -57,8 +62,8 @@ class QueueTool(BaseTool):
     user_id: str
     platform: str  # always "telegram" for Phase 1
 
-    def _run(self, text: str) -> str:
-        """Enqueue a send-notification task. Returns a stop-signal string with job_id."""
+    def _run(self, text: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
+        """Enqueue a send-notification task. Returns Command(goto=END)."""
         from robotina.queue.task_types import SendNotificationInput
 
         task_input = SendNotificationInput(
@@ -82,10 +87,14 @@ class QueueTool(BaseTool):
             at_front=True,
         )
         logger.info("queue tool | enqueued send-notification | job_id=%s", job.id)
-        return (
-            f"Reply queued for delivery. Notification job ID = {job.id}. "
-            "The task is done — do not call this tool again."
+        return Command(
+            update={"messages": [ToolMessage(
+                content=f"Reply queued. job_id={job.id}",
+                tool_call_id=tool_call_id,
+                name="queue",
+            )]},
+            goto=END,
         )
 
-    async def _arun(self, text: str) -> str:
-        return self._run(text)
+    async def _arun(self, text: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
+        return self._run(text, tool_call_id)

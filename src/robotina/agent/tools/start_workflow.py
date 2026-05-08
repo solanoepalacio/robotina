@@ -4,18 +4,26 @@ StartWorkflowTool creates a WorkflowRun record and all WorkflowRunStep records,
 enqueues the first step, and returns the workflow_run_id string.
 
 Used by the Robotina routing agent (Phase 7) when it identifies a multi-step
-workflow intent. For Phase 5 this tool exists but is not yet registered in any
-production agent's tools list — it is tested in isolation via test_start_workflow_tool.py.
+workflow intent.
 
 Pattern: BaseTool subclass (same pattern as ReadSkillTool from Phase 4).
 Session management: creates and closes its own session via SessionLocal() (D-10).
+
+Phase 07.1: returns Command(goto=END) so the LangGraph state machine cannot
+loop after the tool succeeds. Both happy and error paths terminate — we don't
+want the agent to retry on errors either; the workflow is a structured retry
+mechanism on its own.
 """
 from __future__ import annotations
 
 import logging
 import os
+from typing import Annotated
 
-from langchain_core.tools import BaseTool
+from langchain_core.messages import ToolMessage
+from langchain_core.tools import BaseTool, InjectedToolCallId
+from langgraph.graph import END
+from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +46,14 @@ class StartWorkflowTool(BaseTool):
                         injected automatically — the agent does not need to provide them.
 
     Returns:
-        workflow_run_id: UUID string identifying the created WorkflowRun.
+        Command(goto=END) carrying a ToolMessage with the workflow_run_id (or
+        error string on failure). The agent graph routes to END immediately.
     """
 
     name: str = "start-workflow"
     description: str = (
-        "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues the first step. "
-        "When this tool returns, the task is done — do not call it again. "
-        "\n\nArgs:\n"
+        "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues the first step.\n"
+        "Args:\n"
         "  workflow_type (str): Workflow name, e.g. 'add-recipe'.\n"
         "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
         "reply_context and household_id are injected automatically."
@@ -57,11 +65,16 @@ class StartWorkflowTool(BaseTool):
     platform: str = ""
     household_id: str = ""
 
-    def _run(self, workflow_type: str, shared_context: dict) -> str:
-        """Create and enqueue a workflow. Returns workflow_run_id.
+    def _run(
+        self,
+        workflow_type: str,
+        shared_context: dict,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+    ) -> Command:
+        """Create and enqueue a workflow. Returns Command(goto=END).
 
-        Session lifecycle: creates a new session, closes it in a finally block (D-10).
-        Queue: connects to agent-tasks via REDIS_URL env var.
+        Both happy and error paths terminate — the agent must not loop on
+        workflow-start failures.
         """
         from redis import Redis
         from rq import Queue
@@ -99,16 +112,30 @@ class StartWorkflowTool(BaseTool):
                 workflow_type,
                 workflow_run_id,
             )
-            return f"Workflow started successfully. Workflow ID = {workflow_run_id}"
+            content = f"Workflow started. workflow_run_id={workflow_run_id}"
         except Exception as exc:
             logger.error(
                 "start-workflow tool | workflow_type=%s error=%s",
                 workflow_type,
                 exc,
             )
-            return {"error": "workflow_failed", "message": str(exc)}
+            content = f"Workflow start failed: {exc}"
         finally:
             session.close()
 
-    async def _arun(self, workflow_type: str, shared_context: dict) -> str:
-        return self._run(workflow_type, shared_context)
+        return Command(
+            update={"messages": [ToolMessage(
+                content=content,
+                tool_call_id=tool_call_id,
+                name="start-workflow",
+            )]},
+            goto=END,
+        )
+
+    async def _arun(
+        self,
+        workflow_type: str,
+        shared_context: dict,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+    ) -> Command:
+        return self._run(workflow_type, shared_context, tool_call_id)

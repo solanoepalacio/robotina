@@ -2,9 +2,13 @@
 
 Covers ROBOT-03: Robotina agent has queue tool (enqueue a single follow-up
 send-notification task directly). Tests mock RQ Queue — never touch real Redis.
+
+Phase 07.1: QueueTool is terminal — _run returns Command(goto=END) so the
+LangGraph state machine cannot loop after the tool succeeds.
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
+from langgraph.graph import END
 
 
 def test_queue_tool_construction():
@@ -32,7 +36,7 @@ def test_queue_tool_enqueues_send_notification_with_correct_meta():
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        tool._run("Here is your meal plan.")
+        tool._run("Here is your meal plan.", tool_call_id="tc-1")
 
     call_kwargs = mock_queue.enqueue.call_args
     assert call_kwargs.args[0] == "robotina.queue.jobs.run_task"
@@ -54,7 +58,7 @@ def test_queue_tool_enqueues_at_front_of_queue():
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        tool._run("reply text")
+        tool._run("reply text", tool_call_id="tc-1")
 
     call_kwargs = mock_queue.enqueue.call_args
     assert call_kwargs.kwargs.get("at_front") is True, (
@@ -62,14 +66,13 @@ def test_queue_tool_enqueues_at_front_of_queue():
     )
 
 
-def test_queue_tool_returns_stop_signal_with_job_id():
-    """ROBOT-03: _run(text) returns a stop-signal string containing job.id.
+def test_queue_tool_returns_command_goto_end():
+    """Phase 07.1: _run returns Command(goto=END) so the agent graph terminates
+    immediately after the tool runs. Termination is engine-enforced, not
+    prompt-requested."""
+    from langchain_core.messages import ToolMessage
+    from langgraph.types import Command
 
-    A bare UUID return caused the routing LLM to interpret the result as
-    incomplete and re-call the tool, producing duplicate replies. The
-    return value must (a) include the job_id and (b) explicitly tell the
-    LLM not to call the tool again.
-    """
     from robotina.agent.tools.queue import QueueTool
 
     tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
@@ -81,7 +84,25 @@ def test_queue_tool_returns_stop_signal_with_job_id():
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        result = tool._run("some reply")
+        result = tool._run("some reply", tool_call_id="tc-call-1")
 
-    assert "expected-job-id-999" in result
-    assert "do not call this tool again" in result.lower()
+    assert isinstance(result, Command)
+    assert result.goto == END
+    messages = result.update["messages"]
+    assert len(messages) == 1
+    msg = messages[0]
+    assert isinstance(msg, ToolMessage)
+    assert msg.tool_call_id == "tc-call-1"
+    assert msg.name == "queue"
+    assert "expected-job-id-999" in msg.content
+
+
+def test_queue_tool_description_no_prompt_level_stop_hack():
+    """Phase 07.1: tool description should not contain the old prompt-level
+    "do not call this tool again" hack — the engine guarantees termination
+    via Command(goto=END) now."""
+    from robotina.agent.tools.queue import QueueTool
+
+    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
+    assert "do not call" not in tool.description.lower()
+    assert "task is done" not in tool.description.lower()
