@@ -1,5 +1,5 @@
 {
-  "send-notification": {
+  "handle-incoming-message": {
     "model_config": {
       "provider": "ollama",
       "url": "http://192.168.68.109:11434",
@@ -7,7 +7,7 @@
       "reasoning": true
     }
   },
-  "handle-incoming-message": {
+  "acknowledge-add-recipe": {
     "model_config": {
       "provider": "ollama",
       "url": "http://192.168.68.109:11434",

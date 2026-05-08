@@ -1,12 +1,12 @@
 {
-  "send-notification": {
+  "handle-incoming-message": {
     "model_config": {
       "provider": "openai",
       "model": "gpt-4o-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
-  "handle-incoming-message": {
+  "acknowledge-add-recipe": {
     "model_config": {
       "provider": "openai",
       "model": "gpt-4o-mini",
@@ -35,6 +35,13 @@
     }
   },
   "recipe-research-metadata": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "API_TOKEN_OPENAI"
+    }
+  },
+  "recipe-load": {
     "model_config": {
       "provider": "openai",
       "model": "gpt-4o-mini",
