@@ -119,6 +119,43 @@ def test_start_workflow_tool_auto_injects_reply_context():
     assert shared["household_id"] == "house-1"
 
 
+def test_start_workflow_tool_invokes_with_simulated_tool_call_dict():
+    """Phase 07.1 regression: same as the QueueTool test — verify .invoke()
+    via a tool_call dict (the path LangGraph's ToolNode uses) injects
+    tool_call_id correctly."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+
+    with (
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("rq.Queue", return_value=mock_queue),
+        patch("redis.Redis"),
+        patch("robotina.queue.workflow_runner.queue_workflow", return_value="run-regr"),
+    ):
+        result = tool.invoke({
+            "name": "start-workflow",
+            "args": {
+                "workflow_type": "add-recipe",
+                "shared_context": {"recipe_query": "carbonara"},
+            },
+            "id": "tc-sw-regression",
+            "type": "tool_call",
+        })
+
+    # When the tool returns a Command, .invoke() returns it directly.
+    # Injection must have worked (no TypeError raised).
+    assert isinstance(result, Command)
+    inner_msg = result.update["messages"][0]
+    assert inner_msg.tool_call_id == "tc-sw-regression"
+    assert "run-regr" in inner_msg.content
+
+
 def test_start_workflow_tool_description_no_prompt_level_stop_hack():
     """Phase 07.1: tool description should not contain the old prompt-level
     "do not call this tool again" hack."""

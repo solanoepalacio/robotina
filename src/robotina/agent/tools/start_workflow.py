@@ -24,8 +24,24 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool, InjectedToolCallId
 from langgraph.graph import END
 from langgraph.types import Command
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+class _StartWorkflowInput(BaseModel):
+    """Args schema for StartWorkflowTool. tool_call_id is auto-injected by
+    LangChain so the LLM never sees it — InjectedToolCallId only works when
+    declared on an explicit args_schema, not on the _run signature alone
+    (langchain-core 1.2.x requirement)."""
+    workflow_type: str = Field(description="Workflow name, e.g. 'add-recipe'.")
+    shared_context: dict = Field(
+        description=(
+            "Task-specific fields the workflow needs (e.g. recipe_query). "
+            "reply_context and household_id are injected automatically."
+        )
+    )
+    tool_call_id: Annotated[str, InjectedToolCallId]
 
 
 class StartWorkflowTool(BaseTool):
@@ -58,6 +74,7 @@ class StartWorkflowTool(BaseTool):
         "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
         "reply_context and household_id are injected automatically."
     )
+    args_schema: type[BaseModel] = _StartWorkflowInput
 
     # Injected by run_task() at construction time
     chat_id: str = ""
@@ -69,7 +86,7 @@ class StartWorkflowTool(BaseTool):
         self,
         workflow_type: str,
         shared_context: dict,
-        tool_call_id: Annotated[str, InjectedToolCallId],
+        tool_call_id: str,
     ) -> Command:
         """Create and enqueue a workflow. Returns Command(goto=END).
 
@@ -136,6 +153,6 @@ class StartWorkflowTool(BaseTool):
         self,
         workflow_type: str,
         shared_context: dict,
-        tool_call_id: Annotated[str, InjectedToolCallId],
+        tool_call_id: str,
     ) -> Command:
         return self._run(workflow_type, shared_context, tool_call_id)

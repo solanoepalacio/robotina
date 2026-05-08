@@ -30,10 +30,20 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool, InjectedToolCallId
 from langgraph.graph import END
 from langgraph.types import Command
+from pydantic import BaseModel, Field
 from redis import Redis
 from rq import Queue
 
 logger = logging.getLogger(__name__)
+
+
+class _QueueInput(BaseModel):
+    """Args schema for QueueTool. tool_call_id is auto-injected by LangChain
+    so the LLM never sees it — InjectedToolCallId only works when declared on
+    an explicit args_schema, not on the _run signature alone (langchain-core
+    1.2.x requirement)."""
+    text: str = Field(description="The reply text to send to the user.")
+    tool_call_id: Annotated[str, InjectedToolCallId]
 
 
 class QueueTool(BaseTool):
@@ -56,13 +66,14 @@ class QueueTool(BaseTool):
         "Use this for direct replies (answers to questions). "
         "Args: text (str) — the reply text to send to the user."
     )
+    args_schema: type[BaseModel] = _QueueInput
 
     # Injected at construction — agent never sees or reasons about these fields
     chat_id: str
     user_id: str
     platform: str  # always "telegram" for Phase 1
 
-    def _run(self, text: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
+    def _run(self, text: str, tool_call_id: str) -> Command:
         """Enqueue a send-notification task. Returns Command(goto=END)."""
         from robotina.queue.task_types import SendNotificationInput
 
@@ -96,5 +107,5 @@ class QueueTool(BaseTool):
             goto=END,
         )
 
-    async def _arun(self, text: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
+    async def _arun(self, text: str, tool_call_id: str) -> Command:
         return self._run(text, tool_call_id)

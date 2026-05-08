@@ -97,6 +97,42 @@ def test_queue_tool_returns_command_goto_end():
     assert "expected-job-id-999" in msg.content
 
 
+def test_queue_tool_invokes_with_simulated_tool_call_dict():
+    """Phase 07.1 regression: BaseTool with Annotated[..., InjectedToolCallId]
+    on _run alone does NOT trigger injection in langchain-core 1.2.x — the
+    annotation must live on an explicit args_schema. This test exercises the
+    real .invoke() path used by LangGraph's ToolNode (a tool_call dict with
+    args + id) so we catch the missing-tool_call_id signature mismatch
+    before it ships to production."""
+    from robotina.agent.tools.queue import QueueTool
+
+    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
+
+    mock_job = MagicMock()
+    mock_job.id = "regression-job"
+    mock_queue = MagicMock()
+    mock_queue.enqueue.return_value = mock_job
+
+    from langgraph.types import Command
+
+    with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
+         patch("robotina.agent.tools.queue.Redis"):
+        # Mimic langgraph's ToolNode: pass a tool_call dict (not raw kwargs).
+        result = tool.invoke({
+            "name": "queue",
+            "args": {"text": "hola"},
+            "id": "tc-regression-1",
+            "type": "tool_call",
+        })
+
+    # When the tool returns a Command, .invoke() returns it directly.
+    # The tool_call_id must have been injected from the tool_call dict (no TypeError).
+    assert mock_queue.enqueue.called
+    assert isinstance(result, Command)
+    inner_msg = result.update["messages"][0]
+    assert inner_msg.tool_call_id == "tc-regression-1"
+
+
 def test_queue_tool_description_no_prompt_level_stop_hack():
     """Phase 07.1: tool description should not contain the old prompt-level
     "do not call this tool again" hack — the engine guarantees termination
