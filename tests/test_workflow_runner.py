@@ -266,6 +266,98 @@ def test_on_step_failed_marks_workflow_failed():
     session.commit.assert_called_once()
 
 
+def test_extract_task_output_handles_return_direct_toolmessage():
+    """Phase 07.1: when a return_direct=True terminal tool short-circuits the prebuilt
+    create_react_agent graph, the agent's final state has a ToolMessage as the last
+    message — not a JSON-emitting AIMessage. _extract_task_output must surface the
+    tool's return string instead of attempting (and failing) to JSON-parse the empty
+    tool-call AIMessage that precedes it.
+    """
+    from robotina.queue.workflow_runner import _extract_task_output
+
+    tool_msg = MagicMock()
+    tool_msg.type = "tool"
+    tool_msg.content = "Reply queued. job_id=abc"
+
+    ai_msg = MagicMock()
+    ai_msg.type = "ai"
+    # Anthropic tool-use AIMessage: content is a list of blocks, no text block.
+    ai_msg.content = [{"type": "tool_use", "name": "queue", "input": {"text": "..."}}]
+
+    human_msg = MagicMock()
+    human_msg.type = "human"
+    human_msg.content = "user request"
+
+    result = {"messages": [human_msg, ai_msg, tool_msg]}
+
+    assert _extract_task_output(result) == {"tool_message": "Reply queued. job_id=abc"}
+
+
+def test_on_step_complete_advances_after_return_direct_ack():
+    """Regression: the acknowledge-add-recipe step uses QueueTool with return_direct=True,
+    which means the agent terminates with a ToolMessage as its final message. Before
+    the fix, _extract_task_output raised ValueError on the empty tool-call AIMessage,
+    on_step_complete bubbled to except, the step was marked FAILED, and the workflow
+    halted — the user saw the ack but never got the recipe.
+
+    This test drives on_step_complete with that exact agent-output shape and asserts
+    the step is marked DONE, the artifact is the {"tool_message": ...} fallback shape,
+    and the next step (gather) is enqueued.
+    """
+    from robotina.queue.workflow_runner import on_step_complete
+
+    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
+    next_step = make_step(
+        step_key="gather", task_type="recipe-research-gather", task_job_id=None
+    )
+    run = make_run(
+        workflow_type="add-recipe",
+        shared_context={
+            "household_id": "hh-1",
+            "recipe_query": "spaghetti",
+            "reply_context": {
+                "platform": "telegram",
+                "chat_id": "c1",
+                "user_id": "u1",
+            },
+        },
+    )
+
+    session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter.return_value = query_mock
+    query_mock.order_by.return_value = query_mock
+    query_mock.first.side_effect = [step, run, next_step]
+    query_mock.all.return_value = [step]
+    session.query.return_value = query_mock
+
+    queue = MagicMock()
+
+    # Mirror what create_react_agent leaves in state when QueueTool (return_direct=True) runs:
+    # the tool-call AIMessage's content is a list of tool_use blocks (no text), and the final
+    # message is the ToolMessage carrying the queue tool's return string.
+    human_msg = MagicMock()
+    human_msg.type = "human"
+    human_msg.content = "Voy a agregar la receta de bocaditos de arroz"
+
+    ai_msg = MagicMock()
+    ai_msg.type = "ai"
+    ai_msg.content = [{"type": "tool_use", "name": "queue", "input": {"text": "..."}}]
+
+    tool_msg = MagicMock()
+    tool_msg.type = "tool"
+    tool_msg.content = "Reply queued. job_id=xyz"
+
+    output = {"messages": [human_msg, ai_msg, tool_msg]}
+
+    on_step_complete("test-job-id", output, session, queue)
+
+    assert step.status == WorkflowStepStatus.DONE
+    assert step.artifact == {"tool_message": "Reply queued. job_id=xyz"}
+    assert queue.enqueue.called
+    assert next_step.task_job_id is not None
+
+
 def test_reply_context_not_in_recipe_research_input():
     """WF-09: RecipeResearchInput has no reply_context field (enforced at model level)."""
     assert "reply_context" not in RecipeResearchInput.model_fields

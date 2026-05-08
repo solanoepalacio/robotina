@@ -31,10 +31,24 @@ def _extract_task_output(result: dict) -> dict:
 
     Reads the last message content and parses it as JSON.
     Strips markdown code fences (```...```) if present.
+
+    Phase 07.1: When a terminal tool (``return_direct=True``, e.g. ``QueueTool``)
+    short-circuits the prebuilt ``create_react_agent`` graph, the last message
+    is a ``ToolMessage`` rather than a JSON-emitting ``AIMessage`` — the
+    tool-call AIMessage that immediately precedes it has no text content for
+    Anthropic models (the tool_use block carries no JSON). In that case there
+    is no agent-emitted JSON to parse; surface the tool's return string as the
+    artifact directly. Steps that use return_direct tools (e.g. the
+    per-workflow ack agents) do not have downstream consumers of their
+    artifact, so the ``{"tool_message": ...}`` shape is safe.
     """
+    messages = result["messages"]
+    last = messages[-1]
+    if getattr(last, "type", None) == "tool":
+        return {"tool_message": str(last.content)}
     # Find the last AI message (LangGraph always ends with one, but be explicit)
-    ai_messages = [m for m in result["messages"] if getattr(m, "type", None) == "ai"]
-    raw = ai_messages[-1].content if ai_messages else result["messages"][-1].content
+    ai_messages = [m for m in messages if getattr(m, "type", None) == "ai"]
+    raw = ai_messages[-1].content if ai_messages else last.content
     # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
     if isinstance(raw, list):
         raw = " ".join(b.get("text", "") for b in raw if isinstance(b, dict) and b.get("type") == "text")
