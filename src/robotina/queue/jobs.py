@@ -155,6 +155,13 @@ def run_task(task_input) -> object:
         elif task_type == "recipe-load":
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
+        elif task_type == "acknowledge-add-recipe":
+            from robotina.agent.tools.queue import QueueTool
+            tools.append(QueueTool(
+                chat_id=task_input.chat_id,
+                user_id=task_input.user_id,
+                platform=task_input.platform,
+            ))
 
         # Step 5 + 6: Load versioned prompt and append skill index
         prompt_text = Path(config.prompt_path).read_text()

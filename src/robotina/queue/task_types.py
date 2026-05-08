@@ -227,3 +227,37 @@ class SendNotificationInput(BaseModel):
 
 class SendNotificationOutput(BaseModel):
     message_id: str       # platform-assigned ID
+
+
+# ---------------------------------------------------------------------------
+# acknowledge-add-recipe (Phase 07.1)
+# ---------------------------------------------------------------------------
+
+class AcknowledgeAddRecipeInput(BaseModel):
+    """Input for the per-workflow ack agent that runs as add-recipe step 1.
+
+    The agent composes a brief Spanish acknowledgment and calls `queue` to
+    deliver it. Recipient context flows through `reply_context` (already
+    auto-injected by StartWorkflowTool into shared_context).
+    """
+    recipe_query: str
+    reply_context: dict   # {platform, chat_id, user_id}
+
+    @property
+    def chat_id(self) -> str:
+        return self.reply_context["chat_id"]
+
+    @property
+    def user_id(self) -> str:
+        return self.reply_context["user_id"]
+
+    @property
+    def platform(self) -> str:
+        return self.reply_context["platform"]
+
+    def to_user_message(self) -> str:
+        return (
+            f"User is asking to add a recipe: \"{self.recipe_query}\". "
+            "Compose a brief, friendly acknowledgment in Spanish that you will "
+            "search for the recipe and that data will be updated directly in the application."
+        )

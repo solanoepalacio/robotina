@@ -87,6 +87,17 @@ def test_send_notification_removed_from_registry():
         get_agent_config("send-notification")
 
 
+def test_acknowledge_add_recipe_registered():
+    """Phase 07.1: acknowledge-add-recipe runs as add-recipe workflow step 1."""
+    config = get_agent_config("acknowledge-add-recipe")
+    assert isinstance(config, AgentConfig)
+    assert config.task_type == "acknowledge-add-recipe"
+    assert config.prompt_path == "src/robotina/agent/prompts/acknowledge-add-recipe/V001.md"
+    assert config.skills == []
+    assert config.tools == []  # QueueTool injected per-job in run_task
+    assert config.model_config["api_key_env"] == "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN"
+
+
 def test_handle_incoming_message_registered_in_agent_registry():
     """ROBOT-01: handle-incoming-message is registered in AGENT_REGISTRY."""
     config = get_agent_config("handle-incoming-message")

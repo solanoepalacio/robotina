@@ -131,6 +131,22 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         skills=["household-manager"],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
     ),
+    # Phase 07.1: per-workflow acknowledgment agent. Runs as add-recipe step 1,
+    # composes a brief Spanish ack and delivers via queue tool. Per-workflow
+    # (not generic) per feedback_avoid_premature_abstraction.md.
+    "acknowledge-add-recipe": AgentConfig(
+        task_type="acknowledge-add-recipe",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/acknowledge-add-recipe/V001.md",
+        skills=[],
+        tools=[],  # QueueTool injected per-job in run_task()
+    ),
 }
 
 

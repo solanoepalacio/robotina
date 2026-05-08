@@ -18,6 +18,7 @@ from typing import Callable
 from pydantic import BaseModel, ConfigDict
 
 from robotina.queue.task_types import (
+    AcknowledgeAddRecipeInput,
     RecipeData,
     RecipeIngredient,
     RecipeLoadInput,
@@ -101,6 +102,17 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
     "add-recipe": WorkflowDefinition(
         workflow_type="add-recipe",
         steps=[
+            # Phase 07.1: per-workflow acknowledgment agent runs as step 1.
+            # Routes the user-facing ack out of the routing agent so handle-incoming-message
+            # can emit a single tool call (start-workflow) and terminate.
+            WorkflowStepDef(
+                step_key="acknowledge",
+                task_type="acknowledge-add-recipe",
+                build_input=lambda ctx, _: AcknowledgeAddRecipeInput(
+                    recipe_query=ctx["recipe_query"],
+                    reply_context=ctx["reply_context"],
+                ),
+            ),
             WorkflowStepDef(
                 step_key="gather",
                 task_type="recipe-research-gather",

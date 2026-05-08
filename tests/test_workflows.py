@@ -22,18 +22,21 @@ def test_workflow_registry_is_dict():
 
 
 def test_add_recipe_workflow_registered():
-    """WF-03: 'add-recipe' workflow is in WORKFLOW_REGISTRY with 6 steps."""
+    """WF-03: 'add-recipe' workflow is in WORKFLOW_REGISTRY with 7 steps
+    (Phase 07.1 inserted acknowledge as step 1)."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     assert "add-recipe" in WORKFLOW_REGISTRY
-    assert len(WORKFLOW_REGISTRY["add-recipe"].steps) == 6
+    assert len(WORKFLOW_REGISTRY["add-recipe"].steps) == 7
 
 
-def test_add_recipe_workflow_has_6_steps():
-    """D-02: add-recipe workflow has 6 steps: gather -> instructions -> ingredients -> metadata -> load -> notify."""
+def test_add_recipe_workflow_has_7_steps():
+    """Phase 07.1: add-recipe workflow has 7 steps:
+    acknowledge -> gather -> instructions -> ingredients -> metadata -> load -> notify."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     steps = WORKFLOW_REGISTRY["add-recipe"].steps
-    assert len(steps) == 6
+    assert len(steps) == 7
     expected = [
+        ("acknowledge", "acknowledge-add-recipe"),
         ("gather", "recipe-research-gather"),
         ("instructions", "recipe-research-instructions"),
         ("ingredients", "recipe-research-ingredients"),
@@ -46,12 +49,30 @@ def test_add_recipe_workflow_has_6_steps():
         assert step.task_type == task_type
 
 
+def test_add_recipe_build_input_acknowledge_returns_ack_input():
+    """Phase 07.1: acknowledge step (index 0) builds AcknowledgeAddRecipeInput."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    from robotina.queue.task_types import AcknowledgeAddRecipeInput
+    ctx = {
+        "recipe_query": "carbonara",
+        "reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"},
+        "household_id": "h1",
+    }
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[0].build_input(ctx, {})
+    assert isinstance(result, AcknowledgeAddRecipeInput)
+    assert result.recipe_query == "carbonara"
+    assert result.chat_id == "c1"
+    assert result.user_id == "u1"
+    assert result.platform == "telegram"
+
+
 def test_add_recipe_build_input_gather_returns_gather_input():
     """D-02: gather step build_input returns RecipeResearchGatherInput."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.task_types import RecipeResearchGatherInput
     ctx = {"recipe_query": "pasta", "household_id": "h1"}
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[0].build_input(ctx, {})
+    # gather is now step index 1 (acknowledge is step 0)
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[1].build_input(ctx, {})
     assert result == RecipeResearchGatherInput(query="pasta", household_id="h1")
 
 
@@ -61,7 +82,8 @@ def test_add_recipe_build_input_instructions():
     from robotina.queue.task_types import RecipeResearchInstructionsInput
     ctx = {"recipe_query": "pasta"}
     artifacts = {"gather": {"recipes": [{"title": "Test"}]}}
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[1].build_input(ctx, artifacts)
+    # instructions is now step index 2 (acknowledge=0, gather=1)
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[2].build_input(ctx, artifacts)
     assert isinstance(result, RecipeResearchInstructionsInput)
     assert result.query == "pasta"
     assert result.gathered_recipes == [{"title": "Test"}]
@@ -80,7 +102,8 @@ def test_add_recipe_build_input_ingredients():
             "draft_instructions": [{"body": "Cook pasta", "title": None}],
         },
     }
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[2].build_input(ctx, artifacts)
+    # ingredients is now step index 3 (acknowledge=0, gather=1, instructions=2)
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[3].build_input(ctx, artifacts)
     assert isinstance(result, RecipeResearchIngredientsInput)
     assert result.query == "pasta"
     assert len(result.draft_instructions) == 1
@@ -103,7 +126,8 @@ def test_add_recipe_build_input_metadata():
             "ingredients": [{"food_name": "pasta", "unit_name": "g", "quantity": 500.0, "note": None}],
         },
     }
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[3].build_input(ctx, artifacts)
+    # metadata is now step index 4
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[4].build_input(ctx, artifacts)
     assert isinstance(result, RecipeResearchMetadataInput)
     assert result.draft_name == "Pasta Bolognesa"
     assert len(result.ingredients) == 1
@@ -134,19 +158,21 @@ def test_add_recipe_build_input_load_returns_recipe_load_input():
             }
         },
     }
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[4].build_input(ctx, artifacts)
+    # load is now step index 5
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[5].build_input(ctx, artifacts)
     assert isinstance(result, RecipeLoadInput)
     assert result.household_id == "h1"
     assert result.recipe.name == "pasta"
 
 
 def test_add_recipe_build_input_notify_returns_send_notification_input():
-    """D-02: notify step (index 5) build_input uses reply_context and load artifact."""
+    """notify step (now index 6 after Phase 07.1 inserted acknowledge as step 0)
+    build_input uses reply_context and load artifact."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.task_types import SendNotificationInput
     ctx = {"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}}
     artifacts = {"load": {"recipe_name": "Pasta"}}
-    result = WORKFLOW_REGISTRY["add-recipe"].steps[5].build_input(ctx, artifacts)
+    result = WORKFLOW_REGISTRY["add-recipe"].steps[6].build_input(ctx, artifacts)
     assert result == SendNotificationInput(
         platform="telegram", chat_id="c1", user_id="u1", text="Receta agregada: Pasta"
     )
