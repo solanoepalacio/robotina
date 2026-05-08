@@ -185,7 +185,7 @@ None yet.
 | 260330-ggw | Add Spanish language support to Robotina | 2026-03-30 | 128efe8 | [260330-ggw-add-spanish-language-support-to-robotina](./quick/260330-ggw-add-spanish-language-support-to-robotina/) |
 | 260330-mgk | Fix recipe-research-gather prompt step 6 to explicitly specify recipes output format instead of ambiguous JSON array | 2026-03-30 | 0b0ed36 | [260330-mgk-fix-recipe-research-gather-prompt-step-6](./quick/260330-mgk-fix-recipe-research-gather-prompt-step-6/) |
 | 260430-meh | Fix spec.md line 112: Prisma models -> SQLAlchemy models | 2026-04-30 | 85058b1 | [260430-meh-fix-spec-md-line-112-prisma-models-sqlal](./quick/260430-meh-fix-spec-md-line-112-prisma-models-sqlal/) |
-| 260508-tdr | Fix workflow halt after return_direct ack tool: tolerate ToolMessage in _extract_task_output | 2026-05-08 | _pending_ | [260508-tdr-fix-extract-task-output-toolmessage](./quick/260508-tdr-fix-extract-task-output-toolmessage/) |
+| 260508-tdr | Fix workflow halt after return_direct ack tool: tolerate ToolMessage in _extract_task_output | 2026-05-08 | 7916c4b | [260508-tdr-fix-extract-task-output-toolmessage](./quick/260508-tdr-fix-extract-task-output-toolmessage/) |
 
 ## Session Continuity
 
