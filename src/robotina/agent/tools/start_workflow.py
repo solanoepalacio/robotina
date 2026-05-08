@@ -9,39 +9,21 @@ workflow intent.
 Pattern: BaseTool subclass (same pattern as ReadSkillTool from Phase 4).
 Session management: creates and closes its own session via SessionLocal() (D-10).
 
-Phase 07.1: returns Command(goto=END) so the LangGraph state machine cannot
-loop after the tool succeeds. Both happy and error paths terminate — we don't
-want the agent to retry on errors either; the workflow is a structured retry
-mechanism on its own.
+Phase 07.1: ``return_direct=True`` makes this a TERMINAL tool — the LangGraph
+``create_react_agent`` graph terminates immediately after the tool runs (both
+happy and error paths). This is engine-enforced termination, not a prompt-level
+request. (Note: returning ``Command(goto=END)`` does NOT short-circuit the
+prebuilt graph in langgraph 1.1.x — verified empirically. ``return_direct``
+is the supported mechanism.)
 """
 from __future__ import annotations
 
 import logging
 import os
-from typing import Annotated
 
-from langchain_core.messages import ToolMessage
-from langchain_core.tools import BaseTool, InjectedToolCallId
-from langgraph.graph import END
-from langgraph.types import Command
-from pydantic import BaseModel, Field
+from langchain_core.tools import BaseTool
 
 logger = logging.getLogger(__name__)
-
-
-class _StartWorkflowInput(BaseModel):
-    """Args schema for StartWorkflowTool. tool_call_id is auto-injected by
-    LangChain so the LLM never sees it — InjectedToolCallId only works when
-    declared on an explicit args_schema, not on the _run signature alone
-    (langchain-core 1.2.x requirement)."""
-    workflow_type: str = Field(description="Workflow name, e.g. 'add-recipe'.")
-    shared_context: dict = Field(
-        description=(
-            "Task-specific fields the workflow needs (e.g. recipe_query). "
-            "reply_context and household_id are injected automatically."
-        )
-    )
-    tool_call_id: Annotated[str, InjectedToolCallId]
 
 
 class StartWorkflowTool(BaseTool):
@@ -62,8 +44,11 @@ class StartWorkflowTool(BaseTool):
                         injected automatically — the agent does not need to provide them.
 
     Returns:
-        Command(goto=END) carrying a ToolMessage with the workflow_run_id (or
-        error string on failure). The agent graph routes to END immediately.
+        Confirmation string with the workflow_run_id (or error string on
+        failure). ``return_direct=True`` causes the LangGraph agent to
+        terminate immediately after — no further model invocation. Both happy
+        and error paths terminate; the agent must not loop on workflow-start
+        failures.
     """
 
     name: str = "start-workflow"
@@ -74,7 +59,7 @@ class StartWorkflowTool(BaseTool):
         "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
         "reply_context and household_id are injected automatically."
     )
-    args_schema: type[BaseModel] = _StartWorkflowInput
+    return_direct: bool = True
 
     # Injected by run_task() at construction time
     chat_id: str = ""
@@ -82,17 +67,7 @@ class StartWorkflowTool(BaseTool):
     platform: str = ""
     household_id: str = ""
 
-    def _run(
-        self,
-        workflow_type: str,
-        shared_context: dict,
-        tool_call_id: str,
-    ) -> Command:
-        """Create and enqueue a workflow. Returns Command(goto=END).
-
-        Both happy and error paths terminate — the agent must not loop on
-        workflow-start failures.
-        """
+    def _run(self, workflow_type: str, shared_context: dict) -> str:
         from redis import Redis
         from rq import Queue
 
@@ -129,30 +104,16 @@ class StartWorkflowTool(BaseTool):
                 workflow_type,
                 workflow_run_id,
             )
-            content = f"Workflow started. workflow_run_id={workflow_run_id}"
+            return f"Workflow started. workflow_run_id={workflow_run_id}"
         except Exception as exc:
             logger.error(
                 "start-workflow tool | workflow_type=%s error=%s",
                 workflow_type,
                 exc,
             )
-            content = f"Workflow start failed: {exc}"
+            return f"Workflow start failed: {exc}"
         finally:
             session.close()
 
-        return Command(
-            update={"messages": [ToolMessage(
-                content=content,
-                tool_call_id=tool_call_id,
-                name="start-workflow",
-            )]},
-            goto=END,
-        )
-
-    async def _arun(
-        self,
-        workflow_type: str,
-        shared_context: dict,
-        tool_call_id: str,
-    ) -> Command:
-        return self._run(workflow_type, shared_context, tool_call_id)
+    async def _arun(self, workflow_type: str, shared_context: dict) -> str:
+        return self._run(workflow_type, shared_context)

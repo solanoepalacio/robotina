@@ -3,12 +3,13 @@
 Covers ROBOT-03: Robotina agent has queue tool (enqueue a single follow-up
 send-notification task directly). Tests mock RQ Queue — never touch real Redis.
 
-Phase 07.1: QueueTool is terminal — _run returns Command(goto=END) so the
-LangGraph state machine cannot loop after the tool succeeds.
+Phase 07.1: QueueTool is terminal via ``return_direct=True``. The LangGraph
+``create_react_agent`` graph terminates immediately after the tool runs, with
+no further LLM invocation. (``Command(goto=END)`` from a tool does NOT
+short-circuit the prebuilt graph in langgraph 1.1.x — empirically verified —
+hence this approach.)
 """
 from unittest.mock import MagicMock, patch
-
-from langgraph.graph import END
 
 
 def test_queue_tool_construction():
@@ -21,28 +22,37 @@ def test_queue_tool_construction():
     assert tool.name == "queue"
 
 
+def test_queue_tool_is_terminal_via_return_direct():
+    """Phase 07.1: return_direct=True makes the agent graph terminate after
+    the tool runs. This is the engine-enforced termination promised by Plan 03."""
+    from robotina.agent.tools.queue import QueueTool
+
+    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
+    assert tool.return_direct is True
+
+
 def test_queue_tool_enqueues_send_notification_with_correct_meta():
-    """ROBOT-03: _run(text) enqueues 'robotina.queue.jobs.run_task' with meta={'task_type': 'send-notification'},
-    result_ttl=-1, failure_ttl=-1."""
+    """ROBOT-03: _run(text) enqueues 'robotina.queue.jobs.run_task' with
+    meta={'task_type': 'send-notification'}, result_ttl=-1, failure_ttl=-1."""
     from robotina.agent.tools.queue import QueueTool
 
     tool = QueueTool(chat_id="chat-42", user_id="user-7", platform="telegram")
 
     mock_job = MagicMock()
     mock_job.id = "job-uuid-123"
-
     mock_queue = MagicMock()
     mock_queue.enqueue.return_value = mock_job
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        tool._run("Here is your meal plan.", tool_call_id="tc-1")
+        result = tool._run("Here is your meal plan.")
 
     call_kwargs = mock_queue.enqueue.call_args
     assert call_kwargs.args[0] == "robotina.queue.jobs.run_task"
     assert call_kwargs.kwargs.get("result_ttl") == -1
     assert call_kwargs.kwargs.get("failure_ttl") == -1
     assert call_kwargs.kwargs.get("meta") == {"task_type": "send-notification"}
+    assert "job-uuid-123" in result
 
 
 def test_queue_tool_enqueues_at_front_of_queue():
@@ -58,85 +68,68 @@ def test_queue_tool_enqueues_at_front_of_queue():
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        tool._run("reply text", tool_call_id="tc-1")
+        tool._run("reply text")
 
     call_kwargs = mock_queue.enqueue.call_args
-    assert call_kwargs.kwargs.get("at_front") is True, (
-        "QueueTool must use at_front=True — notification replies take priority"
+    assert call_kwargs.kwargs.get("at_front") is True
+
+
+def test_queue_tool_short_circuits_create_react_agent():
+    """Phase 07.1 regression: drive the QueueTool through a real
+    ``create_react_agent`` with a stub model that ALWAYS tries to emit a tool
+    call. If the engine truly terminates after the tool runs, the model is
+    invoked exactly once. If not, the model is invoked twice (or more).
+
+    This is the test that should fail loudly if anything in our termination
+    setup regresses (e.g. ``return_direct`` removed, prebuilt swapped for one
+    that doesn't honor it)."""
+    from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+    from langchain_core.messages import AIMessage, HumanMessage
+    from langgraph.prebuilt import create_react_agent
+
+    from robotina.agent.tools.queue import QueueTool
+
+    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
+
+    mock_job = MagicMock()
+    mock_job.id = "j-1"
+    mock_queue = MagicMock()
+    mock_queue.enqueue.return_value = mock_job
+
+    call_count = {"n": 0}
+
+    class CountingModel(FakeMessagesListChatModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            call_count["n"] += 1
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+        def bind_tools(self, tools, **kwargs):
+            return self  # tools already encoded in preset responses
+
+    first_call = AIMessage(
+        content="",
+        tool_calls=[{"name": "queue", "args": {"text": "hola"}, "id": "tc-1", "type": "tool_call"}],
     )
-
-
-def test_queue_tool_returns_command_goto_end():
-    """Phase 07.1: _run returns Command(goto=END) so the agent graph terminates
-    immediately after the tool runs. Termination is engine-enforced, not
-    prompt-requested."""
-    from langchain_core.messages import ToolMessage
-    from langgraph.types import Command
-
-    from robotina.agent.tools.queue import QueueTool
-
-    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
-
-    mock_job = MagicMock()
-    mock_job.id = "expected-job-id-999"
-    mock_queue = MagicMock()
-    mock_queue.enqueue.return_value = mock_job
+    second_call = AIMessage(
+        content="if engine did not terminate, this proves it",
+        tool_calls=[],
+    )
+    model = CountingModel(responses=[first_call, second_call])
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        result = tool._run("some reply", tool_call_id="tc-call-1")
+        agent = create_react_agent(model=model, tools=[tool])
+        agent.invoke({"messages": [HumanMessage(content="please reply")]})
 
-    assert isinstance(result, Command)
-    assert result.goto == END
-    messages = result.update["messages"]
-    assert len(messages) == 1
-    msg = messages[0]
-    assert isinstance(msg, ToolMessage)
-    assert msg.tool_call_id == "tc-call-1"
-    assert msg.name == "queue"
-    assert "expected-job-id-999" in msg.content
-
-
-def test_queue_tool_invokes_with_simulated_tool_call_dict():
-    """Phase 07.1 regression: BaseTool with Annotated[..., InjectedToolCallId]
-    on _run alone does NOT trigger injection in langchain-core 1.2.x — the
-    annotation must live on an explicit args_schema. This test exercises the
-    real .invoke() path used by LangGraph's ToolNode (a tool_call dict with
-    args + id) so we catch the missing-tool_call_id signature mismatch
-    before it ships to production."""
-    from robotina.agent.tools.queue import QueueTool
-
-    tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
-
-    mock_job = MagicMock()
-    mock_job.id = "regression-job"
-    mock_queue = MagicMock()
-    mock_queue.enqueue.return_value = mock_job
-
-    from langgraph.types import Command
-
-    with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
-         patch("robotina.agent.tools.queue.Redis"):
-        # Mimic langgraph's ToolNode: pass a tool_call dict (not raw kwargs).
-        result = tool.invoke({
-            "name": "queue",
-            "args": {"text": "hola"},
-            "id": "tc-regression-1",
-            "type": "tool_call",
-        })
-
-    # When the tool returns a Command, .invoke() returns it directly.
-    # The tool_call_id must have been injected from the tool_call dict (no TypeError).
-    assert mock_queue.enqueue.called
-    assert isinstance(result, Command)
-    inner_msg = result.update["messages"][0]
-    assert inner_msg.tool_call_id == "tc-regression-1"
+    assert call_count["n"] == 1, (
+        f"Expected exactly 1 LLM call (engine terminates after terminal tool); "
+        f"got {call_count['n']}. return_direct may have regressed."
+    )
 
 
 def test_queue_tool_description_no_prompt_level_stop_hack():
     """Phase 07.1: tool description should not contain the old prompt-level
-    "do not call this tool again" hack — the engine guarantees termination
-    via Command(goto=END) now."""
+    "do not call this tool again" hack — engine guarantees termination."""
     from robotina.agent.tools.queue import QueueTool
 
     tool = QueueTool(chat_id="c1", user_id="u1", platform="telegram")
