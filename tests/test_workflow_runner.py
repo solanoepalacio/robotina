@@ -377,9 +377,9 @@ def test_reply_context_not_in_recipe_load_input():
 
 
 def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
-    """Quick task 260509-ln9: when reply_context is present in shared_context,
-    on_step_failed enqueues a send-notification at the front of the queue with
-    the locked Spanish apology text and the workflow_type in parens.
+    """When reply_context is present in shared_context, on_step_failed
+    enqueues a send-notification at the front of the queue with the locked
+    Spanish apology text and the workflow_type in parens.
     """
     from robotina.queue.workflow_runner import on_step_failed
     from robotina.queue.task_types import SendNotificationInput
@@ -425,8 +425,8 @@ def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
 
 
 def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog):
-    """Quick task 260509-ln9: when shared_context has no reply_context (e.g. workflow
-    initiated by a scheduled task), on_step_failed logs a WARN and does NOT enqueue.
+    """When shared_context has no reply_context (e.g. workflow initiated by a
+    scheduled task), on_step_failed logs a WARN and does NOT enqueue.
     """
     import logging
     from robotina.queue.workflow_runner import on_step_failed

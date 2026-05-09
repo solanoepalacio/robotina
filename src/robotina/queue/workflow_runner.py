@@ -334,7 +334,7 @@ def on_step_failed(job_id: str, session: Session, queue=None) -> None:
     The failed RQ job is retained in RQ's FailedJobRegistry by the caller
     (run_task re-raises the exception after calling this function).
 
-    Quick task 260509-ln9: when ``queue`` is provided AND the WorkflowRun's
+    When ``queue`` is provided AND the WorkflowRun's
     ``shared_context.reply_context`` is populated, also enqueue a single
     ``send-notification`` job at the front of the queue with a Spanish apology
     so terminal failures don't go silent. This is best-effort — any error in
@@ -392,8 +392,8 @@ def on_step_failed(job_id: str, session: Session, queue=None) -> None:
         len(pending_steps),
     )
 
-    # Dead-letter: notify user that their request failed (quick task 260509-ln9).
-    # Best-effort: never raise from this block — the workflow is already FAILED.
+    # Dead-letter: best-effort apology so terminal failures don't go silent.
+    # Never raise from this block — the workflow is already FAILED.
     if queue is None:
         return
     try:
