@@ -58,7 +58,10 @@ class HouseholdManagerApiTool(BaseTool):
         "Args: method (str) — HTTP method (GET/POST/PATCH/DELETE). "
         "path (str) — API path relative to base URL (e.g. /api/recipes). "
         "body (dict | None) — JSON request body for POST/PATCH. "
-        "query (dict | None) — URL query parameters for filtering/pagination."
+        "query (dict | None) — URL query parameters for filtering/pagination. "
+        "Arguments are passed as JSON. Use JSON literals: null (not None or none), "
+        "true/false (not True/False). Strings must use double quotes. "
+        "Example: {\"query\": null}, not {\"query\": none}."
     )
 
     # Injected at construction — agent never sees or reasons about household_id.
