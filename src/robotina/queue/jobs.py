@@ -105,7 +105,7 @@ def run_task(task_input) -> object:
             workflow_runner.on_step_complete(job.id, artifact, _session, _queue)
             return artifact
         except Exception:
-            workflow_runner.on_step_failed(job.id, _session)
+            workflow_runner.on_step_failed(job.id, _session, _queue)
             raise
         finally:
             _session.close()
@@ -200,7 +200,7 @@ def run_task(task_input) -> object:
 
     except Exception:
         # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
-        workflow_runner.on_step_failed(job.id, _session)
+        workflow_runner.on_step_failed(job.id, _session, _queue)
         raise  # re-raise so RQ moves the job to FailedJobRegistry
 
     finally:

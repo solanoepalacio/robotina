@@ -328,15 +328,25 @@ def on_step_complete(
         )
 
 
-def on_step_failed(job_id: str, session: Session) -> None:
+def on_step_failed(job_id: str, session: Session, queue=None) -> None:
     """Mark step FAILED, cancel all remaining PENDING steps, mark WorkflowRun FAILED.
 
     The failed RQ job is retained in RQ's FailedJobRegistry by the caller
     (run_task re-raises the exception after calling this function).
 
+    Quick task 260509-ln9: when ``queue`` is provided AND the WorkflowRun's
+    ``shared_context.reply_context`` is populated, also enqueue a single
+    ``send-notification`` job at the front of the queue with a Spanish apology
+    so terminal failures don't go silent. This is best-effort — any error in
+    the dead-letter block is logged and swallowed (the workflow is already
+    FAILED; we don't cascade).
+
     Args:
         job_id: RQ job ID of the failing job.
         session: SQLAlchemy session.
+        queue: RQ Queue instance connected to "agent-tasks". Optional; when
+               omitted, the dead-letter hook is skipped (preserves
+               backward-compatibility for tests that don't pass a queue).
     """
     from robotina.queue.models import (
         WorkflowRun,
@@ -381,3 +391,48 @@ def on_step_failed(job_id: str, session: Session) -> None:
         job_id,
         len(pending_steps),
     )
+
+    # Dead-letter: notify user that their request failed (quick task 260509-ln9).
+    # Best-effort: never raise from this block — the workflow is already FAILED.
+    if queue is None:
+        return
+    try:
+        reply_context = (run.shared_context or {}).get("reply_context") if run is not None else None
+        required = ("platform", "chat_id", "user_id")
+        if not isinstance(reply_context, dict) or not all(k in reply_context and reply_context[k] for k in required):
+            logger.warning(
+                "Workflow failed without reply_context; skipping dead-letter | run_id=%s workflow_type=%s",
+                step.workflow_run_id,
+                run.workflow_type if run is not None else "<unknown>",
+            )
+            return
+
+        from robotina.queue.task_types import SendNotificationInput
+
+        apology_text = (
+            f"Algo falló procesando tu pedido ({run.workflow_type}). Disculpá las molestias."
+        )
+        task_input = SendNotificationInput(
+            platform=reply_context["platform"],
+            chat_id=reply_context["chat_id"],
+            user_id=reply_context["user_id"],
+            text=apology_text,
+        )
+        queue.enqueue(
+            "robotina.queue.jobs.run_task",
+            task_input,
+            result_ttl=-1,
+            failure_ttl=-1,
+            meta={"task_type": "send-notification"},
+            at_front=True,
+        )
+        logger.info(
+            "Dead-letter notification enqueued | run_id=%s workflow_type=%s",
+            step.workflow_run_id,
+            run.workflow_type,
+        )
+    except Exception:
+        logger.exception(
+            "Dead-letter enqueue failed; swallowing | run_id=%s",
+            step.workflow_run_id,
+        )

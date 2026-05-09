@@ -374,3 +374,87 @@ def test_reply_context_not_in_recipe_load_input():
 # src/robotina/agent/workflows.py:11). End-to-end coverage of the workflow
 # runner now lives in add-recipe integration tests.
 # ---------------------------------------------------------------------------
+
+
+def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
+    """Quick task 260509-ln9: when reply_context is present in shared_context,
+    on_step_failed enqueues a send-notification at the front of the queue with
+    the locked Spanish apology text and the workflow_type in parens.
+    """
+    from robotina.queue.workflow_runner import on_step_failed
+    from robotina.queue.task_types import SendNotificationInput
+
+    step = make_step(status=WorkflowStepStatus.RUNNING, workflow_run_id="run-xyz")
+    run = make_run(
+        workflow_type="add-recipe",
+        status=WorkflowStatus.RUNNING,
+        shared_context={
+            "reply_context": {
+                "platform": "telegram",
+                "chat_id": "c1",
+                "user_id": "u1",
+            },
+        },
+    )
+
+    session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter.return_value = query_mock
+    query_mock.first.side_effect = [step, run]
+    query_mock.all.return_value = []
+    session.query.return_value = query_mock
+
+    queue = MagicMock()
+
+    on_step_failed("test-job-id", session, queue)
+
+    # Exactly one enqueue, with the locked shape
+    queue.enqueue.assert_called_once()
+    call = queue.enqueue.call_args
+    assert call.args[0] == "robotina.queue.jobs.run_task"
+    task_input = call.args[1]
+    assert isinstance(task_input, SendNotificationInput)
+    assert task_input.platform == "telegram"
+    assert task_input.chat_id == "c1"
+    assert task_input.user_id == "u1"
+    assert task_input.text == "Algo falló procesando tu pedido (add-recipe). Disculpá las molestias."
+    assert call.kwargs.get("at_front") is True
+    assert call.kwargs.get("result_ttl") == -1
+    assert call.kwargs.get("failure_ttl") == -1
+    assert call.kwargs.get("meta") == {"task_type": "send-notification"}
+
+
+def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog):
+    """Quick task 260509-ln9: when shared_context has no reply_context (e.g. workflow
+    initiated by a scheduled task), on_step_failed logs a WARN and does NOT enqueue.
+    """
+    import logging
+    from robotina.queue.workflow_runner import on_step_failed
+
+    step = make_step(status=WorkflowStepStatus.RUNNING, workflow_run_id="run-abc")
+    run = make_run(
+        workflow_type="scheduled-thing",
+        status=WorkflowStatus.RUNNING,
+        shared_context={},  # no reply_context
+    )
+
+    session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter.return_value = query_mock
+    query_mock.first.side_effect = [step, run]
+    query_mock.all.return_value = []
+    session.query.return_value = query_mock
+
+    queue = MagicMock()
+
+    with caplog.at_level(logging.WARNING, logger="robotina.queue.workflow_runner"):
+        on_step_failed("test-job-id", session, queue)
+
+    queue.enqueue.assert_not_called()
+    # WARN was emitted naming the run_id
+    assert any(
+        rec.levelno == logging.WARNING
+        and "skipping dead-letter" in rec.getMessage()
+        and "run-abc" in rec.getMessage()
+        for rec in caplog.records
+    ), f"Expected WARN log mentioning run-abc; got: {[r.getMessage() for r in caplog.records]}"
