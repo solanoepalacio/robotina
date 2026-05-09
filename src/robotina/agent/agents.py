@@ -76,7 +76,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "reasoning": True,
         },
         prompt_path="src/robotina/agent/prompts/recipe-research-gather/V001.md",
-        skills=["recipe-research"],
+        skills=[],
         tools=[],  # WebSearchTool injected per-job in run_task()
     ),
     "recipe-research-instructions": AgentConfig(
@@ -89,8 +89,8 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "reasoning": True,
         },
         prompt_path="src/robotina/agent/prompts/recipe-research-instructions/V001.md",
-        skills=["recipe-research"],
-        tools=[],  # only read-skill (generic injection)
+        skills=[],
+        tools=[],  # no tools — produces JSON directly from user message
     ),
     "recipe-research-ingredients": AgentConfig(
         task_type="recipe-research-ingredients",
@@ -102,7 +102,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "reasoning": True,
         },
         prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V001.md",
-        skills=["recipe-research"],
+        skills=[],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
     ),
     "recipe-research-metadata": AgentConfig(
@@ -115,8 +115,8 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "reasoning": True,
         },
         prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V001.md",
-        skills=["recipe-research"],
-        tools=[],  # only read-skill (generic injection)
+        skills=[],
+        tools=[],  # no tools — produces JSON directly from user message
     ),
     "recipe-load": AgentConfig(
         task_type="recipe-load",
