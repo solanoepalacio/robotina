@@ -22,8 +22,33 @@ import os
 
 import httpx
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
+
+
+class HouseholdManagerApiArgs(BaseModel):
+    """Strict argument schema for HouseholdManagerApiTool.
+
+    ``extra='forbid'`` makes any unknown LLM-emitted field raise ``ValidationError``
+    at ``tool.invoke()`` time. The langgraph ``ToolNode`` wraps that error in a
+    ``ToolMessage(status='error')`` the agent sees on its next turn, so a single
+    LLM hallucination (e.g. extra ``response`` field) becomes a recoverable error
+    instead of a ``TypeError`` that kills the workflow.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: str = Field(description="HTTP method: GET, POST, PATCH, or DELETE.")
+    path: str = Field(description="API path relative to base URL, e.g. /api/recipes.")
+    body: dict | None = Field(
+        default=None,
+        description="JSON request body for POST/PATCH; null for GET/DELETE.",
+    )
+    query: dict | None = Field(
+        default=None,
+        description="URL query parameters; null if none.",
+    )
 
 
 class HouseholdManagerApiTool(BaseTool):
@@ -63,6 +88,11 @@ class HouseholdManagerApiTool(BaseTool):
         "true/false (not True/False). Strings must use double quotes. "
         "Example: {\"query\": null}, not {\"query\": none}."
     )
+
+    # Strict input schema: rejects unknown LLM-emitted fields with ValidationError
+    # rather than letting them flow into _run() as kwargs (where they would raise
+    # TypeError and crash the workflow). See HouseholdManagerApiArgs docstring.
+    args_schema: type[BaseModel] = HouseholdManagerApiArgs
 
     # Injected at construction — agent never sees or reasons about household_id.
     # Phase 7 scope: stored for future endpoint-specific injection; NOT auto-appended
