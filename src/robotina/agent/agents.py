@@ -75,7 +75,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_GATHER_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V001.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V002.md",
         skills=[],
         tools=[],  # WebSearchTool injected per-job in run_task()
     ),
