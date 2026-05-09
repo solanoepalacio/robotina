@@ -191,10 +191,11 @@ None yet.
 | 260509-ln9 | Telegram dead-letter notification on terminal workflow failure | 2026-05-09 | 3aacd11 | [260509-ln9-telegram-dead-letter-notification-on-ter](./quick/260509-ln9-telegram-dead-letter-notification-on-ter/) |
 | 260509-m46 | Add JSON-literal guidance to dict-arg tool descriptions | 2026-05-09 | 220f9d9 | [260509-m46-add-json-literal-guidance-to-dict-arg-to](./quick/260509-m46-add-json-literal-guidance-to-dict-arg-to/) |
 | 260509-m4f | Translate skill files to English and fix null-handling contradictions | 2026-05-09 | 94d8e0e | [260509-m4f-translate-skill-files-to-english-and-fix](./quick/260509-m4f-translate-skill-files-to-english-and-fix/) |
+| 260509-nru | Strict args_schema on dict-arg tools — bad LLM tool args become ToolMessage(error) instead of TypeError that kills the workflow | 2026-05-09 | f12c56b | [260509-nru-strict-tool-call-args-validation](./quick/260509-nru-strict-tool-call-args-validation/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-09 - Completed quick tasks 260509-m46 (tool description JSON guidance) + 260509-m4f (skill alignment)
+Last activity: 2026-05-09 - Completed quick task 260509-nru (strict tool-call args validation)
 
 Last session: 2026-04-30T19:09:37.019Z
 Stopped at: Completed quick task 260430-meh
