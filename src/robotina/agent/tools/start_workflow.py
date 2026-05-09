@@ -22,8 +22,31 @@ import logging
 import os
 
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
+
+
+class StartWorkflowArgs(BaseModel):
+    """Strict argument schema for StartWorkflowTool.
+
+    ``extra='forbid'`` makes any unknown LLM-emitted field raise ``ValidationError``
+    at ``tool.invoke()`` time, which the langgraph ``ToolNode`` converts into a
+    ``ToolMessage(status='error')`` the agent sees on its next turn. See
+    ``HouseholdManagerApiArgs`` docstring for the full rationale.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_type: str = Field(
+        description="Workflow identifier, e.g. 'add-recipe'.",
+    )
+    shared_context: dict = Field(
+        description=(
+            "Task-specific fields the workflow needs (e.g. recipe_query). "
+            "reply_context and household_id are injected automatically."
+        ),
+    )
 
 
 class StartWorkflowTool(BaseTool):
@@ -63,6 +86,10 @@ class StartWorkflowTool(BaseTool):
         "Example: {\"recipe_query\": \"lentil soup\"}, not {'recipe_query': 'lentil soup'}."
     )
     return_direct: bool = True
+
+    # Strict input schema: rejects unknown LLM-emitted fields with ValidationError
+    # rather than letting them flow into _run() as kwargs. See StartWorkflowArgs docstring.
+    args_schema: type[BaseModel] = StartWorkflowArgs
 
     # Injected by run_task() at construction time
     chat_id: str = ""

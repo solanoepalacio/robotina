@@ -178,3 +178,81 @@ def test_start_workflow_tool_description_no_prompt_level_stop_hack():
     )
     assert "do not call" not in tool.description.lower()
     assert "task is done" not in tool.description.lower()
+
+
+# ---------------------------------------------------------------------------
+# Strict args-schema tests
+#
+# Same rationale as test_household_manager_api_tool::test_args_schema_*: an
+# unknown LLM-emitted argument key must produce a ValidationError (not a
+# TypeError) so langgraph's ToolNode can convert it into a ToolMessage the
+# agent sees on its next turn.
+# ---------------------------------------------------------------------------
+
+
+def test_args_schema_forbids_unknown_field():
+    """An unknown LLM-emitted argument key raises pydantic ValidationError
+    (not TypeError) and the error message names the offending field."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+
+    bad_args = {
+        "workflow_type": "add-recipe",
+        "shared_context": {"recipe_query": "carbonara"},
+        "response": "200",  # hallucinated extra field
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        tool.invoke(bad_args)
+
+    assert "response" in str(exc_info.value)
+
+
+def test_args_schema_allows_required_only():
+    """A minimal valid call (workflow_type + shared_context) still works
+    under the strict schema — extra='forbid' must not break the happy path."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+    expected_run_id = "run-strict-1"
+
+    with (
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("rq.Queue", return_value=mock_queue),
+        patch("redis.Redis"),
+        patch(
+            "robotina.queue.workflow_runner.queue_workflow",
+            return_value=expected_run_id,
+        ),
+    ):
+        result = tool.invoke(
+            {
+                "workflow_type": "add-recipe",
+                "shared_context": {"recipe_query": "carbonara"},
+            }
+        )
+
+    assert isinstance(result, str)
+    assert expected_run_id in result
+
+
+def test_args_schema_json_schema_forbids_extra():
+    """JSON schema for the args model reports ``additionalProperties: false``."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+    schema = tool.args_schema.model_json_schema()
+    assert schema.get("additionalProperties") is False
