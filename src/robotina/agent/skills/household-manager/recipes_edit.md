@@ -1,5 +1,9 @@
 # Edit a recipe
 
+## JSON output rules
+
+For every request body documented on this page, use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`. The `Set null to clear` columns in the tables below mean exactly the JSON literal `null`. (Canonical reference: `shared.md` > JSON output rules.)
+
 Always fetch the current recipe via `GET /api/recipes/:id` (see `recipes_get.md`) before editing. This gives you the correct sub-resource IDs (section, ingredient, step) needed for update and delete operations.
 
 If `isLocked` is `true` in the response, the recipe cannot be edited. To unlock, send `PATCH /api/recipes/:id` with `{ "isLocked": false }` first.

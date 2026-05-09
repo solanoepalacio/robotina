@@ -1,5 +1,9 @@
 # Manage meal plan
 
+## JSON output rules
+
+For every request body documented on this page, use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`. (Canonical reference: `shared.md` > JSON output rules.)
+
 The meal plan list endpoint returns a flat `entries` array, **not** a paginated envelope. Do not look for `items`, `total`, `page`, or `perPage` in the response.
 
 ## MealType values

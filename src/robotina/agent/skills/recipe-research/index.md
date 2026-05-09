@@ -1,16 +1,16 @@
 # Skill: recipe-research
 
-Pipeline de investigacion de recetas en 4 pasos. Cada agente ejecuta un paso especifico.
+A four-step recipe research pipeline. Each agent runs exactly one step.
 
-## Pasos
+## Steps
 
-1. **gather** — Busca recetas en la web usando terminos en espanol. Lee `recipe-research/gather.md` para instrucciones detalladas.
-2. **instructions** — Crea instrucciones base usando consenso de las recetas encontradas. Lee `recipe-research/instructions.md`.
-3. **ingredients** — Extrae y verifica ingredientes contra la API del household-manager. Lee `recipe-research/ingredients.md`.
-4. **metadata** — Estima tiempos de preparacion, coccion y porciones. Lee `recipe-research/metadata.md`.
+1. **gather** — Search the web for recipes using Spanish search queries. Read `recipe-research/gather.md` for the detailed instructions.
+2. **instructions** — Build base instructions by consensus across the gathered recipes. Read `recipe-research/instructions.md`.
+3. **ingredients** — Extract and verify ingredients against the household-manager API. Read `recipe-research/ingredients.md`.
+4. **metadata** — Estimate prep time, cook time, and servings. Read `recipe-research/metadata.md`.
 
-## Importante
+## Important
 
-- Todo el contenido (nombres de recetas, ingredientes, instrucciones, descripciones) debe estar en **espanol**.
-- Los terminos de busqueda deben ser frases naturales que un cocinero argentino usaria.
-- Usa la herramienta `read-skill` con la ruta `recipe-research/<paso>.md` para obtener instrucciones especificas de tu paso.
+- All content the model produces — recipe names, ingredient names, step bodies, descriptions — must be written in Spanish, in the natural register an Argentine home cook would use.
+- Search queries must read like natural phrases an Argentine home cook would type into a search engine.
+- Use the `read-skill` tool with the path `recipe-research/<step>.md` to load the detailed instructions for your step.
