@@ -12,12 +12,151 @@ import time — which is the desired behavior for per-task-type configuration.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
+import random
+import time
 from typing import Any, Protocol, runtime_checkable
 
+import httpx
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import ChatResult
 from langchain_core.tools import BaseTool
+from langchain_ollama import ChatOllama
 from langgraph.prebuilt import create_react_agent  # locked per AGENT-11/D-03
+from ollama import ResponseError as OllamaResponseError
+
+logger = logging.getLogger(__name__)
+
+
+# --- OllamaBackend transient-retry config (hard-coded; no env vars per BRIEF) ---
+
+_OLLAMA_RETRY_MAX_ATTEMPTS = 3            # 1 initial + 2 retries
+_OLLAMA_RETRY_BASE_DELAY = 0.5            # seconds
+_OLLAMA_RETRY_BACKOFF_FACTOR = 2.0
+_OLLAMA_RETRY_JITTER = 0.25               # ±25%
+_OLLAMA_RETRY_5XX_STATUSES = frozenset({500, 502, 503, 504})
+_OLLAMA_RETRY_TRANSIENT_HTTPX = (
+    httpx.ConnectError,
+    httpx.ReadTimeout,
+    httpx.ConnectTimeout,
+)
+
+
+def _is_transient_ollama_error(exc: BaseException) -> bool:
+    """True iff `exc` is a retryable Ollama transient error.
+
+    Retryable:
+      - ollama.ResponseError with status_code in {500, 502, 503, 504}
+      - httpx.ConnectError / httpx.ReadTimeout / httpx.ConnectTimeout
+
+    Not retryable (returns False):
+      - 4xx ResponseError (auth, bad request, etc.)
+      - ResponseError with status_code == -1 (unknown — fail fast)
+      - any other exception
+    """
+    if isinstance(exc, OllamaResponseError):
+        return exc.status_code in _OLLAMA_RETRY_5XX_STATUSES
+    if isinstance(exc, _OLLAMA_RETRY_TRANSIENT_HTTPX):
+        return True
+    return False
+
+
+def _compute_backoff(attempt_index: int) -> float:
+    """Backoff delay in seconds for the (attempt_index)-th retry (0-indexed).
+
+    attempt_index=0 → ~0.5s ±25% (i.e. [0.375, 0.625])
+    attempt_index=1 → ~1.0s ±25% (i.e. [0.75, 1.25])
+    """
+    delay = _OLLAMA_RETRY_BASE_DELAY * (_OLLAMA_RETRY_BACKOFF_FACTOR ** attempt_index)
+    jitter_ratio = random.uniform(-_OLLAMA_RETRY_JITTER, _OLLAMA_RETRY_JITTER)
+    return max(0.0, delay * (1 + jitter_ratio))
+
+
+class _RetryingChatOllama(ChatOllama):
+    """ChatOllama with bounded retry on Ollama 5xx and transient httpx errors.
+
+    Status-code-aware: 4xx errors (auth, etc.) propagate without retry. 5xx
+    (including the 'error parsing tool call' 500 that Ollama returns when the
+    model emits malformed tool-call JSON) and httpx connect/read timeouts are
+    retried up to 3 attempts total with exponential backoff + ±25% jitter. On
+    exhaustion the original exception is re-raised so the existing FAILED-step
+    path in robotina/queue/jobs.py still works.
+
+    Why a subclass and not Runnable.with_retry(): with_retry filters by
+    exception type only, so it would also retry 4xx — undesirable. And the
+    result of with_retry is a RunnableRetry wrapper, which langgraph's
+    create_react_agent does not accept (it requires BaseChatModel |
+    RunnableBinding).
+    """
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        last_exc: BaseException | None = None
+        for attempt in range(_OLLAMA_RETRY_MAX_ATTEMPTS):
+            try:
+                return super()._generate(
+                    messages, stop=stop, run_manager=run_manager, **kwargs
+                )
+            except Exception as exc:
+                last_exc = exc
+                if not _is_transient_ollama_error(exc):
+                    raise
+                if attempt + 1 >= _OLLAMA_RETRY_MAX_ATTEMPTS:
+                    raise
+                delay = _compute_backoff(attempt)
+                logger.warning(
+                    "Ollama transient error, retrying (attempt %d/%d): %s",
+                    attempt + 2,
+                    _OLLAMA_RETRY_MAX_ATTEMPTS,
+                    exc,
+                )
+                time.sleep(delay)
+        # Defensive: loop only exits via return or raise.
+        assert last_exc is not None
+        raise last_exc
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        last_exc: BaseException | None = None
+        for attempt in range(_OLLAMA_RETRY_MAX_ATTEMPTS):
+            try:
+                return await super()._agenerate(
+                    messages, stop=stop, run_manager=run_manager, **kwargs
+                )
+            except Exception as exc:
+                last_exc = exc
+                if not _is_transient_ollama_error(exc):
+                    raise
+                if attempt + 1 >= _OLLAMA_RETRY_MAX_ATTEMPTS:
+                    raise
+                delay = _compute_backoff(attempt)
+                logger.warning(
+                    "Ollama transient error, retrying (attempt %d/%d): %s",
+                    attempt + 2,
+                    _OLLAMA_RETRY_MAX_ATTEMPTS,
+                    exc,
+                )
+                await asyncio.sleep(delay)
+        # Defensive: loop only exits via return or raise.
+        assert last_exc is not None
+        raise last_exc
 
 
 @runtime_checkable
@@ -52,12 +191,13 @@ class OllamaBackend:
 
     Ollama is unauthenticated — no api_key field. The api_key_env field in
     model_config is accepted but ignored for Ollama.
+
+    Wraps ChatOllama in a `_RetryingChatOllama` to survive Ollama 5xx
+    tool-call-parse errors and transient httpx connect/read timeouts.
     """
 
     def __init__(self, config: dict) -> None:
-        from langchain_ollama import ChatOllama
-
-        self._model = ChatOllama(
+        self._model = _RetryingChatOllama(
             model=config["model"],
             base_url=config.get("url"),  # None = default http://localhost:11434
             reasoning=config.get("reasoning"),  # None = model default; True = separate think content from response
