@@ -186,10 +186,11 @@ None yet.
 | 260330-mgk | Fix recipe-research-gather prompt step 6 to explicitly specify recipes output format instead of ambiguous JSON array | 2026-03-30 | 0b0ed36 | [260330-mgk-fix-recipe-research-gather-prompt-step-6](./quick/260330-mgk-fix-recipe-research-gather-prompt-step-6/) |
 | 260430-meh | Fix spec.md line 112: Prisma models -> SQLAlchemy models | 2026-04-30 | 85058b1 | [260430-meh-fix-spec-md-line-112-prisma-models-sqlal](./quick/260430-meh-fix-spec-md-line-112-prisma-models-sqlal/) |
 | 260508-tdr | Fix workflow halt after return_direct ack tool: tolerate ToolMessage in _extract_task_output | 2026-05-08 | 7916c4b | [260508-tdr-fix-extract-task-output-toolmessage](./quick/260508-tdr-fix-extract-task-output-toolmessage/) |
+| 260508-qx8 | Fix RecipeLoadInput.to_user_message — give the load agent the full structured recipe | 2026-05-08 | 23bc1cd | [260508-qx8-fix-recipe-load-user-message](./quick/260508-qx8-fix-recipe-load-user-message/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-08 - Completed quick task 260508-tdr: Fix workflow halt after return_direct ack tool
+Last activity: 2026-05-08 - Completed quick task 260508-qx8: Fix RecipeLoadInput.to_user_message
 
 Last session: 2026-04-30T19:09:37.019Z
 Stopped at: Completed quick task 260430-meh
