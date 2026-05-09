@@ -1,28 +1,27 @@
-# Metadata: Estimar tiempos y porciones
+# Metadata: Estimate times and servings
 
-## Objetivo
-Producir la receta final completa con todos los metadatos estimados.
+## Goal
+Produce the final, complete recipe with all metadata estimated.
 
-## Proceso
+## Process
 
-### 1. Analizar fuentes de metadatos
-Lee los metadatos de todas las recetas del paso gather (tiempos, porciones) y las instrucciones del borrador.
+### 1. Review metadata sources
+Read the metadata of every recipe from the gather step (times, servings) plus the draft instructions.
 
-### 2. Estimar tiempos
-- **prep_time**: tiempo de preparacion en minutos. Estima basandote en la cantidad y complejidad de ingredientes.
-- **cook_time**: tiempo de coccion en minutos. Estima basandote en las instrucciones (temperatura, tecnicas de coccion).
-- **total_time**: prep_time + cook_time.
-- IMPORTANTE: Los campos de tiempo NUNCA deben ser null. Siempre estima aunque no haya datos de las recetas. Usa la complejidad de las instrucciones como guia (ej: pasta con 10 ingredientes -> ~30 min de coccion).
+### 2. Estimate times
+- **prep_time**: preparation time in minutes. Estimate based on the count and complexity of the ingredients.
+- **cook_time**: cooking time in minutes. Estimate based on the instructions (temperature, cooking technique).
+- **total_time**: `prep_time + cook_time`.
 
-### 3. Estimar porciones
-- **servings_qty**: numero de porciones (entero). Si las recetas no lo especifican, estima 4 porciones como valor por defecto razonable.
-- **servings_unit**: siempre "porciones".
+### 3. Estimate servings
+- **servings_qty**: number of servings as an integer. If the source recipes do not specify a value, default to `4` as a reasonable fallback.
+- **servings_unit**: always `"porciones"`.
 
-### 4. Construir RecipeData final
-Combina toda la informacion recopilada en los pasos anteriores en la estructura final.
+### 4. Assemble the final RecipeData
+Combine everything from the previous steps into the final structure.
 
-## Formato de salida
-Tu respuesta final debe ser un JSON con la estructura completa de RecipeData:
+## Output format
+Your final response must be a JSON object with the full `RecipeData` structure:
 ```json
 {
   "recipe": {
@@ -43,4 +42,7 @@ Tu respuesta final debe ser un JSON con la estructura completa de RecipeData:
   }
 }
 ```
-Todos los campos de tiempo deben tener valores numericos (nunca null).
+
+**JSON output rules.** Use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`.
+
+**Time fields must always be numeric.** Always estimate `prep_time`, `cook_time`, and `total_time` even when the source recipes do not provide values — use the complexity of the instructions as a guide (e.g., pasta with 10 ingredients -> ~30 min of cooking time). All time fields must hold numeric values; they are never `null` (this is a narrower constraint than the general null rule above — time fields are specifically required).

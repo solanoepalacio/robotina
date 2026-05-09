@@ -1,34 +1,34 @@
-# Ingredients: Extraer y verificar ingredientes
+# Ingredients: Extract and verify ingredients
 
-## Objetivo
-Extraer ingredientes de las instrucciones del borrador y verificar que existan en el sistema del hogar.
+## Goal
+Extract ingredients from the draft instructions and verify each one exists in the household-manager system.
 
-## Proceso
+## Process
 
-### 1. Extraer ingredientes
-Lee las instrucciones del borrador e identifica todos los ingredientes mencionados con:
-- Nombre del alimento en espanol (ej: "cebolla", "aceite de oliva")
-- Cantidad (numero, ej: 2, 0.5)
-- Unidad (ej: "unidad", "cucharada", "g", "ml", "taza")
-- Nota opcional (ej: "picada finamente")
+### 1. Extract ingredients
+Read the draft instructions and identify every ingredient mentioned, with:
+- Food name in Spanish (e.g., `"cebolla"`, `"aceite de oliva"`)
+- Quantity as a number (e.g., `2`, `0.5`)
+- Unit name in Spanish (e.g., `"unidad"`, `"cucharada"`, `"g"`, `"ml"`, `"taza"`)
+- Optional note in Spanish (e.g., `"picada finamente"`)
 
-### 2. Verificar en household-manager
-Para cada ingrediente, usa la herramienta `household-manager-api` para verificar que existe:
-- Metodo: GET
-- Path: `/api/foods?name={nombre_del_alimento}`
-- Busca con el nombre en espanol directamente (ej: `GET /api/foods?name=cebolla`)
+### 2. Verify against household-manager
+For each ingredient, call the `household-manager-api` tool to verify the food exists:
+- Method: `GET`
+- Path: `/api/foods?name={food_name}`
+- Look up the Spanish name directly (e.g., `GET /api/foods?name=cebolla`).
 
-### 3. Manejar ingredientes no encontrados
-Si un ingrediente no existe en el household-manager:
-- Revisa las otras recetas del paso gather para buscar un sustituto
-- Si encuentras un sustituto que si existe, usalo
-- Si no hay sustituto disponible, omite el ingrediente por completo
+### 3. Handle missing ingredients
+If an ingredient does not exist in household-manager:
+- Re-check the other recipes from the gather step for a substitute.
+- If you find a substitute that **does** exist, use it.
+- If no substitute is available, drop the ingredient entirely.
 
-### 4. No crear alimentos nuevos
-No intentes crear alimentos nuevos en el household-manager. Solo usa los que ya existen.
+### 4. Do not create new foods
+Do not attempt to create new foods in household-manager. Only use foods that already exist.
 
-## Formato de salida
-Tu respuesta final debe ser un JSON con:
+## Output format
+Your final response must be a JSON object with the verified ingredients:
 ```json
 {
   "ingredients": [
@@ -37,4 +37,6 @@ Tu respuesta final debe ser un JSON con:
   ]
 }
 ```
-Solo incluye ingredientes verificados que existen en el household-manager.
+Only include ingredients you have verified against household-manager.
+
+**JSON output rules.** Use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`.

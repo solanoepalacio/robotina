@@ -59,6 +59,12 @@ List endpoints return a paginated envelope:
 
 **Important:** The response field is `perPage` (not `pageSize`). The query parameter for requesting page size is `pageSize`. These are different names — do not confuse them.
 
+## JSON output rules
+
+When you construct request bodies for any household-manager endpoint, follow these rules. Use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`.
+
+This is the canonical rule for the whole bundle; the per-file pages may restate it for emphasis.
+
 ## Filtering reference lists
 
 The food and unit reference endpoints accept an optional `?name=` query parameter for targeted lookups.

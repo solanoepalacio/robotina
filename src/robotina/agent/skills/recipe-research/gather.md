@@ -1,35 +1,35 @@
-# Gather: Busqueda de recetas en la web
+# Gather: Recipe web search
 
-## Objetivo
-Buscar recetas en multiples sitios web y extraer datos estructurados de cada resultado.
+## Goal
+Search recipes across multiple websites and extract structured data from each result.
 
-## Proceso
+## Process
 
-### 1. Construir terminos de busqueda
-Crea 3 terminos de busqueda en espanol alrededor del nombre de la receta. Usa frases naturales que un cocinero argentino buscaria:
-- Ejemplo para "Pasta Bolognesa": "Pasta Bolognesa facil de preparar", "pasta bolognesa deliciosa", "receta casera de salsa bolognesa"
-- Prioriza sitios de recetas argentinos/latinoamericanos
+### 1. Build search queries
+Build 3 search queries, in Spanish, around the recipe name. Use natural phrases that an Argentine home cook would actually type. The query strings themselves stay in Spanish; only this instructional text is in English.
+- Examples for "Pasta Bolognesa": `"Pasta Bolognesa facil de preparar"`, `"pasta bolognesa deliciosa"`, `"receta casera de salsa bolognesa"`
+- Prioritize Argentine and Latin American recipe sites.
 
-### 2. Buscar con web-search
-Usa la herramienta `web-search` para cada termino. Cada busqueda devuelve hasta 3 resultados con:
-- `title`: titulo de la pagina
-- `url`: URL del resultado
-- `content`: resumen del contenido
-- `raw_content`: contenido HTML completo (puede ser null)
-- `score`: relevancia del resultado
+### 2. Search with web-search
+Call the `web-search` tool once per query. Each call returns up to 3 results, each with these fields:
+- `title`: page title
+- `url`: result URL
+- `content`: short text summary of the page
+- `raw_content`: full HTML page content (may be `null`)
+- `score`: relevance score for the result
 
-### 3. Extraer datos de cada resultado
-Para cada resultado con `raw_content` disponible, intenta extraer datos estructurados de la receta:
-- Titulo, ingredientes, instrucciones, tiempos, porciones
-- Si no puedes extraer datos estructurados del HTML, usa el campo `content` (resumen) como fuente alternativa
+### 3. Extract data from each result
+For each result that has `raw_content` available, try to extract structured recipe data:
+- Title, ingredients, instructions, times, servings.
+- If you cannot extract structured data from the HTML, fall back to the `content` summary as the source.
 
-### 4. Manejo de errores
-- Si un resultado no tiene datos utiles, saltalo y continua con el siguiente
-- Solo falla si TODOS los resultados son inutilizables
-- Al menos 1 fuente utilizable es suficiente para continuar
+### 4. Error handling
+- If a single result has no usable data, skip it and move on to the next.
+- Only fail if **every** result is unusable.
+- One usable source is enough to continue the pipeline.
 
-## Formato de salida
-Tu respuesta final debe ser un JSON con la lista de recetas encontradas. Cada receta es un dict con los campos disponibles:
+## Output format
+Your final response must be a JSON object with the list of recipes you found. Each recipe is an object with the fields you were able to extract:
 ```json
 {
   "recipes": [
@@ -46,4 +46,5 @@ Tu respuesta final debe ser un JSON con la lista de recetas encontradas. Cada re
   ]
 }
 ```
-Incluye todos los campos que puedas extraer. Los campos faltantes se omiten (no uses null).
+
+**JSON output rules.** Use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`.

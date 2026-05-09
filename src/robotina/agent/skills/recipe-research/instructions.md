@@ -1,30 +1,30 @@
-# Instructions: Crear instrucciones base por consenso
+# Instructions: Build base instructions by consensus
 
-## Objetivo
-Analizar todas las recetas encontradas y crear instrucciones base usando un enfoque de consenso.
+## Goal
+Analyse every recipe gathered in the previous step and build a single set of base instructions using a consensus approach.
 
-## Proceso
+## Process
 
-### 1. Analizar recetas
-Lee todas las recetas del paso gather. Identifica:
-- Pasos comunes que aparecen en la mayoria de las recetas
-- Tecnicas de coccion compartidas
-- Orden tipico de preparacion
+### 1. Analyse the gathered recipes
+Read every recipe from the gather step and identify:
+- Steps that appear in the majority of recipes
+- Cooking techniques that are shared across sources
+- The typical order of preparation
 
-### 2. Consenso
-Usa el enfoque "mayoria gana":
-- Si 6 de 10 recetas mencionan salar la carne antes, incluyelo
-- Si solo 1 receta menciona un paso inusual, omitelo
-- En caso de empate, incluye el paso (mejor tener mas informacion)
+### 2. Consensus heuristic
+Apply a "majority wins" rule:
+- If 6 of 10 recipes mention salting the meat first, include that step.
+- If only 1 recipe mentions an unusual step, drop it.
+- On a tie, include the step (better to have more information than less).
 
-### 3. Redactar instrucciones
-Escribe instrucciones claras y concisas en espanol:
-- Cada paso debe ser una accion especifica
-- Incluye tiempos aproximados cuando sea relevante (ej: "cocinar 5 minutos")
-- Usa vocabulario de cocina argentino/latinoamericano
+### 3. Write the instructions
+Produce clear, concise instruction steps. The step bodies themselves must be written in Argentine Spanish — only this instructional text is in English:
+- Each step should describe a single, specific action.
+- Include approximate timings when relevant (e.g., `"cocinar 5 minutos"`).
+- Use Argentine / Latin American kitchen vocabulary.
 
-## Formato de salida
-Tu respuesta final debe ser un JSON con:
+## Output format
+Your final response must be a JSON object with this shape:
 ```json
 {
   "draft_name": "Nombre de la receta en espanol",
@@ -35,3 +35,5 @@ Tu respuesta final debe ser un JSON con:
   ]
 }
 ```
+
+**JSON output rules.** Use the JSON literal `null` for missing optional fields — never the Python value `None`, never the bare word `none`, never an empty string in place of `null`. Booleans are `true` and `false`, lowercase. Numeric fields are bare numbers, never quoted. Do not omit optional fields when you have decided their value is "missing" — emit them with `null`.
