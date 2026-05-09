@@ -188,10 +188,11 @@ None yet.
 | 260508-tdr | Fix workflow halt after return_direct ack tool: tolerate ToolMessage in _extract_task_output | 2026-05-08 | 7916c4b | [260508-tdr-fix-extract-task-output-toolmessage](./quick/260508-tdr-fix-extract-task-output-toolmessage/) |
 | 260508-qx8 | Fix RecipeLoadInput.to_user_message — give the load agent the full structured recipe | 2026-05-08 | 23bc1cd | [260508-qx8-fix-recipe-load-user-message](./quick/260508-qx8-fix-recipe-load-user-message/) |
 | 260509-lcd | Add bounded transient retry to OllamaBackend for Ollama 5xx errors | 2026-05-09 | f801814 | [260509-lcd-add-bounded-transient-retry-to-ollamabac](./quick/260509-lcd-add-bounded-transient-retry-to-ollamabac/) |
+| 260509-ln9 | Telegram dead-letter notification on terminal workflow failure | 2026-05-09 | 3aacd11 | [260509-ln9-telegram-dead-letter-notification-on-ter](./quick/260509-ln9-telegram-dead-letter-notification-on-ter/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-09 - Completed quick task 260509-lcd: Add bounded transient retry to OllamaBackend
+Last activity: 2026-05-09 - Completed quick task 260509-ln9: Telegram dead-letter notification
 
 Last session: 2026-04-30T19:09:37.019Z
 Stopped at: Completed quick task 260430-meh
