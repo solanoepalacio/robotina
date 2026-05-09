@@ -57,7 +57,10 @@ class StartWorkflowTool(BaseTool):
         "Args:\n"
         "  workflow_type (str): Workflow name, e.g. 'add-recipe'.\n"
         "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
-        "reply_context and household_id are injected automatically."
+        "reply_context and household_id are injected automatically.\n"
+        "Arguments are passed as JSON. Use JSON literals: null (not None or none), "
+        "true/false (not True/False). Strings must use double quotes. "
+        "Example: {\"recipe_query\": \"lentil soup\"}, not {'recipe_query': 'lentil soup'}."
     )
     return_direct: bool = True
 
