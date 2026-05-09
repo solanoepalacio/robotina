@@ -224,3 +224,31 @@ def test_recipe_research_metadata_output_conforms_to_recipe_data():
     )
     assert m.recipe.name == "Pasta Bolognesa"
     assert m.recipe.servings_qty == 4
+
+
+def test_recipe_load_input_user_message_contains_full_recipe():
+    """The recipe-load agent needs the full structured recipe — not just the name —
+    to resolve foods, build the compound payload, and POST /api/recipes. A prior
+    bug rendered only `f"Load recipe: {self.recipe.name}"`, so the agent
+    (correctly) refused to proceed and the workflow advanced to a misleading
+    "Receta agregada: unknown recipe" notification with no recipe actually
+    created. This test pins the contract.
+    """
+    from robotina.queue.task_types import RecipeLoadInput
+
+    recipe = _make_recipe_data()
+    msg = RecipeLoadInput(recipe=recipe, household_id="hh-789").to_user_message()
+
+    assert msg.startswith("Load this recipe into the household-manager system:")
+    # Top-level fields
+    assert recipe.name in msg
+    assert recipe.description in msg
+    assert recipe.source_url in msg
+    # Every ingredient food_name and (non-null) unit_name
+    for ing in recipe.ingredients:
+        assert ing.food_name in msg
+        if ing.unit_name is not None:
+            assert ing.unit_name in msg
+    # Every step body
+    for step in recipe.steps:
+        assert step.body in msg

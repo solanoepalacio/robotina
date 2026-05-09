@@ -199,7 +199,11 @@ class RecipeLoadInput(BaseModel):
     household_id: str
 
     def to_user_message(self) -> str:
-        return f"Load recipe: {self.recipe.name}"
+        import json
+        return (
+            "Load this recipe into the household-manager system:\n\n"
+            + json.dumps(self.recipe.model_dump(mode="json"), ensure_ascii=False, indent=2)
+        )
 
 
 class RecipeLoadOutput(BaseModel):
