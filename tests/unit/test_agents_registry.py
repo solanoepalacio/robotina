@@ -12,7 +12,7 @@ def test_get_agent_config_returns_agent_config():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.model_config["provider"] == "ollama"
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V001.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V002.md"
 
 
 def test_agent_config_has_required_fields():
@@ -104,7 +104,7 @@ def test_handle_incoming_message_registered_in_agent_registry():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.skills == ["household-manager"]
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V001.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V002.md"
     assert config.tools == []  # tools are injected per-job, not stored in registry
 
 

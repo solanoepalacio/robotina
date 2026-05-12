@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 
 def test_prompt_file_exists_for_robotina():
-    """ROBOT-06: src/robotina/agent/prompts/robotina/V001.md exists."""
-    prompt_path = Path("src/robotina/agent/prompts/robotina/V001.md")
+    """ROBOT-06: src/robotina/agent/prompts/robotina/V002.md exists."""
+    prompt_path = Path("src/robotina/agent/prompts/robotina/V002.md")
     assert prompt_path.exists(), (
         f"Expected prompt file at {prompt_path} — run from project root"
     )
