@@ -22,9 +22,9 @@ Families can delegate household tasks to Robotina in natural language and trust 
 - [x] Workflow registry + task-runner advancement hook + `start-workflow` tool — Validated in Phase 5: task-runner-and-workflow-engine
 - [x] Agent infrastructure: LLM module + adapters (Ollama, Anthropic, OpenAI), `agents.py` scaffold, skill loading, prompt versioning, LangWatch + OTel instrumentation — Validated in Phase 4: llm-module-and-agent-infrastructure
 - [x] Notification agent (`send-notification`): format-telegram-message skill, prompt, tool, experiment — Validated in Phase 6: send-notification-agent
-- [ ] Robotina agent (`handle-incoming-message`): household-manager skill (auth update), prompt, tools (household-manager-api, queue, start-workflow)
-- [ ] Recipe Research agent (`recipe-research`): skill, prompt, web-search tool, experiment
-- [ ] Recipe Loader agent (`recipe-load`): skill, prompt, household-manager-api tool, experiment
+- [x] Robotina agent (`handle-incoming-message`): household-manager skill (auth update), prompt, tools (household-manager-api, queue, start-workflow) — Validated in Phase 7: handle-incoming-message-agent
+- [x] Recipe Research agent (`recipe-research`): skill, prompt, web-search tool, experiment — Validated in Phase 8: recipe-research-agent
+- [x] Recipe Loader agent (`recipe-load`): skill reuse (household-manager), prompt, household-manager-api tool, experiment — Validated in Phase 9: recipe-load-agent-and-end-to-end-integration
 - [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API
 - [x] Developer tooling: Docker Compose (Postgres + Redis), uv project setup, uv run shortcuts — Validated in Phase 1: Developer Tooling and Infrastructure
 
@@ -81,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-27 after Phase 6 completion (send-notification-agent)*
+*Last updated: 2026-03-31 after Phase 9 completion (recipe-load-agent-and-end-to-end-integration) — all v1.0 milestone phases complete*

@@ -192,10 +192,11 @@ None yet.
 | 260509-m46 | Add JSON-literal guidance to dict-arg tool descriptions | 2026-05-09 | 220f9d9 | [260509-m46-add-json-literal-guidance-to-dict-arg-to](./quick/260509-m46-add-json-literal-guidance-to-dict-arg-to/) |
 | 260509-m4f | Translate skill files to English and fix null-handling contradictions | 2026-05-09 | 94d8e0e | [260509-m4f-translate-skill-files-to-english-and-fix](./quick/260509-m4f-translate-skill-files-to-english-and-fix/) |
 | 260509-nru | Strict args_schema on dict-arg tools — bad LLM tool args become ToolMessage(error) instead of TypeError that kills the workflow | 2026-05-09 | f12c56b | [260509-nru-strict-tool-call-args-validation](./quick/260509-nru-strict-tool-call-args-validation/) |
+| 260509-o56 | Inline recipe-research skill files into the 4 sub-agent prompts; delete the bundle (1:1 per-agent runbook content was the wrong abstraction for `skill`) | 2026-05-09 | c018f0d | [260509-o56-inline-recipe-research-skill-files-into-](./quick/260509-o56-inline-recipe-research-skill-files-into-/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-09 - Completed quick task 260509-nru (strict tool-call args validation)
+Last activity: 2026-05-09 - Completed quick task 260509-o56 (inline recipe-research skills into agent prompts)
 
 Last session: 2026-04-30T19:09:37.019Z
 Stopped at: Completed quick task 260430-meh
