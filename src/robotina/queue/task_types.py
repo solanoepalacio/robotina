@@ -39,25 +39,25 @@ class ReplyContext(BaseModel):
 
 class RecipeIngredient(BaseModel):
     food_name: str        # human-readable name — resolved to foodId by recipe-load
-    unit_name: str | None
-    quantity: float | None
-    note: str | None
+    unit_name: str | None = None
+    quantity: float | None = None
+    note: str | None = None
 
 
 class RecipeStep(BaseModel):
     body: str             # instruction text
-    title: str | None     # optional step heading
+    title: str | None = None     # optional step heading
 
 
 class RecipeData(BaseModel):
     name: str
-    description: str | None
-    servings_qty: int | None
-    servings_unit: str | None   # e.g. "porciones"
-    prep_time: int | None       # minutes
-    cook_time: int | None       # minutes
-    total_time: int | None      # minutes
-    source_url: str | None      # original recipe URL if found
+    description: str | None = None
+    servings_qty: int | None = None
+    servings_unit: str | None = None   # e.g. "porciones"
+    prep_time: int | None = None       # minutes
+    cook_time: int | None = None       # minutes
+    total_time: int | None = None      # minutes
+    source_url: str | None = None      # original recipe URL if found
     ingredients: list[RecipeIngredient]
     steps: list[RecipeStep]
 
