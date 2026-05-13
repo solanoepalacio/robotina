@@ -41,8 +41,13 @@ def test_ollama_create_agent_wraps_in_tool_strategy(ollama_config):
         backend.create_agent(system_prompt="x", tools=[], response_format=ToyModel)
     kwargs = mock_create.call_args.kwargs
     assert isinstance(kwargs["response_format"], ToolStrategy)
-    # _SchemaSpec.schema holds the original class
-    assert kwargs["response_format"].schema_spec.schema is ToyModel
+    # NOTE (Rule 1 fix): the verified langchain 1.2.13 surface is
+    # ToolStrategy.schema_specs (plural, list of _SchemaSpec). The plan
+    # cited ".schema_spec" but the installed library uses ".schema_specs".
+    # We assert against the actual attribute and also against the public
+    # ".schema" attribute that both strategies expose.
+    assert kwargs["response_format"].schema is ToyModel
+    assert kwargs["response_format"].schema_specs[0].schema is ToyModel
 
 
 def test_anthropic_create_agent_wraps_in_provider_strategy(monkeypatch):
@@ -58,6 +63,8 @@ def test_anthropic_create_agent_wraps_in_provider_strategy(monkeypatch):
             backend.create_agent(system_prompt="x", tools=[], response_format=ToyModel)
     kwargs = mock_create.call_args.kwargs
     assert isinstance(kwargs["response_format"], ProviderStrategy)
+    # ProviderStrategy uses .schema_spec (singular) per langchain 1.2.13.
+    assert kwargs["response_format"].schema is ToyModel
     assert kwargs["response_format"].schema_spec.schema is ToyModel
 
 
@@ -74,4 +81,5 @@ def test_openai_create_agent_wraps_in_provider_strategy(monkeypatch):
             backend.create_agent(system_prompt="x", tools=[], response_format=ToyModel)
     kwargs = mock_create.call_args.kwargs
     assert isinstance(kwargs["response_format"], ProviderStrategy)
+    assert kwargs["response_format"].schema is ToyModel
     assert kwargs["response_format"].schema_spec.schema is ToyModel

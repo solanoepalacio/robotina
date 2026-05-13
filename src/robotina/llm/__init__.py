@@ -31,6 +31,7 @@ from langchain_core.tools import BaseTool
 from langchain_ollama import ChatOllama
 from langchain.agents import create_agent as _create_agent  # AGENT-12
 from ollama import ResponseError as OllamaResponseError
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,7 @@ class LLMBackend(Protocol):
         self,
         system_prompt: str,
         tools: list[BaseTool] | None = None,
+        response_format: type[BaseModel] | None = None,
     ) -> Any:
         """Return a runnable agent graph bound to this model.
 
@@ -187,6 +189,14 @@ class LLMBackend(Protocol):
         producing ``ToolMessage(status='error')``, and callback delivery via
         ``RunnableConfig(callbacks=[...])``. Verified empirically against
         ``langchain 1.2.13``.
+
+        When ``response_format`` is provided, the adapter wraps it in the
+        provider-appropriate strategy:
+          - Ollama   → ToolStrategy (synthesized emit tool)
+          - Anthropic / OpenAI → ProviderStrategy (native strict-schema)
+        The agent's invoke result will populate ``state['structured_response']``
+        with a Pydantic instance of ``response_format``. See Phase 11
+        RESEARCH.md "Pattern 1" / "Pattern 2" for full citations.
         """
         ...
 
@@ -216,12 +226,23 @@ class OllamaBackend:
         self,
         system_prompt: str,
         tools: list[BaseTool] | None = None,
+        response_format: type[BaseModel] | None = None,
     ) -> Any:
-        return _create_agent(
-            model=self._model,
-            tools=tools or [],
-            system_prompt=system_prompt,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "tools": tools or [],
+            "system_prompt": system_prompt,
+        }
+        if response_format is not None:
+            # Explicit ToolStrategy: ChatOllama has no profile, but "gpt-oss"
+            # is in FALLBACK_MODELS_WITH_STRUCTURED_OUTPUT
+            # (langchain/agents/factory.py:148-158), so AutoStrategy would
+            # resolve to ProviderStrategy and call bind_tools(strict=True,
+            # response_format=...) which Ollama does not honor.
+            # See Phase 11 RESEARCH.md, Pitfall 1.
+            from langchain.agents.structured_output import ToolStrategy
+            kwargs["response_format"] = ToolStrategy(response_format)
+        return _create_agent(**kwargs)
 
 
 class AnthropicBackend:
@@ -249,12 +270,17 @@ class AnthropicBackend:
         self,
         system_prompt: str,
         tools: list[BaseTool] | None = None,
+        response_format: type[BaseModel] | None = None,
     ) -> Any:
-        return _create_agent(
-            model=self._model,
-            tools=tools or [],
-            system_prompt=system_prompt,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "tools": tools or [],
+            "system_prompt": system_prompt,
+        }
+        if response_format is not None:
+            from langchain.agents.structured_output import ProviderStrategy
+            kwargs["response_format"] = ProviderStrategy(response_format)
+        return _create_agent(**kwargs)
 
 
 class OpenAIBackend:
@@ -282,12 +308,17 @@ class OpenAIBackend:
         self,
         system_prompt: str,
         tools: list[BaseTool] | None = None,
+        response_format: type[BaseModel] | None = None,
     ) -> Any:
-        return _create_agent(
-            model=self._model,
-            tools=tools or [],
-            system_prompt=system_prompt,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "tools": tools or [],
+            "system_prompt": system_prompt,
+        }
+        if response_format is not None:
+            from langchain.agents.structured_output import ProviderStrategy
+            kwargs["response_format"] = ProviderStrategy(response_format)
+        return _create_agent(**kwargs)
 
 
 def make_backend(model_config: dict) -> LLMBackend:
