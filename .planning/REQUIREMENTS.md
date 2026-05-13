@@ -60,7 +60,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **AGENT-09**: Debug log level can be enabled independently per module (gateway, scheduler, queue, agent, LLM)
 - [x] **AGENT-10**: All agent actions are logged (LLM stream start, tool calls and results)
 - [x] **AGENT-11**: `create_react_agent` from `langgraph.prebuilt` is used for all agents *(superseded by AGENT-12 in Phase 10)*
-- [ ] **AGENT-12**: All agents use `create_agent` from `langchain.agents` (supersedes AGENT-11). The deprecated `langgraph.prebuilt.create_react_agent` is no longer imported anywhere in `src/` or `tests/`. The three `LLMBackend` adapters (Ollama, Anthropic, OpenAI) call `langchain.agents.create_agent(model=…, tools=…, system_prompt=…)` with strict behavior parity — `return_direct=True` short-circuit, message state shape, callback delivery, and strict-args→ToolMessage(status='error') flow are all preserved.
+- [x] **AGENT-12**: All agents use `create_agent` from `langchain.agents` (supersedes AGENT-11). The deprecated `langgraph.prebuilt.create_react_agent` is no longer imported anywhere in `src/` or `tests/`. The three `LLMBackend` adapters (Ollama, Anthropic, OpenAI) call `langchain.agents.create_agent(model=…, tools=…, system_prompt=…)` with strict behavior parity — `return_direct=True` short-circuit, message state shape, callback delivery, and strict-args→ToolMessage(status='error') flow are all preserved.
 
 ### Notification Agent
 
@@ -171,7 +171,7 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | AGENT-09 | Phase 4 | Complete |
 | AGENT-10 | Phase 4 | Complete |
 | AGENT-11 | Phase 4 | Complete |
-| AGENT-12 | Phase 10 | In Progress |
+| AGENT-12 | Phase 10 | Complete |
 | OBS-01 | Phase 4 | Complete |
 | OBS-02 | Phase 4 | Complete |
 | WF-02 | Phase 5 | Complete |
@@ -217,4 +217,4 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after roadmap creation — traceability updated with individual requirement-to-phase mappings*
+*Last updated: 2026-05-12 after Phase 10 — added AGENT-12 (LangChain 1.x agent API migration), marked AGENT-11 superseded*
