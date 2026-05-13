@@ -2,7 +2,9 @@
 
 ## Overview
 
-Robotina is built in nine phases following a strict dependency order: infrastructure and data contracts first, then gateway, then the LLM module and agent infrastructure, then the workflow engine, and finally agents in order of increasing complexity (send-notification -> handle-incoming-message -> recipe-research -> recipe-load). Each phase delivers a complete, verifiable capability that unblocks the next. Nothing in Phase 9 is testable until every prior phase is solid -- the architecture enforces this linearity.
+Robotina is built in nine core phases following a strict dependency order: infrastructure and data contracts first, then gateway, then the LLM module and agent infrastructure, then the workflow engine, and finally agents in order of increasing complexity (send-notification -> handle-incoming-message -> recipe-research -> recipe-load). Each phase delivers a complete, verifiable capability that unblocks the next. Nothing in Phase 9 is testable until every prior phase is solid -- the architecture enforces this linearity.
+
+Phases 10-12 are a follow-on track that migrates the agent layer to the LangChain 1.x agent API (`langchain.agents.create_agent`) and uses its new capabilities -- schema-constrained output via `response_format` (Phase 11) and middleware-based instrumentation (Phase 12) -- to retire bug classes that surfaced during real use (notably the 2026-05-13 canelones de choclo parse failure where prose-wrapped JSON defeated `extract_task_output`). These phases run after Phase 9 in strict order: 10 -> 11 -> 12.
 
 ## Phases
 
@@ -19,8 +21,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Task Runner and Workflow Engine** - Sequential RQ worker with workflow state transitions, artifact persistence, and next-step advancement (completed 2026-03-26)
 - [x] **Phase 6: send-notification Agent** - Notification agent formats and delivers Telegram messages with LangWatch traces verified (completed 2026-03-27)
 - [x] **Phase 7: handle-incoming-message Agent** - Robotina routing agent handles direct replies and initiates multi-step workflows end-to-end (completed 2026-03-27)
-- [ ] **Phase 8: recipe-research Agent** - Recipe research agent performs structured web search and produces typed RecipeData output
-- [ ] **Phase 9: recipe-load Agent and End-to-End Integration** - Recipe loader resolves food/unit names and creates recipes; full add-recipe workflow works end-to-end
+- [x] **Phase 07.1: Deterministic Agent Termination (INSERTED)** - Engine-enforced single-round agent termination via `Command(goto=END)`; eliminates duplicate-message and rare infinite-loop bugs (completed 2026-05-08)
+- [x] **Phase 8: recipe-research Agent** - Recipe research agent performs structured web search and produces typed RecipeData output (completed 2026-03-30)
+- [x] **Phase 9: recipe-load Agent and End-to-End Integration** - Recipe loader resolves food/unit names and creates recipes; full add-recipe workflow works end-to-end (completed 2026-05-12)
+- [ ] **Phase 10: LangChain 1.x Agent API Migration** - Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters with strict behavior parity
+- [ ] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)`
+- [ ] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`)
 
 ## Phase Details
 
@@ -162,9 +168,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 07.1-01-PLAN.md -- Wave 0: replace send-notification agent with deterministic Python (plain text)
-- [ ] 07.1-02-PLAN.md -- Wave 1: per-workflow acknowledge-add-recipe agent + routing-prompt simplification
-- [ ] 07.1-03-PLAN.md -- Wave 2: terminal queue and start-workflow tools via Command(goto=END)
+- [x] 07.1-01-PLAN.md -- Wave 0: replace send-notification agent with deterministic Python (plain text)
+- [x] 07.1-02-PLAN.md -- Wave 1: per-workflow acknowledge-add-recipe agent + routing-prompt simplification
+- [x] 07.1-03-PLAN.md -- Wave 2: terminal queue and start-workflow tools via Command(goto=END)
 
 ### Phase 8: recipe-research Agent
 **Goal**: The recipe research pipeline performs structured multi-site web search via Tavily across 4 sequential sub-tasks (gather, instructions, ingredients, metadata) and produces a fully populated `RecipeData` output, with traces pinned to LangWatch experiment collections
@@ -178,10 +184,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 08-01-PLAN.md -- I/O models (8 new Pydantic classes) + workflow registry update (6-step add-recipe) + recipe-scrapers dependency
+- [x] 08-01-PLAN.md -- I/O models (8 new Pydantic classes) + workflow registry update (6-step add-recipe) + recipe-scrapers dependency
 - [x] 08-02-PLAN.md -- WebSearchTool implementation + recipe-research skill (5 files) + 4 system prompt files
 - [x] 08-03-PLAN.md -- 4 AgentConfig registry entries + run_task() elif tool injection + unit tests
-- [ ] 08-04-PLAN.md -- Combined experiment script (experiments/recipe_research.py) + human pipeline verification
+- [x] 08-04-PLAN.md -- Combined experiment script (experiments/recipe_research.py) + human pipeline verification
 
 ### Phase 9: recipe-load Agent and End-to-End Integration
 **Goal**: The recipe loader agent resolves human-readable ingredient names to household-manager IDs and creates the recipe; the full add-recipe workflow runs end-to-end from a Telegram message to a delivered recipe confirmation
@@ -198,10 +204,76 @@ Plans:
 - [x] 09-01-PLAN.md -- Core recipe-load agent wiring: RecipeLoadOutput extension, AGENT_REGISTRY entry, run_task() elif, V001.md prompt, workflow notify update, unit tests
 - [x] 09-02-PLAN.md -- Experiment script (experiments/recipe_load.py) with 4 edge cases + human verification checkpoint
 
+### Phase 10: LangChain 1.x Agent API Migration
+**Goal**: Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters (Ollama, Anthropic, OpenAI) with strict behavior parity. This is the prerequisite unlock for the LangChain 1.x agent features (`response_format`, middleware, custom state schemas) that the project is on but not yet using -- the lockfile pins `langchain 1.2.13` and `langchain-core 1.2.22` while the code still imports the langgraph-prebuilt API.
+**Depends on**: Phase 9
+**Requirements**: AGENT-12
+**Success Criteria** (what must be TRUE):
+  1. All three `LLMBackend` adapters in `src/robotina/llm/__init__.py` call `langchain.agents.create_agent` and no longer import `create_react_agent` from `langgraph.prebuilt`; the AGENT-11/D-03 decision record is updated to reference the new API and the rationale for the switch
+  2. `return_direct=True` short-circuit semantics are preserved -- `QueueTool` and `StartWorkflowTool` still terminate the agent in one round with a `ToolMessage` as the last state message, and `extract_task_output`'s `tool_message` branch (workflow_runner.py:47-48) continues to fire correctly
+  3. All four test files that construct real agents -- `test_queue_tool.py`, `test_start_workflow_tool.py`, `test_household_manager_api_tool.py`, `test_llm_backend.py` -- are updated to use `create_agent` and `uv run pytest` is green
+  4. End-to-end `add-recipe` workflow (research -> load -> notify) runs to completion on at least one real recipe query with no semantic regression versus the pre-migration baseline
+  5. CLAUDE.md technology stack table is updated -- `langchain >=1.2`, `langchain-core >=1.2`, langgraph entry reflects its new role as a lower-level dependency (not the agent API surface); the "What NOT to Use" table reflects that `create_react_agent` is now superseded by `create_agent` rather than the recommended path
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+- [ ] 10-01-PLAN.md -- AGENT-12 requirement + source-grep lock test (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 10-02-PLAN.md -- Adapter migration + 4 test files + 7-file comment sweep (Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 10-03-PLAN.md -- CLAUDE.md / STATE.md / PROJECT.md / new decision record + end-to-end Telegram checkpoint (Wave 3)
+
+**Notes:**
+- Pure mechanical swap with strict parity -- no `response_format`, no middleware, no state-schema changes. Those are Phases 11 and 12.
+- Riskiest area: the `return_direct=True` short-circuit semantics. `create_agent` is built on langgraph internally so this should hold, but explicit verification via the existing test_queue_tool / test_start_workflow_tool patterns is part of success criterion 2.
+
+### Phase 11: Structured Agent Output via response_format
+**Goal**: Replace free-text JSON emission from the recipe-research sub-agents and the recipe-load agent with schema-constrained output via `create_agent(response_format=...)`, eliminating the prose-wrapping parse failures that today cause workflow dead-letters (see canelones de choclo incident 2026-05-13: agent emitted valid JSON wrapped in preamble + markdown fence + postscript, defeating `extract_task_output`'s parser and cancelling 5 remaining workflow steps).
+**Depends on**: Phase 10
+**Requirements**: TBD (new -- candidate RRECIPE-07, RLOAD-07)
+**Success Criteria** (what must be TRUE):
+  1. The four recipe-research sub-agents (`recipe-research-gather`, `-instructions`, `-ingredients`, `-metadata`) and the `recipe-load` agent are configured with `response_format` bound to their respective Pydantic output models; agent outputs come from the structured channel rather than free-text content
+  2. The prose-stripping / code-fence / JSON-scan fallbacks in `extract_task_output` (workflow_runner.py:55-76) are removed or reduced to a defensive error -- structured-output agents produce parsable artifacts without that logic
+  3. A regression test reproducing the 2026-05-13 canelones parse failure (agent output: prose preamble + ```json fence + postscript) passes on the new pipeline
+  4. End-to-end `add-recipe` workflow runs without parse failures across at least three distinct recipe queries with no manual prompt tuning between runs
+  5. `uv run pytest` is green; experiments still emit valid LangWatch traces tagged with prompt version and model config
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 11 to break down)
+
+**Notes:**
+- This is the phase that retires the canelones-style bug class permanently. Phase 10 makes the API available; this phase uses it where it pays off.
+- Each agent's Pydantic output model already exists in `src/robotina/queue/task_types.py` (or wherever the QUEUE-* models live) -- this phase binds them to the agent, not authors new schemas.
+- Open question for planning: ToolStrategy vs. ProviderStrategy for `response_format`. ProviderStrategy uses OpenAI strict mode / Anthropic tool-use strict schemas (token-level constraint). ToolStrategy emulates via a final-emit tool. Ollama backend likely needs ToolStrategy; OpenAI/Anthropic should prefer ProviderStrategy.
+
+### Phase 12: Middleware-Based Agent Instrumentation
+**Goal**: Migrate the per-agent instrumentation layer (today implemented as `langchain_core.callbacks` handlers in `src/robotina/agent/callbacks.py`) to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`). This aligns Robotina with the LangChain 1.x recommended instrumentation pattern, gives a typed and composable place for span/log enrichment, and clears the way for additional pre/post-model guards (token-budget checks, prompt-injection filters) without further callback bolt-ons. LangWatch traces and the existing per-tool / per-LLM log lines must remain intact.
+**Depends on**: Phase 11
+**Requirements**: TBD (new -- candidate OBS-06)
+**Success Criteria** (what must be TRUE):
+  1. Per-agent log lines currently produced by `robotina.agent.callbacks` (`LLM stream start`, `Tool call`, `Tool result`) are emitted by middleware -- the legacy `AgentLoggingHandler` callback is removed or vestigial, and no remaining call site passes it to `create_agent`
+  2. LangWatch traces for at least one production run (handle-incoming-message -> queue -> send-notification) and one experiment run (`uv run experiments/recipe_research.py` or equivalent) appear in the correct LangWatch collection with no regression in span content (model name, tool calls, token usage where the provider exposes it)
+  3. `uv run pytest` is green; instrumentation-related tests are updated to assert middleware presence and ordering rather than callback registration
+  4. No `from langchain_core.callbacks` imports remain in `src/robotina/agent/` except where the LangWatch SDK itself requires them internally (verified by grep + a brief written rationale per remaining import in the phase summary)
+  5. The phase summary documents the LangWatch + middleware interaction model -- specifically whether LangWatch's OTel bridge picks up traces independent of callbacks, or whether a thin shim is needed
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 12 to break down)
+
+**Notes:**
+- Sequencing matters: this phase runs **after** Phase 11 so middleware sees the `response_format` plumbing already in place. Running them in parallel would create merge friction in `src/robotina/llm/__init__.py`.
+- Real risk: LangWatch SDK confidence is LOW per project memory ([[project_robotina]]). Verify whether LangWatch hooks via callbacks or via OTel directly **before** rewriting -- if it depends on callbacks, success criterion 5 grows into a small bridge layer rather than a clean rip-and-replace. A short spike at the start of Phase 12 planning is appropriate.
+- This phase does **not** include custom state schemas for `reply_context` / `household_id` -- that work is captured in backlog (Phase D, see .planning/backlog/) and would be promoted to a phase only when at least three tools need ambient context they currently get via kwargs.
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -212,5 +284,37 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Task Runner and Workflow Engine | 5/5 | Complete   | 2026-03-27 |
 | 6. send-notification Agent | 4/4 | Complete   | 2026-03-27 |
 | 7. handle-incoming-message Agent | 4/4 | Complete   | 2026-03-27 |
-| 8. recipe-research Agent | 0/4 | Not started | - |
-| 9. recipe-load Agent and End-to-End Integration | 0/2 | Not started | - |
+| 07.1. Deterministic Agent Termination (INSERTED) | 3/3 | Complete   | 2026-05-08 |
+| 8. recipe-research Agent | 4/4 | Complete   | 2026-03-30 |
+| 9. recipe-load Agent and End-to-End Integration | 2/2 | Complete   | 2026-05-12 |
+| 10. LangChain 1.x Agent API Migration | 0/3 | In Progress | - |
+| 11. Structured Agent Output via response_format | 0/0 | Not started | - |
+| 12. Middleware-Based Agent Instrumentation | 0/0 | Not started | - |
+
+## Backlog
+
+Unsequenced ideas that aren't ready for active planning. Promote with `/gsd-review-backlog` when promotion criteria are met.
+
+### Phase 999.1: Custom state schemas for reply_context and household_id (BACKLOG)
+
+**Goal:** Lift `reply_context: ReplyContext` and `household_id: str` from per-task `*Input` Pydantic models into a typed `AgentState` schema passed to `create_agent(state_schema=...)`. Tools access these via `InjectedState` rather than runtime kwargs. The job dispatcher in `run_task()` (`src/robotina/queue/jobs.py`) maps `WorkflowRun.shared_context` -> agent state at invocation time.
+
+**Why this is a backlog item, not an active phase:** This refactor changes the contract between the workflow runner / job dispatcher and the agent -- a meaningful structural shift. Real ergonomic value (removes the "thread `household_id` through every `*Input` model and every tool signature" plumbing) but no current production pain forces it. Adding new ambient fields today is annoying-but-rare, not blocking.
+
+**Requirements:** TBD
+
+**Depends on:** Phase 10 (requires `langchain.agents.create_agent`; `langgraph.prebuilt.create_react_agent` does not cleanly support `state_schema=`). Independent of Phases 11 and 12 -- they make this phase nicer when promoted, but neither requires it.
+
+**Promotion criteria** -- promote to an active phase via `/gsd-review-backlog` when ANY of:
+  1. Three or more tools need ambient context (currently only `household_id` is threaded; if `user_id`, `locale`, or workflow-scoped flags get added, this triggers)
+  2. Adding a new ambient field becomes a recurring chore (touched in 2+ phases of work over a quarter)
+  3. A future phase wants middleware that needs typed state reads (Phase 12 follow-on, e.g. enriching spans with `reply_context.platform` automatically)
+
+**Scope estimate when promoted:** 1-2 days. Touches: agent construction in `src/robotina/llm/__init__.py` (3 backends); tool signatures (`household_manager_api.py`, `queue.py`, `start_workflow.py`, `web_search.py`); job dispatcher in `src/robotina/queue/jobs.py`; the 4 test files that build real agents.
+
+**Source decision:** Sequencing discussion 2026-05-12, conversation following the canelones de choclo parse failure analysis (2026-05-13 logs). User opted to land A/B/C (Phases 10/11/12) and defer D as backlog.
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed quick task 260430-meh
-last_updated: "2026-05-08T20:29:44.153Z"
-last_activity: 2026-04-30
+status: Active
+stopped_at: Phases 1-9 complete; ready to start Phase 10 (LangChain 1.x Agent API Migration)
+last_updated: "2026-05-13T01:39:31.894Z"
+last_activity: 2026-05-13
 progress:
-  total_phases: 10
+  total_phases: 14
   completed_phases: 8
-  total_plans: 34
+  total_plans: 40
   completed_plans: 32
-  percent: 94
+  percent: 80
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 09 — recipe-load-agent-and-end-to-end-integration
+**Current focus:** Phase 10 — langchain-1-x-agent-api-migration
 
 ## Current Position
 
-Phase: 09
+Phase: 10
 Plan: Not started
 
 ## Performance Metrics
@@ -89,6 +89,9 @@ Plan: Not started
 ### Roadmap Evolution
 
 - Phase 07.1 inserted after Phase 7: Deterministic agent termination (URGENT)
+- Phase 10 added: LangChain 1.x Agent API Migration (create_react_agent -> create_agent)
+- Phase 11 added: Structured Agent Output via response_format (fixes canelones-class parse failures)
+- Phase 12 added: Middleware-Based Agent Instrumentation (callbacks -> @before_model/@after_model/@wrap_model_call)
 
 ### Decisions
 
@@ -196,8 +199,8 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-05-09 - Completed quick task 260509-o56 (inline recipe-research skills into agent prompts)
+Last activity: 2026-05-13
 
-Last session: 2026-04-30T19:09:37.019Z
-Stopped at: Completed quick task 260430-meh
+Last session: 2026-05-12T21:54:00.000Z
+Stopped at: Phases 1-9 complete; ready to start Phase 10 (LangChain 1.x Agent API Migration)
 Resume file: None
