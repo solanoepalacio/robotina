@@ -86,6 +86,10 @@ Plan: 3 of 3 (all plans complete; awaiting phase verification, then Phase 11)
 | Phase 10-langchain-1-x-agent-api-migration P01 | 2min | 2 tasks | 2 files |
 | Phase 10-langchain-1-x-agent-api-migration P02 | 7min | 3 tasks | 12 files |
 | Phase 10-langchain-1-x-agent-api-migration P03 | 30min | 3 tasks | 5 files |
+| Phase 11-structured-agent-output-via-response-format P01 | 5min | 3 tasks | 6 files |
+| Phase 11-structured-agent-output-via-response-format P02 | 6min | 2 tasks | 2 files |
+| Phase 11-structured-agent-output-via-response-format P03 | 6min | 6 tasks | 9 files |
+| Phase 11-structured-agent-output-via-response-format P04 | TBD | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -95,6 +99,7 @@ Plan: 3 of 3 (all plans complete; awaiting phase verification, then Phase 11)
 - Phase 10 added: LangChain 1.x Agent API Migration (create_react_agent -> create_agent)
 - Phase 11 added: Structured Agent Output via response_format (fixes canelones-class parse failures)
 - Phase 12 added: Middleware-Based Agent Instrumentation (callbacks -> @before_model/@after_model/@wrap_model_call)
+- Phase 11 code complete (manual checkpoint pending): response_format adopted on 5 named agents; canelones-class parse failures structurally eliminated for those agents — pending 3-query end-to-end verification (Plan 11-04 Task 4.2)
 
 ### Decisions
 
@@ -182,6 +187,9 @@ Recent decisions affecting current work:
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — AGENT-12 marked complete in REQUIREMENTS.md only AFTER the manual end-to-end Telegram verification approved by user; checkbox flip lives in a separate post-checkpoint task (3.3) from the docs rollover (3.1) so the requirement contract change is atomic and gated on real production behavior, not unit-test parity
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — Tangential pydantic optional-field bug (RecipeStep / RecipeIngredient / RecipeData fields without = None defaults) exposed during Task 3.2 end-to-end verification; fixed inline as quick task 260512-pyd (commit 19b3b9d). Pre-existing latent schema bug surfaced by an LLM model swap, NOT caused by the create_agent migration. Out of Plan 10-03 scope but unblocked the Task 3.2 end-to-end gate
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — Phase 10 success criterion 4 closed: end-to-end add-recipe Telegram workflow runs to completion under langchain.agents.create_agent with no semantic regression; LangWatch traces appear with spans for each agent invocation; no LangGraphDeprecatedSinceV10 warnings in worker logs. Phase 10 migration functionally complete; Plans 11 and 12 unblocked
+- [Phase 11-structured-agent-output-via-response-format]: Per-provider Strategy mapping: Ollama → ToolStrategy (correctness — gpt-oss is in FALLBACK_MODELS_WITH_STRUCTURED_OUTPUT so AutoStrategy would silently route to ProviderStrategy and call bind_tools(strict=True, response_format=...) which Ollama does not honor); Anthropic / OpenAI → ProviderStrategy. Strategy selected inside each LLMBackend adapter, not in run_task.
+- [Phase 11-structured-agent-output-via-response-format]: AgentConfig.response_format_model is NOT overridable via AGENT_OVERRIDES_FILEPATH — schema is a code contract, not config. get_agent_config only propagates model_config and prompt_path; the response_format_model field flows directly from AGENT_REGISTRY.
+- [Phase 11-structured-agent-output-via-response-format]: _extract_task_output in workflow_runner.py rewritten — prefers result['structured_response'] when expects_structured=True (resolved by on_step_complete via get_agent_config(step.task_type).response_format_model is not None); raises ValueError loudly on missing. The prose-strip / markdown-fence / first-{-scan / json.loads fallback ladder + TEMP DIAGNOSTIC logger.error block are REMOVED. handle-incoming-message and acknowledge-add-recipe continue to use the return_direct tool-message branch (out of scope for Phase 11).
 
 ### Pending Todos
 

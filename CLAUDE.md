@@ -24,7 +24,7 @@ Robotina is the AI agent component of a household management system. It listens 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
 | Python | 3.12+ | Runtime | 3.12 is stable, has improved performance over 3.11, and full support for typing features used by SQLAlchemy 2.x and Pydantic v2. 3.13 released Oct 2024 but 3.12 has wider ecosystem compatibility. |
-| LangChain | `langchain>=1.2`, `langchain-core>=1.2` | Agent orchestration via `langchain.agents.create_agent` | LangChain 1.x is the current major. `create_agent` (the agent factory) lives in `langchain.agents`, not `langgraph.prebuilt`. `LLMBackend.create_agent()` wraps this factory. |
+| LangChain | `langchain>=1.2`, `langchain-core>=1.2` | Agent orchestration via `langchain.agents.create_agent` | LangChain 1.x is the current major. `create_agent` (the agent factory) lives in `langchain.agents`, not `langgraph.prebuilt`. `LLMBackend.create_agent()` wraps this factory. As of Phase 11, `create_agent(response_format=Schema)` is in active use on the 5 artifact-producing agents (recipe-research-gather/instructions/ingredients/metadata + recipe-load). See `.planning/decisions/response-format-adoption.md`. |
 | langchain-core | `>=1.2` | Base abstractions (`BaseChatModel`, `BaseTool`) | `langchain-core` is the stable, minimal dependency. Agent code should import from `langchain_core` wherever possible; `langchain` provides higher-level constructs. |
 | langgraph | `>=1.0` | Underlying graph engine for `create_agent` | `create_agent` is built on `langgraph` (`CompiledStateGraph`, `ToolNode`, `StateGraph`). Pinned as a direct dep to document the floor; not the agent API surface anymore. |
 | Redis | `7.x` | Job queue backing store, AOF persistence | Mature, stable. Version 7 adds multi-part AOF and improved persistence. AOF with `appendfsync always` satisfies the spec's no-lost-tasks requirement. |
@@ -102,6 +102,7 @@ Robotina is the AI agent component of a household management system. It listens 
 | Pydantic v1 | LangChain 0.3 and SQLAlchemy 2.x both require or strongly prefer v2. Mixing versions causes silent serialization bugs. | Pydantic v2 exclusively |
 | `aioredis` (standalone) | Merged into `redis-py` since `redis>=4.2`. Using both creates version conflicts. | `redis>=5.0` (includes async support) |
 | `dotenv` loaded manually per module | Inconsistent env loading order. | Single `load_dotenv()` at entrypoint, or rely on Docker Compose environment injection. |
+| Custom output parser that scans for prose, fences, JSON | This is exactly the canelones-class bug. LangChain's structured-output path (`response_format=`) is token-level (provider) or tool-arg-validated (Ollama). See `.planning/decisions/response-format-adoption.md`. | `response_format=<Pydantic class>` on `langchain.agents.create_agent` (Phase 11) |
 ## Stack Patterns by Variant
 - Use `docker-compose up` for Postgres 15 + Redis 7
 - Use `uv run agent` / `uv run scheduler` shortcuts
