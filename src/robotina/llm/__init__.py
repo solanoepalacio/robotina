@@ -29,7 +29,7 @@ from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatResult
 from langchain_core.tools import BaseTool
 from langchain_ollama import ChatOllama
-from langgraph.prebuilt import create_react_agent  # locked per AGENT-11/D-03
+from langchain.agents import create_agent as _create_agent  # AGENT-12
 from ollama import ResponseError as OllamaResponseError
 
 logger = logging.getLogger(__name__)
@@ -91,9 +91,9 @@ class _RetryingChatOllama(ChatOllama):
 
     Why a subclass and not Runnable.with_retry(): with_retry filters by
     exception type only, so it would also retry 4xx — undesirable. And the
-    result of with_retry is a RunnableRetry wrapper, which langgraph's
-    create_react_agent does not accept (it requires BaseChatModel |
-    RunnableBinding).
+    result of with_retry is a RunnableRetry wrapper, which
+    ``langchain.agents.create_agent`` does not accept (it requires
+    BaseChatModel | RunnableBinding).
     """
 
     def _generate(
@@ -177,11 +177,16 @@ class LLMBackend(Protocol):
         system_prompt: str,
         tools: list[BaseTool] | None = None,
     ) -> Any:
-        """Return a runnable LangGraph ReAct agent bound to this model.
+        """Return a runnable agent graph bound to this model.
 
-        Uses create_react_agent from langgraph.prebuilt (locked per AGENT-11/D-03).
-        Note: langgraph 1.1.3 emits LangGraphDeprecatedSinceV10 — this is expected
-        and the API remains fully functional through at least LangGraph v1.x.
+        Uses ``langchain.agents.create_agent`` (the LangChain 1.x agent factory;
+        AGENT-12 supersedes AGENT-11/D-03). The factory returns a
+        ``CompiledStateGraph`` whose ``.invoke({"messages": [...]})`` contract is
+        unchanged from the previous prebuilt ReAct-agent path — including
+        ``return_direct=True`` short-circuit semantics, strict-args validation
+        producing ``ToolMessage(status='error')``, and callback delivery via
+        ``RunnableConfig(callbacks=[...])``. Verified empirically against
+        ``langchain 1.2.13``.
         """
         ...
 
@@ -212,10 +217,10 @@ class OllamaBackend:
         system_prompt: str,
         tools: list[BaseTool] | None = None,
     ) -> Any:
-        return create_react_agent(
+        return _create_agent(
             model=self._model,
             tools=tools or [],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
 
@@ -245,10 +250,10 @@ class AnthropicBackend:
         system_prompt: str,
         tools: list[BaseTool] | None = None,
     ) -> Any:
-        return create_react_agent(
+        return _create_agent(
             model=self._model,
             tools=tools or [],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
 
@@ -278,10 +283,10 @@ class OpenAIBackend:
         system_prompt: str,
         tools: list[BaseTool] | None = None,
     ) -> Any:
-        return create_react_agent(
+        return _create_agent(
             model=self._model,
             tools=tools or [],
-            prompt=system_prompt,
+            system_prompt=system_prompt,
         )
 
 

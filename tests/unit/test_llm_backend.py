@@ -14,14 +14,14 @@ def test_llm_backend_protocol_exists():
 
 
 def test_ollama_adapter_creates_agent():
-    """AGENT-02: OllamaBackend creates a create_react_agent runnable."""
+    """AGENT-02 / AGENT-12: OllamaBackend creates a langchain.agents.create_agent runnable."""
     from robotina.llm import LLMBackend, OllamaBackend
 
     mock_model = MagicMock()
     mock_agent = MagicMock()
     mock_agent.invoke = MagicMock()
 
-    with patch("robotina.llm.create_react_agent", return_value=mock_agent) as mock_cra:
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
         with patch("langchain_ollama.ChatOllama", return_value=mock_model):
             adapter = OllamaBackend({"model": "test", "api_key_env": "HELLO_WORLD_API_TOKEN"})
             result = adapter.create_agent("hello")
@@ -32,7 +32,7 @@ def test_ollama_adapter_creates_agent():
 
 
 def test_anthropic_adapter_creates_agent(monkeypatch):
-    """AGENT-02: AnthropicBackend creates a create_react_agent runnable."""
+    """AGENT-02 / AGENT-12: AnthropicBackend creates a langchain.agents.create_agent runnable."""
     from robotina.llm import AnthropicBackend, LLMBackend
 
     monkeypatch.setenv("HELLO_WORLD_API_TOKEN", "test-api-key")
@@ -41,7 +41,7 @@ def test_anthropic_adapter_creates_agent(monkeypatch):
     mock_agent = MagicMock()
     mock_agent.invoke = MagicMock()
 
-    with patch("robotina.llm.create_react_agent", return_value=mock_agent) as mock_cra:
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
         with patch("langchain_anthropic.ChatAnthropic", return_value=mock_model):
             adapter = AnthropicBackend({
                 "model": "claude-3-5-haiku",
@@ -55,7 +55,7 @@ def test_anthropic_adapter_creates_agent(monkeypatch):
 
 
 def test_openai_adapter_creates_agent(monkeypatch):
-    """AGENT-02: OpenAIBackend creates a create_react_agent runnable."""
+    """AGENT-02 / AGENT-12: OpenAIBackend creates a langchain.agents.create_agent runnable."""
     from robotina.llm import LLMBackend, OpenAIBackend
 
     monkeypatch.setenv("HELLO_WORLD_API_TOKEN", "test-api-key")
@@ -64,7 +64,7 @@ def test_openai_adapter_creates_agent(monkeypatch):
     mock_agent = MagicMock()
     mock_agent.invoke = MagicMock()
 
-    with patch("robotina.llm.create_react_agent", return_value=mock_agent) as mock_cra:
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
         with patch("langchain_openai.ChatOpenAI", return_value=mock_model):
             adapter = OpenAIBackend({
                 "model": "gpt-4",
