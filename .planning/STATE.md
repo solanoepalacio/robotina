@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Active
-stopped_at: Phases 1-9 complete; ready to start Phase 10 (LangChain 1.x Agent API Migration)
-last_updated: "2026-05-13T01:39:31.894Z"
+stopped_at: Phase 10 Plan 01 complete; Plan 02 next (adapter migration + 4 test files + comment sweep)
+last_updated: "2026-05-13T01:44:59Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 14
   completed_phases: 8
   total_plans: 40
-  completed_plans: 32
-  percent: 80
+  completed_plans: 33
+  percent: 82
 ---
 
 # Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (langchain-1-x-agent-api-migration) — EXECUTING
+Plan: 2 of 3 (Plan 01 complete; Plan 02 next)
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Plan: Not started
 | Phase 08-recipe-research-agent P04 | 2min | 2 tasks | 1 files |
 | Phase 09 P01 | 2min | 2 tasks | 8 files |
 | Phase 09 P02 | 2min | 2 tasks | 1 files |
+| Phase 10-langchain-1-x-agent-api-migration P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,10 @@ Recent decisions affecting current work:
 - [Phase 09]: Notification text in Spanish with recipe description and app link via HOUSEHOLD_MANAGER_BASE_URL
 - [Phase 09]: Reuse household-manager skill for recipe-load -- no dedicated skill directory (D-08)
 - [Phase 09]: Full recipe data included in experiment user message via _build_user_message() so agent can resolve names
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — AGENT-12 added to REQUIREMENTS.md as unchecked / "In Progress" supersedes AGENT-11; Plan 10-03 flips it to Complete after manual end-to-end Telegram verification
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Requirement supersession marker pattern '*(superseded by REQ-XX in Phase N)*' tag on the old bullet preserves decision history instead of deleting
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Lock-test-first wave boundary: the source-grep test in tests/unit/test_llm_backend.py is renamed test_create_agent_used_not_agent_executor and its assertions inverted in wave 1 so the test is RED against the unchanged source — Plan 10-02 turns it green via the source rename; the FAILING state at the plan boundary IS the success signal
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Per-adapter test patch targets (patch('robotina.llm.create_react_agent', ...) at lines 24/44/67) are NOT updated in wave 1; Plan 10-02 owns them alongside the source change so the wave boundary stays clean
 
 ### Pending Todos
 
@@ -201,6 +206,6 @@ None yet.
 
 Last activity: 2026-05-13
 
-Last session: 2026-05-12T21:54:00.000Z
-Stopped at: Phases 1-9 complete; ready to start Phase 10 (LangChain 1.x Agent API Migration)
+Last session: 2026-05-13T01:44:59Z
+Stopped at: Completed 10-01-PLAN.md (AGENT-12 requirement + source-grep lock test). Next: 10-02-PLAN.md (adapter migration + 4 test files + comment sweep). The renamed source-grep test test_create_agent_used_not_agent_executor is intentionally RED at this boundary — Plan 02 will turn it green by migrating src/robotina/llm/__init__.py.
 Resume file: None
