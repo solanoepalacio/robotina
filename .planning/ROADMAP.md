@@ -221,7 +221,7 @@ Plans:
 - [x] 10-01-PLAN.md -- AGENT-12 requirement + source-grep lock test (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 10-02-PLAN.md -- Adapter migration + 4 test files + 7-file comment sweep (Wave 2)
+- [x] 10-02-PLAN.md -- Adapter migration + 4 test files + 7-file comment sweep (Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 10-03-PLAN.md -- CLAUDE.md / STATE.md / PROJECT.md / new decision record + end-to-end Telegram checkpoint (Wave 3)

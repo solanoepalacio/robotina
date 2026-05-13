@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Active
-stopped_at: Phase 10 Plan 01 complete; Plan 02 next (adapter migration + 4 test files + comment sweep)
-last_updated: "2026-05-13T01:44:59Z"
+stopped_at: Phase 10 Plan 02 complete (adapter migration + 4 test-file migrations + 7-file doc sweep; AGENT-12 lock test RED -> GREEN); Plan 03 next (CLAUDE.md/STATE.md/PROJECT.md updates + decision record + manual end-to-end Telegram checkpoint flips AGENT-12 to Complete)
+last_updated: "2026-05-13T01:56:21Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 14
   completed_phases: 8
   total_plans: 40
-  completed_plans: 33
-  percent: 82
+  completed_plans: 34
+  percent: 85
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 10 (langchain-1-x-agent-api-migration) — EXECUTING
-Plan: 2 of 3 (Plan 01 complete; Plan 02 next)
+Plan: 3 of 3 (Plans 01 + 02 complete; Plan 03 next)
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Plan: 2 of 3 (Plan 01 complete; Plan 02 next)
 | Phase 09 P01 | 2min | 2 tasks | 8 files |
 | Phase 09 P02 | 2min | 2 tasks | 1 files |
 | Phase 10-langchain-1-x-agent-api-migration P01 | 2min | 2 tasks | 2 files |
+| Phase 10-langchain-1-x-agent-api-migration P02 | 7min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -172,6 +173,11 @@ Recent decisions affecting current work:
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Requirement supersession marker pattern '*(superseded by REQ-XX in Phase N)*' tag on the old bullet preserves decision history instead of deleting
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Lock-test-first wave boundary: the source-grep test in tests/unit/test_llm_backend.py is renamed test_create_agent_used_not_agent_executor and its assertions inverted in wave 1 so the test is RED against the unchanged source — Plan 10-02 turns it green via the source rename; the FAILING state at the plan boundary IS the success signal
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-01 — Per-adapter test patch targets (patch('robotina.llm.create_react_agent', ...) at lines 24/44/67) are NOT updated in wave 1; Plan 10-02 owns them alongside the source change so the wave boundary stays clean
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — Self-recursion guard alias `from langchain.agents import create_agent as _create_agent` is mandatory because the LLMBackend.create_agent METHOD has the same name as the factory function; without aliasing, the method body would recurse infinitely. All call sites in src/robotina/llm/__init__.py use `_create_agent(...)` while the public method signature stays `create_agent`
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — Test mock patch targets follow the imported alias name (patch('robotina.llm._create_agent', ...)) not the upstream module path (`langchain.agents.create_agent`); patching the upstream path does not intercept calls because Python resolves the imported name at import time
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — AC1 grep-zero gate (no `create_react_agent` / `langgraph.prebuilt` matches under src/ tests/ experiments/) is interpreted by INTENT not literally: the lock test in tests/unit/test_llm_backend.py necessarily contains those tokens in its load-bearing forbidden-strings assertions. The intent (no remaining USAGE outside the lock test) is verified by `grep ... | grep -v test_llm_backend.py | wc -l == 0`
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — The Plan-verbatim Protocol docstring phrase `the previous ``create_react_agent`` path` would have failed the renamed source-grep lock test (which forbids the substring `create_react_agent` anywhere in src/robotina/llm/__init__.py); rephrased to `the previous prebuilt ReAct-agent path` — Rule 1 deviation, semantics preserved, lock satisfied
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — Pre-existing test pollution from tests/test_pyproject.py::test_experiment_mains_importable (importing experiments/* runs `load_dotenv()` at module top, leaking AGENT_OVERRIDES_FILEPATH=overrides/openai.json into agents_registry tests) fails 9 unit tests on order-dependence; reproduced on Plan 10-01 final commit daf2f7b — out of scope for Plan 10-02, candidate quick task for the future
 
 ### Pending Todos
 
@@ -206,6 +212,6 @@ None yet.
 
 Last activity: 2026-05-13
 
-Last session: 2026-05-13T01:44:59Z
-Stopped at: Completed 10-01-PLAN.md (AGENT-12 requirement + source-grep lock test). Next: 10-02-PLAN.md (adapter migration + 4 test files + comment sweep). The renamed source-grep test test_create_agent_used_not_agent_executor is intentionally RED at this boundary — Plan 02 will turn it green by migrating src/robotina/llm/__init__.py.
+Last session: 2026-05-13T01:56:21Z
+Stopped at: Completed 10-02-PLAN.md (LLMBackend adapter migration to langchain.agents.create_agent + 4 test files + 7-file comment sweep). Plan 01's renamed source-grep lock test `test_create_agent_used_not_agent_executor` transitioned RED -> GREEN inside Task 2.1 commit `ecdfa02`. `return_direct=True` short-circuit and strict-args -> ToolMessage(status='error') parity verified under the new factory. 148 non-integration tests pass (the pre-existing AGENT_OVERRIDES_FILEPATH env-pollution from tests/test_pyproject.py::test_experiment_mains_importable is documented and out of scope). Next: 10-03-PLAN.md (CLAUDE.md / STATE.md / PROJECT.md / new decision record + manual end-to-end Telegram checkpoint to flip AGENT-12 to checked / Complete in REQUIREMENTS.md).
 Resume file: None
