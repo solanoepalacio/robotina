@@ -212,6 +212,7 @@ None yet.
 | 260509-nru | Strict args_schema on dict-arg tools — bad LLM tool args become ToolMessage(error) instead of TypeError that kills the workflow | 2026-05-09 | f12c56b | [260509-nru-strict-tool-call-args-validation](./quick/260509-nru-strict-tool-call-args-validation/) |
 | 260509-o56 | Inline recipe-research skill files into the 4 sub-agent prompts; delete the bundle (1:1 per-agent runbook content was the wrong abstraction for `skill`) | 2026-05-09 | c018f0d | [260509-o56-inline-recipe-research-skill-files-into-](./quick/260509-o56-inline-recipe-research-skill-files-into-/) |
 | 260512-pyd | Make optional RecipeData fields truly optional with `= None` defaults (RecipeStep.title, RecipeIngredient optional fields, RecipeData optional fields) — fixes pydantic ValidationError when LLM omits null-valued fields | 2026-05-12 | 19b3b9d | (fast — no directory) |
+| 260513-lcc | Align CLAUDE.md langchain-core row to `>=1.2` (was `>=0.3`) — internal consistency cleanup flagged by Phase 10 VERIFICATION.md | 2026-05-13 | f52533a | (fast — no directory) |
 
 ## Session Continuity
 
