@@ -16,12 +16,13 @@ Per-job injection pattern (locked Phase 4 constraint):
 Enqueues at FRONT of queue (at_front=True). Notification replies to the user
 should always be delivered before other pending jobs like research or loading.
 
-Phase 07.1: ``return_direct=True`` makes this a TERMINAL tool — the LangGraph
-``create_react_agent`` graph terminates immediately after the tool runs, with no
-further LLM invocation. This is engine-enforced termination, not a prompt-level
-request. (Note: returning ``Command(goto=END)`` does NOT short-circuit the
-prebuilt graph in langgraph 1.1.x — verified empirically. ``return_direct``
-is the supported mechanism.)
+Phase 07.1: ``return_direct=True`` makes this a TERMINAL tool — the
+``langchain.agents.create_agent`` graph terminates immediately after the tool
+runs, with no further LLM invocation. This is engine-enforced termination, not
+a prompt-level request. (Note: returning ``Command(goto=END)`` from a tool does
+NOT short-circuit the prebuilt graph — verified empirically for both the
+legacy prebuilt ReAct-agent path and the LangChain 1.x ``create_agent`` factory
+— hence this ``return_direct=True`` approach.)
 """
 from __future__ import annotations
 

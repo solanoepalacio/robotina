@@ -268,7 +268,7 @@ def test_on_step_failed_marks_workflow_failed():
 
 def test_extract_task_output_handles_return_direct_toolmessage():
     """Phase 07.1: when a return_direct=True terminal tool short-circuits the prebuilt
-    create_react_agent graph, the agent's final state has a ToolMessage as the last
+    langchain.agents.create_agent graph, the agent's final state has a ToolMessage as the last
     message — not a JSON-emitting AIMessage. _extract_task_output must surface the
     tool's return string instead of attempting (and failing) to JSON-parse the empty
     tool-call AIMessage that precedes it.
@@ -333,7 +333,7 @@ def test_on_step_complete_advances_after_return_direct_ack():
 
     queue = MagicMock()
 
-    # Mirror what create_react_agent leaves in state when QueueTool (return_direct=True) runs:
+    # Mirror what langchain.agents.create_agent leaves in state when QueueTool (return_direct=True) runs:
     # the tool-call AIMessage's content is a list of tool_use blocks (no text), and the final
     # message is the ToolMessage carrying the queue tool's return string.
     human_msg = MagicMock()

@@ -148,7 +148,7 @@ def build_agent():
 def extract_json_output(result: dict) -> dict:
     """Extract JSON from the last assistant message in agent result.
 
-    Per Pitfall 4: create_react_agent returns {"messages": [...]}.
+    Per Pitfall 4: langchain.agents.create_agent returns {"messages": [...]}.
     The agent's prompt instructs it to respond with JSON.
     """
     messages = result.get("messages", [])

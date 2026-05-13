@@ -33,7 +33,7 @@ def _extract_task_output(result: dict) -> dict:
     Strips markdown code fences (```...```) if present.
 
     Phase 07.1: When a terminal tool (``return_direct=True``, e.g. ``QueueTool``)
-    short-circuits the prebuilt ``create_react_agent`` graph, the last message
+    short-circuits the ``langchain.agents.create_agent`` graph, the last message
     is a ``ToolMessage`` rather than a JSON-emitting ``AIMessage`` — the
     tool-call AIMessage that immediately precedes it has no text content for
     Anthropic models (the tool_use block carries no JSON). In that case there

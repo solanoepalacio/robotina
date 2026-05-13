@@ -47,7 +47,7 @@ def run_task(task_input) -> object:
                     The task type is NOT read from this model — it comes from job meta.
 
     Returns:
-        Agent invocation result (messages list from create_react_agent).
+        Agent invocation result (messages list from langchain.agents.create_agent).
 
     Raises:
         ValueError: If job has no task_type in meta.
