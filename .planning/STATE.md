@@ -127,7 +127,7 @@ Recent decisions affecting current work:
 - [Phase 04-llm-module-and-agent-infrastructure]: Gateway enqueue string changed from 'robotina.queue.jobs.handle_incoming_message' to 'robotina.queue.jobs.run_task'; meta=task_type unchanged; run_task reads task_type from meta to dispatch to correct agent (D-09 confirmed)
 - [Phase 04-llm-module-and-agent-infrastructure]: AgentConfig uses plain Python dataclass (not Pydantic) — internal config, no external serialization needed
 - [Phase 04-llm-module-and-agent-infrastructure]: get_agent_config() re-reads AGENT_OVERRIDES_FILEPATH JSON on every call (hot-reload) — supports prompt experimentation without restart
-- [Phase 04-llm-module-and-agent-infrastructure]: Use create_react_agent from langgraph.prebuilt despite LangGraphDeprecatedSinceV10 warning — locked per AGENT-11/D-03, API remains functional in v1.1.3
+- [Phase 04-llm-module-and-agent-infrastructure]: AGENT-11/D-03 superseded in Phase 10 by AGENT-12 — all agents now use `langchain.agents.create_agent` (LangGraph V1.0 deprecation; removal in V2.0). Behavior parity (return_direct, state shape, callbacks) verified during Phase 10.
 - [Phase 04-llm-module-and-agent-infrastructure]: ChatOpenAI uses model_name= (not model=) and openai_api_base= — verified against langchain-openai 1.1.12 field names
 - [Phase 04-llm-module-and-agent-infrastructure]: api_key_env in model_config stores env var NAME not token value; resolved via os.environ at adapter instantiation time for clear misconfiguration errors
 - [Phase 04-llm-module-and-agent-infrastructure]: SKILLS_BASE anchored to Path(__file__).parent / 'skills' — absolute path makes SkillSet testable without import manipulation

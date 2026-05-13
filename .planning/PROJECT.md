@@ -62,6 +62,7 @@ Families can delegate household tasks to Robotina in natural language and trust 
 | `RecipeData` uses human-readable food/unit names (not IDs) | Recipe-research agent has no access to household-manager IDs; recipe-load resolves them | — Pending |
 | Two separate RQ workers: scheduler-worker (`--with-scheduler`) and task-runner | Keeps scheduling concerns decoupled from agent execution | — Pending |
 | Skills use lazy loading (index pre-loaded, sub-files on demand) | Avoids context bloat for tasks that only need part of a skill | — Pending |
+| `create_agent` from `langchain.agents` is used for all agents | LangGraph deprecated `create_react_agent` (V1.0; removal in V2.0). The new factory is required to unlock `response_format` (Phase 11) and middleware (Phase 12). Behavior parity verified empirically during Phase 10. | — Active |
 
 ## Evolution
 

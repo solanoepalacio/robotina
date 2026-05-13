@@ -24,9 +24,9 @@ Robotina is the AI agent component of a household management system. It listens 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
 | Python | 3.12+ | Runtime | 3.12 is stable, has improved performance over 3.11, and full support for typing features used by SQLAlchemy 2.x and Pydantic v2. 3.13 released Oct 2024 but 3.12 has wider ecosystem compatibility. |
-| LangChain | `langchain>=0.3`, `langchain-core>=0.3` | Agent orchestration | 0.3 stabilized the `create_react_agent` API from `langgraph` and removed most of the deprecated `AgentExecutor` path. The spec's `LLMBackend` Protocol wraps `BaseChatModel` which is `langchain-core` — keep `langchain` as thin as possible. |
+| LangChain | `langchain>=1.2`, `langchain-core>=1.2` | Agent orchestration via `langchain.agents.create_agent` | LangChain 1.x is the current major. `create_agent` (the agent factory) lives in `langchain.agents`, not `langgraph.prebuilt`. `LLMBackend.create_agent()` wraps this factory. |
 | langchain-core | `>=0.3` | Base abstractions (`BaseChatModel`, `BaseTool`) | `langchain-core` is the stable, minimal dependency. Agent code should import from `langchain_core` wherever possible; `langchain` provides higher-level constructs. |
-| langgraph | `>=0.2` | `create_react_agent` implementation | As of LangChain 0.2+, `create_react_agent` lives in `langgraph` (not `langchain`). The spec's `create_agent()` method returns a LangGraph runnable. Required for the ReAct agent pattern. |
+| langgraph | `>=1.0` | Underlying graph engine for `create_agent` | `create_agent` is built on `langgraph` (`CompiledStateGraph`, `ToolNode`, `StateGraph`). Pinned as a direct dep to document the floor; not the agent API surface anymore. |
 | Redis | `7.x` | Job queue backing store, AOF persistence | Mature, stable. Version 7 adds multi-part AOF and improved persistence. AOF with `appendfsync always` satisfies the spec's no-lost-tasks requirement. |
 | RQ (python-rq) | `>=2.5` | Task queue, built-in scheduler | 2.5 introduced native `enqueue_at` and cron scheduling, eliminating the `rq-scheduler` add-on. `--with-scheduler` flag activates it on the worker. Spec explicitly requires RQ 2.5+. |
 | PostgreSQL | `15+` | Persistent storage for conversations, workflow state | JSON columns (`WorkflowRun.shared_context`, `WorkflowRunStep.artifact`) work well on Postgres 14+. 15/16 adds better JSON performance. |
@@ -83,7 +83,7 @@ Robotina is the AI agent component of a household management system. It listens 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
 | RQ 2.5 native scheduler | `rq-scheduler` (add-on) | Never for this project — rq-scheduler is superseded by native RQ 2.5 scheduling. Only needed for RQ < 2.5. |
-| LangGraph `create_react_agent` | LangChain `AgentExecutor` | Never — `AgentExecutor` is deprecated as of LangChain 0.2 and scheduled for removal. The spec's `LLMBackend.create_agent()` must use LangGraph's `create_react_agent`. |
+| LangChain `langchain.agents.create_agent` | LangGraph `create_react_agent` | Never — `create_react_agent` is deprecated in LangGraph V1.0 (emits `LangGraphDeprecatedSinceV10`, removal in V2.0). `LLMBackend.create_agent()` must use `langchain.agents.create_agent`. `AgentExecutor` is still forbidden (long-standing). |
 | SQLAlchemy 2.x `Mapped` + `mapped_column` | SQLAlchemy 1.x `Column` style | Only if stuck on Python 3.8 or very old ecosystems. This project uses 3.12 and the 2.x style is already in the spec verbatim. |
 | `httpx` (async) | `requests` (sync) | `requests` if you have no async context. But the Telegram handler and FastAPI routes will be async; use `httpx` throughout. |
 | `python-telegram-bot` v21 | `aiogram`, `telebot` | `aiogram` is a valid alternative with better async ergonomics; however, `python-telegram-bot` v21 is async and has larger community/docs surface. Stick with it unless migrating. |
@@ -94,6 +94,7 @@ Robotina is the AI agent component of a household management system. It listens 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
 | `AgentExecutor` (langchain legacy) | Deprecated since LangChain 0.2, slated for removal. Unreliable tool-call retry semantics. | `langgraph.prebuilt.create_react_agent` |
+| `langgraph.prebuilt.create_react_agent` | Deprecated in LangGraph V1.0, removal in V2.0. Emits `LangGraphDeprecatedSinceV10` at call time. | `langchain.agents.create_agent` |
 | `rq-scheduler` (PyPI package) | Superseded by native RQ 2.5 scheduler. Two schedulers in one project creates confusion and race conditions. | `rq>=2.5` native `enqueue_at` / cron |
 | Celery | Overkill for single-worker, sequential task queue. Adds broker config complexity (beat scheduler, separate broker/backend). | RQ — simpler, Redis-only, sufficient for this use case. |
 | `requests` library in async handlers | Blocks the event loop. | `httpx` with `async with httpx.AsyncClient()` |
@@ -130,7 +131,7 @@ Robotina is the AI agent component of a household management system. It listens 
 ## Confidence Notes
 | Area | Confidence | Notes |
 |------|------------|-------|
-| LangChain package split (core / langgraph) | HIGH | Well-documented migration that happened LangChain 0.2 → 0.3. `create_react_agent` is in `langgraph.prebuilt`. |
+| LangChain package split (core / langgraph / agents) | HIGH | `langchain.agents.create_agent` is the current factory as of LangChain 1.x (verified empirically against installed `langchain 1.2.13`, 2026-05-12). `create_react_agent` is deprecated in `langgraph.prebuilt`. |
 | RQ 2.5 native scheduler | HIGH | Spec explicitly states "RQ 2.5+" and describes `enqueue_at` + cron. This is accurate per RQ changelog. |
 | SQLAlchemy 2.x `Mapped` syntax | HIGH | Code in spec uses it verbatim; syntax is stable since SQLAlchemy 2.0 (Jan 2023). |
 | Exact package versions (numbers) | LOW-MEDIUM | No network access to verify PyPI. Versions stated are conservative lower bounds from training data (Aug 2025 cutoff). Run `uv add <package>` to resolve to actual latest at install time. |
@@ -138,7 +139,7 @@ Robotina is the AI agent component of a household management system. It listens 
 | python-telegram-bot v21 async API | MEDIUM | V20/V21 async rewrite is well-documented, but Telegram Bot API changes frequently. Verify handler patterns at implementation time. |
 ## Sources
 - Spec file: `/plans/01-kickoff/spec.md` — authoritative for all technology choices; versions explicitly referenced: Python, RQ 2.5+, SQLAlchemy 2.x, Alembic, LangChain, LangWatch, OTel
-- LangChain migration guide (training data, Aug 2025): `create_react_agent` moved to `langgraph.prebuilt` in LangChain 0.2+
+- LangChain 1.x agent API: `create_agent` lives in `langchain.agents` as of LangChain 1.x; `langgraph.prebuilt.create_react_agent` is the prior-generation API that this project migrated away from in Phase 10.
 - RQ changelog (training data): native scheduler added in RQ 2.0, matured in 2.5
 - SQLAlchemy 2.0 release notes (training data): `Mapped` / `mapped_column` declarative API introduced Jan 2023
 <!-- GSD:stack-end -->
