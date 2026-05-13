@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 10 complete
-stopped_at: "Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output)."
-last_updated: "2026-05-13T11:57:44.424Z"
+status: Phase 11 complete
+stopped_at: "Phase 11 complete (4/4 plans). LLMBackend.create_agent gains an optional response_format kwarg with per-provider Strategy wrap (ToolStrategy on Ollama, ProviderStrategy on Anthropic/OpenAI); AgentConfig grows a non-overridable response_format_model field; 5 named agents bound to their Pydantic Output models (recipe-research-{gather,instructions,ingredients,metadata} + recipe-load); 5 new prompt versions strip JSON-emission boilerplate; _extract_task_output rewritten to read structured_response first with fail-loud on missing (prose-strip/code-fence/JSON-scan ladder removed). 119 unit tests green. Manual checkpoint APPROVED 2026-05-13 on workflow_run_id f1d930d4-a409-45b5-a59f-55eb504ea311 (one representative add-recipe run, zero canelones-class parse failures). RRECIPE-07/RLOAD-07/WF-10 flipped to Complete. Two debts uncovered during verification but explicitly out-of-scope per user: recipe-load emits hallucinated recipe_id without POST /api/recipes (response_format schema becomes the exit ramp; V003 prompt rewrite did not hold; deterministic fix needs Phase 12 middleware) and WorkflowRun.shared_context.household_id propagates as empty string from handle-incoming-message (Phase 999.1 scope). Next: Phase 12 (middleware-based agent instrumentation)."
+last_updated: "2026-05-13T19:50:00.000Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 14
-  completed_phases: 9
-  total_plans: 40
-  completed_plans: 35
-  percent: 88
+  completed_phases: 10
+  total_plans: 44
+  completed_plans: 39
+  percent: 89
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 10 — langchain-1-x-agent-api-migration
+**Current focus:** Phase 11 — structured-agent-output-via-response-format
 
 ## Current Position
 
-Phase: 10 — COMPLETE
-Plan: 3 of 3 (all plans complete; awaiting phase verification, then Phase 11)
+Phase: 11 — COMPLETE
+Plan: 4 of 4 (all plans complete; manual checkpoint APPROVED 2026-05-13; RRECIPE-07/RLOAD-07/WF-10 → Complete; Next: Phase 12)
 
 ## Performance Metrics
 

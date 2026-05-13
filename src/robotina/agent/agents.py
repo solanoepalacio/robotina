@@ -152,7 +152,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_LOAD_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-load/V002.md",
+        prompt_path="src/robotina/agent/prompts/recipe-load/V003.md",
         skills=["household-manager"],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
         response_format_model=RecipeLoadOutput,

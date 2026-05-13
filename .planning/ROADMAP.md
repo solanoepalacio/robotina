@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: recipe-research Agent** - Recipe research agent performs structured web search and produces typed RecipeData output (completed 2026-03-30)
 - [x] **Phase 9: recipe-load Agent and End-to-End Integration** - Recipe loader resolves food/unit names and creates recipes; full add-recipe workflow works end-to-end (completed 2026-05-12)
 - [x] **Phase 10: LangChain 1.x Agent API Migration** - Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters with strict behavior parity (completed 2026-05-13)
-- [ ] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)`
+- [x] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)` (completed 2026-05-13)
 - [ ] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`)
 
 ## Phase Details

@@ -129,3 +129,33 @@ The Task 4.2 resume-signal block flips all three to Complete in REQUIREMENTS.md 
 - CLAUDE.md "What NOT to Use" `response_format=` row — present (line 105)
 - Commit `16798d3` — present in `git log --oneline -2`
 - No deletions in commit (verified post-commit)
+
+---
+
+## Final Outcome (resume-signal, 2026-05-13)
+
+**Status:** APPROVED
+
+User executed Query 1 (`agrega canelones de verdura`) on the live agent. Run is the canonical proof-of-life for Phase 11.
+
+- workflow_run_id: `f1d930d4-a409-45b5-a59f-55eb504ea311`
+- Final state: `DONE` — all 7 workflow steps advanced (handle-incoming-message → acknowledge → gather → instructions → ingredients → metadata → load → notify)
+- `ValueError: structured_response missing` log lines: **0**
+- Free-text JSON parse failures (canelones-class): **0**
+- Phase 11 narrow goal: **MET** ✓
+
+User judgment: one clean run was sufficient evidence for sign-off. Queries 2 and 3 not executed.
+
+### Debts uncovered during verification (out of Phase 11 scope, logged in 11-VERIFICATION.md)
+
+1. **recipe-load emits hallucinated `recipe_id`/`recipe_slug` without `POST /api/recipes`.** The structured-response schema becomes the exit ramp; the model satisfies it with invented UUID-shaped strings. V003 prompt rewrite (commit `3ce39c5`) reframed the output as a "receipt of the POST" but did not change behavior. Deterministic fix requires Phase 12 middleware (pre-emit gate asserting a specific tool was called). User explicitly accepted as deferred debt: "If it doesn't work we'll move forwards anyway."
+2. **`WorkflowRun.shared_context.household_id` is empty string** from the `start-workflow` tool call in `handle-incoming-message`. Pre-existing latent bug; Phase 999.1 (Custom State Schemas for Reply Context and Household Id) is the scoped slot. User decision: leave alone for now.
+
+Neither debt invalidates the Phase 11 narrow goal (canelones-class parse failures retired). Both are recorded in `11-VERIFICATION.md` "Deferred Debt Uncovered During Verification" for future-self.
+
+### Resume-signal flips applied
+
+- `.planning/STATE.md` — frontmatter `status: Phase 11 complete`; `progress.completed_phases: 10`; `progress.total_plans: 44`; `progress.completed_plans: 39`; `progress.percent: 89`; `## Current Position` updated; `**Current focus:** Phase 11`.
+- `.planning/REQUIREMENTS.md` — RRECIPE-07 / RLOAD-07 / WF-10 each flipped to `[x]` in their requirement bullets AND traceability-table Status set to `Complete`.
+- `.planning/ROADMAP.md` — Phase 11 line flipped to `[x]` with `(completed 2026-05-13)`.
+- `.planning/phases/11-.../11-VERIFICATION.md` — APPROVED block filled; both debts documented; sign-off recorded.
