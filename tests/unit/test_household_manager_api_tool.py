@@ -228,8 +228,9 @@ def test_args_schema_json_schema_forbids_extra():
 
 def test_extra_field_in_agent_loop_yields_tool_error_message(monkeypatch):
     """End-to-end proof: a tool call with an extra field, driven through a
-    real ``create_react_agent``, produces a ``ToolMessage(status="error")``
-    rather than letting a ``TypeError`` escape ``agent.invoke()``.
+    real ``langchain.agents.create_agent``, produces a
+    ``ToolMessage(status="error")`` rather than letting a ``TypeError`` escape
+    ``agent.invoke()``.
 
     This is the load-bearing assertion — it reproduces the failure mode that
     cancelled three pending workflow steps in production and confirms the fix
@@ -241,13 +242,13 @@ def test_extra_field_in_agent_loop_yields_tool_error_message(monkeypatch):
         FakeMessagesListChatModel,
     )
     from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-    from langgraph.prebuilt import create_react_agent
+    from langchain.agents import create_agent
 
     from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
 
     class CountingModel(FakeMessagesListChatModel):
         # FakeMessagesListChatModel doesn't know how to bind tools. The
-        # prebuilt react agent calls ``model.bind_tools(...)`` before use;
+        # ``create_agent`` factory calls ``model.bind_tools(...)`` before use;
         # returning ``self`` keeps the canned-response behavior intact.
         def bind_tools(self, tools, **kwargs):
             return self
@@ -276,7 +277,7 @@ def test_extra_field_in_agent_loop_yields_tool_error_message(monkeypatch):
     model = CountingModel(responses=[bad_tool_call, final_reply])
     tool = HouseholdManagerApiTool(household_id="hh-1")
 
-    agent = create_react_agent(model=model, tools=[tool])
+    agent = create_agent(model=model, tools=[tool])
 
     # Must NOT raise TypeError — the validation error is wrapped by langgraph's
     # default ToolNode error handler into a ToolMessage instead.

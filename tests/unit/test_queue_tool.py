@@ -3,9 +3,9 @@
 Covers ROBOT-03: Robotina agent has queue tool (enqueue a single follow-up
 send-notification task directly). Tests mock RQ Queue — never touch real Redis.
 
-Phase 07.1: QueueTool is terminal via ``return_direct=True``. The LangGraph
-``create_react_agent`` graph terminates immediately after the tool runs, with
-no further LLM invocation. (``Command(goto=END)`` from a tool does NOT
+Phase 07.1 + AGENT-12: QueueTool is terminal via ``return_direct=True``. The
+``langchain.agents.create_agent`` graph terminates immediately after the tool
+runs, with no further LLM invocation. (``Command(goto=END)`` from a tool does NOT
 short-circuit the prebuilt graph in langgraph 1.1.x — empirically verified —
 hence this approach.)
 """
@@ -74,18 +74,19 @@ def test_queue_tool_enqueues_at_front_of_queue():
     assert call_kwargs.kwargs.get("at_front") is True
 
 
-def test_queue_tool_short_circuits_create_react_agent():
-    """Phase 07.1 regression: drive the QueueTool through a real
-    ``create_react_agent`` with a stub model that ALWAYS tries to emit a tool
-    call. If the engine truly terminates after the tool runs, the model is
-    invoked exactly once. If not, the model is invoked twice (or more).
+def test_queue_tool_short_circuits_create_agent():
+    """Phase 07.1 / AGENT-12 regression: drive the QueueTool through a real
+    ``langchain.agents.create_agent`` with a stub model that ALWAYS tries to
+    emit a tool call. If the engine truly terminates after the tool runs, the
+    model is invoked exactly once. If not, the model is invoked twice (or
+    more).
 
     This is the test that should fail loudly if anything in our termination
-    setup regresses (e.g. ``return_direct`` removed, prebuilt swapped for one
+    setup regresses (e.g. ``return_direct`` removed, factory swapped for one
     that doesn't honor it)."""
     from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
     from langchain_core.messages import AIMessage, HumanMessage
-    from langgraph.prebuilt import create_react_agent
+    from langchain.agents import create_agent
 
     from robotina.agent.tools.queue import QueueTool
 
@@ -118,7 +119,7 @@ def test_queue_tool_short_circuits_create_react_agent():
 
     with patch("robotina.agent.tools.queue.Queue", return_value=mock_queue), \
          patch("robotina.agent.tools.queue.Redis"):
-        agent = create_react_agent(model=model, tools=[tool])
+        agent = create_agent(model=model, tools=[tool])
         agent.invoke({"messages": [HumanMessage(content="please reply")]})
 
     assert call_count["n"] == 1, (

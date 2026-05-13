@@ -3,9 +3,9 @@
 These tests mock the workflow_runner / DB / Redis layers so they don't need
 infrastructure.
 
-Phase 07.1: StartWorkflowTool is terminal via ``return_direct=True``. The
-LangGraph ``create_react_agent`` graph terminates immediately after the tool
-runs (both happy and error paths).
+Phase 07.1 + AGENT-12: StartWorkflowTool is terminal via ``return_direct=True``.
+The ``langchain.agents.create_agent`` graph terminates immediately after the
+tool runs (both happy and error paths).
 """
 from unittest.mock import MagicMock, patch
 
@@ -113,14 +113,14 @@ def test_start_workflow_tool_auto_injects_reply_context():
     assert shared["household_id"] == "house-1"
 
 
-def test_start_workflow_tool_short_circuits_create_react_agent():
-    """Phase 07.1 regression: drive the StartWorkflowTool through a real
-    ``create_react_agent`` with a stub model that always tries to emit a tool
-    call. The engine must terminate after the tool runs, regardless of what
-    the model wants to do next."""
+def test_start_workflow_tool_short_circuits_create_agent():
+    """Phase 07.1 / AGENT-12 regression: drive the StartWorkflowTool through a
+    real ``langchain.agents.create_agent`` with a stub model that always tries
+    to emit a tool call. The engine must terminate after the tool runs,
+    regardless of what the model wants to do next."""
     from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
     from langchain_core.messages import AIMessage, HumanMessage
-    from langgraph.prebuilt import create_react_agent
+    from langchain.agents import create_agent
 
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
@@ -159,7 +159,7 @@ def test_start_workflow_tool_short_circuits_create_react_agent():
         patch("redis.Redis"),
         patch("robotina.queue.workflow_runner.queue_workflow", return_value="run-r"),
     ):
-        agent = create_react_agent(model=model, tools=[tool])
+        agent = create_agent(model=model, tools=[tool])
         agent.invoke({"messages": [HumanMessage(content="add a recipe")]})
 
     assert call_count["n"] == 1, (
