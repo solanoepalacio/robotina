@@ -630,22 +630,26 @@ The existing `test_extract_task_output_handles_return_direct_toolmessage` at `te
 | A3 | The repo convention is to write a new `V###.md` for each prompt bump and update `AgentConfig.prompt_path`, not to overwrite. | Runtime State Inventory → "Prompts on disk" | Low — the existing `V001.md` → `V002.md` pattern in `recipe-research-gather` confirms this. [VERIFIED via filesystem listing convention in agents.py paths] |
 | A4 | `WF-08` is an unused ID in the workflow-runner family. | Phase Requirements | Low — easy to verify at plan time by grepping REQUIREMENTS.md. [ASSUMED; the convention exists but I didn't enumerate every WF-* in the file] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `_extract_task_output` take `expects_structured: bool` from the caller, or should it look up `AgentConfig.response_format_model` itself?**
    - What we know: Today's signature is `(result: dict)`. `on_step_complete` has the step in scope and can resolve `task_type` → `AgentConfig` via `get_agent_config`.
    - What's unclear: Passing a bool keeps `_extract_task_output` decoupled from the agent registry (testable in isolation). Doing the lookup inside `_extract_task_output` saves the caller a line. Both work.
    - Recommendation: Pass the bool. Pure-function `_extract_task_output` is easier to unit-test (no registry import in test setup). This is what the code example above does.
+   - RESOLVED: Plan 11-02 adopts a hybrid path that preserves the spirit of the recommendation. `_extract_task_output` remains a pure function taking `expects_structured: bool` (testable in isolation as recommended). The bool, however, is resolved INSIDE `on_step_complete` via `get_agent_config(step.task_type).response_format_model is not None` — NOT at the `run_task` call site as a strict reading of "from the caller" would suggest. Rationale: `on_step_complete` already has `step.task_type` from the DB row in scope; pulling the resolution one layer further out (to `run_task`) would require threading `expects_structured` through the RQ job metadata or duplicating the registry lookup in two places. Single-source resolution at the consumer boundary is cleaner. End state is functionally identical to the recommendation (pure `_extract_task_output` with a bool param); only the bool's resolution point differs by one layer. See Plan 11-02 Task 2.2 inline rationale block.
 
 2. **What happens when the model declines to call any tool on a ToolStrategy agent (Ollama)?**
    - What we know: `factory.py:1242` forces `tool_choice="any"` when structured output tools are present. The model is required to call a tool.
    - What's unclear: If gpt-oss:20b cannot satisfy the schema AND is forbidden from text-only finish, does the graph terminate with an empty structured_response or hang in a loop? My read of the code is that the loop runs until any AIMessage matches the structured-output tool OR a normal tool — there's no explicit max-iterations cap visible in the snippet I read; if there's a recursion limit, it raises `GraphRecursionError`.
    - Recommendation: Look at `factory.py` recursion-limit handling (or set `langgraph` `recursion_limit` explicitly) during planning. For Phase 11 ship-readiness this is an edge case behind the 3-query manual checkpoint; it's not blocking but should be noted.
+   - RESOLVED: Deferred to the manual 3-query checkpoint in Plan 11-04 Task 4.2. If the edge case is observed during the 3-query run (graph hangs / `GraphRecursionError`), document mitigation as a follow-up phase (set explicit `recursion_limit` on the agent invoke, or add a watchdog timeout). Not blocking for Phase 11 ship because: (a) gpt-oss:20b has empirically completed all 5 schemas during dev, (b) the existing `_RetryingChatOllama` wrapper covers transient malformed tool-call retries, and (c) the dead-letter flow on terminal failure is unchanged from today's behavior.
 
 3. **Will the `name` argument on `create_agent` (`factory.py:687`) be useful for LangWatch correlation?**
    - What we know: `name` sets `output.name` on each AIMessage. LangWatch tags traces by agent name elsewhere.
    - What's unclear: Whether passing `name=task_type` here helps trace organization.
    - Recommendation: Defer to Phase 12 (middleware-based instrumentation). Not blocking.
+   - RESOLVED: Deferred to Phase 12 (Middleware-Based Agent Instrumentation), per the scope boundary already declared in CONTEXT.md `<domain>`. Phase 11 explicitly does not change LangWatch instrumentation surface; Phase 12 is the right home for `name=` + middleware-based trace tagging.
+
 
 ## Environment Availability
 
