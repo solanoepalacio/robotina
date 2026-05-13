@@ -172,7 +172,16 @@ def run_task(task_input) -> object:
         # @langwatch.trace() creates the parent trace; get_langchain_callback() captures
         # LangChain events (LLM calls, tool calls) as child spans under that trace.
         # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
-        agent = backend.create_agent(system_prompt=prompt_text, tools=tools)
+        #
+        # Phase 11: thread response_format through. For agents with
+        # config.response_format_model = None (handle-incoming-message,
+        # acknowledge-add-recipe), the adapter omits the kwarg entirely (see
+        # LLMBackend Protocol implementations in src/robotina/llm/__init__.py).
+        agent = backend.create_agent(
+            system_prompt=prompt_text,
+            tools=tools,
+            response_format=config.response_format_model,
+        )
         user_message = task_input.to_user_message()
 
         try:

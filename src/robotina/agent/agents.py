@@ -19,6 +19,14 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from robotina.queue.task_types import (
+    RecipeLoadOutput,
+    RecipeResearchGatherOutput,
+    RecipeResearchIngredientsOutput,
+    RecipeResearchInstructionsOutput,
+    RecipeResearchMetadataOutput,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,9 +96,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_GATHER_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V002.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V003.md",
         skills=[],
         tools=[],  # WebSearchTool injected per-job in run_task()
+        response_format_model=RecipeResearchGatherOutput,
     ),
     "recipe-research-instructions": AgentConfig(
         task_type="recipe-research-instructions",
@@ -101,9 +110,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_INSTRUCTIONS_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-instructions/V001.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-instructions/V002.md",
         skills=[],
-        tools=[],  # no tools — produces JSON directly from user message
+        tools=[],  # no tools — produces structured output directly from user message
+        response_format_model=RecipeResearchInstructionsOutput,
     ),
     "recipe-research-ingredients": AgentConfig(
         task_type="recipe-research-ingredients",
@@ -114,9 +124,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_INGREDIENTS_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V001.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V002.md",
         skills=[],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
+        response_format_model=RecipeResearchIngredientsOutput,
     ),
     "recipe-research-metadata": AgentConfig(
         task_type="recipe-research-metadata",
@@ -127,9 +138,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_METADATA_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V001.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V002.md",
         skills=[],
-        tools=[],  # no tools — produces JSON directly from user message
+        tools=[],  # no tools — produces structured output directly from user message
+        response_format_model=RecipeResearchMetadataOutput,
     ),
     "recipe-load": AgentConfig(
         task_type="recipe-load",
@@ -140,9 +152,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_LOAD_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-load/V001.md",
+        prompt_path="src/robotina/agent/prompts/recipe-load/V002.md",
         skills=["household-manager"],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
+        response_format_model=RecipeLoadOutput,
     ),
     # Phase 07.1: per-workflow acknowledgment agent. Runs as add-recipe step 1,
     # composes a brief Spanish ack and delivers via queue tool. Per-workflow

@@ -95,3 +95,45 @@ def test_get_agent_config_preserves_registry_response_format_model_through_model
         assert config.model_config["provider"] == "openai"
     finally:
         AGENT_REGISTRY["handle-incoming-message"] = original
+
+
+# ---------------------------------------------------------------------------
+# Phase 11 (Plan 11-03): assert the 5 named agents are bound to their
+# Pydantic Output models, and the 2 out-of-scope agents are NOT.
+# ---------------------------------------------------------------------------
+
+from robotina.queue.task_types import (
+    RecipeResearchGatherOutput,
+    RecipeResearchInstructionsOutput,
+    RecipeResearchIngredientsOutput,
+    RecipeResearchMetadataOutput,
+    RecipeLoadOutput,
+)
+
+
+def test_registry_recipe_research_gather_bound_to_gather_output():
+    assert AGENT_REGISTRY["recipe-research-gather"].response_format_model is RecipeResearchGatherOutput
+
+
+def test_registry_recipe_research_instructions_bound_to_instructions_output():
+    assert AGENT_REGISTRY["recipe-research-instructions"].response_format_model is RecipeResearchInstructionsOutput
+
+
+def test_registry_recipe_research_ingredients_bound_to_ingredients_output():
+    assert AGENT_REGISTRY["recipe-research-ingredients"].response_format_model is RecipeResearchIngredientsOutput
+
+
+def test_registry_recipe_research_metadata_bound_to_metadata_output():
+    assert AGENT_REGISTRY["recipe-research-metadata"].response_format_model is RecipeResearchMetadataOutput
+
+
+def test_registry_recipe_load_bound_to_load_output():
+    assert AGENT_REGISTRY["recipe-load"].response_format_model is RecipeLoadOutput
+
+
+def test_registry_non_scope_agents_have_no_response_format_model():
+    """handle-incoming-message and acknowledge-add-recipe must NOT have
+    response_format_model set (CONTEXT.md scope decision + Pitfall 6
+    return_direct conflict for acknowledge-add-recipe)."""
+    assert AGENT_REGISTRY["handle-incoming-message"].response_format_model is None
+    assert AGENT_REGISTRY["acknowledge-add-recipe"].response_format_model is None
