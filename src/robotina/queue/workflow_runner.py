@@ -15,76 +15,83 @@ IMPORTANT: All RQ enqueue calls must use:
 """
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_task_output(result: dict) -> dict:
-    """Extract the agent's final JSON output from a LangGraph result.
+def _extract_task_output(result: dict, *, expects_structured: bool = False) -> dict:
+    """Extract a JSON-serializable artifact from a langchain.agents.create_agent result.
 
-    Reads the last message content and parses it as JSON.
-    Strips markdown code fences (```...```) if present.
+    Phase 11 refactor: prefer ``result['structured_response']`` (a Pydantic
+    instance populated by ``create_agent(response_format=...)``) over
+    free-text parsing. The legacy free-text JSON parse fallback ladder
+    (prose-strip, markdown-code-fence stripping, first-brace scan, retry
+    parse) is REMOVED — with ``response_format`` bound on every
+    artifact-producing agent (RRECIPE-07, RLOAD-07) it is unreachable on
+    the success path, and a footgun for any new agent added without
+    ``response_format``.
 
-    Phase 07.1: When a terminal tool (``return_direct=True``, e.g. ``QueueTool``)
-    short-circuits the ``langchain.agents.create_agent`` graph, the last message
-    is a ``ToolMessage`` rather than a JSON-emitting ``AIMessage`` — the
-    tool-call AIMessage that immediately precedes it has no text content for
-    Anthropic models (the tool_use block carries no JSON). In that case there
-    is no agent-emitted JSON to parse; surface the tool's return string as the
-    artifact directly. Steps that use return_direct tools (e.g. the
-    per-workflow ack agents) do not have downstream consumers of their
-    artifact, so the ``{"tool_message": ...}`` shape is safe.
+    Args:
+        result: The dict returned by ``agent.invoke({"messages": [...]})``.
+                Contains "messages" (list[BaseMessage]) and, when
+                response_format was bound, "structured_response" (a Pydantic
+                BaseModel instance).
+        expects_structured: True when the executing agent has
+                ``response_format`` bound (the caller — on_step_complete —
+                resolves this from AgentConfig.response_format_model). When
+                True, this function REQUIRES result['structured_response']
+                to be a BaseModel and returns ``instance.model_dump(mode='json')``.
+                When False, only the return_direct tool-message branch is
+                available.
+
+    Returns:
+        A JSON-serializable dict suitable for ``WorkflowRunStep.artifact``.
+
+    Raises:
+        ValueError: When expects_structured=True and structured_response is
+            missing / None / not a BaseModel — i.e., regression on a bound
+            agent. Also when expects_structured=False and the final message
+            is not a ToolMessage (no return_direct short-circuit) — i.e., a
+            non-structured agent produced free-text, which Phase 11
+            deliberately refuses to silently consume.
     """
-    messages = result["messages"]
-    last = messages[-1]
+    if expects_structured:
+        sr = result.get("structured_response")
+        if isinstance(sr, BaseModel):
+            return sr.model_dump(mode="json")
+        if sr is None:
+            raise ValueError(
+                "structured_response missing on response_format agent result; "
+                "this is a regression — the agent did not populate the typed "
+                "output channel. Check the agent's create_agent kwargs and "
+                "the bound Pydantic schema."
+            )
+        # Defensive: structured_response could in theory be a dict for
+        # JSON-schema schemas, but Robotina only uses Pydantic models, so
+        # treat anything else as a regression.
+        raise ValueError(
+            f"structured_response is not a BaseModel: type={type(sr).__name__}"
+        )
+
+    # No response_format on this agent — preserve the return_direct tool-message path
+    # (Phase 07.1: QueueTool / StartWorkflowTool short-circuit the graph).
+    last = result["messages"][-1]
     if getattr(last, "type", None) == "tool":
         return {"tool_message": str(last.content)}
-    # Find the last AI message (LangGraph always ends with one, but be explicit)
-    ai_messages = [m for m in messages if getattr(m, "type", None) == "ai"]
-    raw = ai_messages[-1].content if ai_messages else last.content
-    # AIMessage.content can be a list of content blocks (Anthropic tool-use format)
-    if isinstance(raw, list):
-        raw = " ".join(b.get("text", "") for b in raw if isinstance(b, dict) and b.get("type") == "text")
-    content = raw.strip()
-    if content.startswith("```"):
-        lines = content.split("\n")
-        json_lines = []
-        for line in lines[1:]:
-            if line.strip() == "```":
-                break
-            json_lines.append(line)
-        content = "\n".join(json_lines)
-    parsed = None
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        # Scan for first JSON object or array in case of leading prose
-        for start_char in ('{', '['):
-            idx = content.find(start_char)
-            if idx != -1:
-                try:
-                    parsed = json.loads(content[idx:])
-                    break
-                except json.JSONDecodeError:
-                    pass
-    if parsed is None:
-        # TEMP DIAGNOSTIC (remove once recipe-research-gather parse failure is understood):
-        # Dump the full content (and length) so we can tell whether the failure is
-        # trailing prose vs. mid-JSON truncation.
-        logger.error(
-            "extract_task_output | parse failed | length=%d | full_content=%r",
-            len(content),
-            content,
-        )
-        raise ValueError(f"Could not parse JSON from agent output: {content[:200]!r}")
-    return parsed
+
+    # Phase 11: there is no longer a free-text fallback for non-tool-message
+    # finals. Any non-structured agent landing here is a bug.
+    raise ValueError(
+        f"Agent produced no structured_response and no terminal ToolMessage; "
+        f"last message type={getattr(last, 'type', None)!r}"
+    )
 
 
 def queue_workflow(
@@ -248,9 +255,22 @@ def on_step_complete(
         logger.debug("on_step_complete: no workflow step found for job_id=%s (direct task)", job_id)
         return
 
-    # Extract JSON artifact from agent output
+    # Extract JSON artifact from agent output. Phase 11: resolve whether this
+    # task's agent has response_format bound — that determines whether
+    # _extract_task_output should read structured_response (and fail loudly on
+    # missing) or fall back to the return_direct tool-message branch.
     if isinstance(output, dict) and "messages" in output:
-        artifact = _extract_task_output(output)
+        from robotina.agent.agents import get_agent_config
+        try:
+            agent_config = get_agent_config(step.task_type)
+            expects_structured = agent_config.response_format_model is not None
+        except KeyError:
+            # Task type not in registry (e.g. send-notification post-07.1 has
+            # been removed; the deterministic Python path in jobs.py builds its
+            # own artifact and never reaches this branch). Treat as
+            # non-structured to preserve existing tool_message fallback.
+            expects_structured = False
+        artifact = _extract_task_output(output, expects_structured=expects_structured)
     elif hasattr(output, "model_dump"):
         artifact = output.model_dump(mode="json")
     elif isinstance(output, dict):
