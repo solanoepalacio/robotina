@@ -233,22 +233,31 @@ Plans:
 ### Phase 11: Structured Agent Output via response_format
 **Goal**: Replace free-text JSON emission from the recipe-research sub-agents and the recipe-load agent with schema-constrained output via `create_agent(response_format=...)`, eliminating the prose-wrapping parse failures that today cause workflow dead-letters (see canelones de choclo incident 2026-05-13: agent emitted valid JSON wrapped in preamble + markdown fence + postscript, defeating `extract_task_output`'s parser and cancelling 5 remaining workflow steps).
 **Depends on**: Phase 10
-**Requirements**: TBD (new -- candidate RRECIPE-07, RLOAD-07)
+**Requirements**: RRECIPE-07, RLOAD-07, WF-10
 **Success Criteria** (what must be TRUE):
   1. The four recipe-research sub-agents (`recipe-research-gather`, `-instructions`, `-ingredients`, `-metadata`) and the `recipe-load` agent are configured with `response_format` bound to their respective Pydantic output models; agent outputs come from the structured channel rather than free-text content
   2. The prose-stripping / code-fence / JSON-scan fallbacks in `extract_task_output` (workflow_runner.py:55-76) are removed or reduced to a defensive error -- structured-output agents produce parsable artifacts without that logic
   3. A regression test reproducing the 2026-05-13 canelones parse failure (agent output: prose preamble + ```json fence + postscript) passes on the new pipeline
   4. End-to-end `add-recipe` workflow runs without parse failures across at least three distinct recipe queries with no manual prompt tuning between runs
   5. `uv run pytest` is green; experiments still emit valid LangWatch traces tagged with prompt version and model config
-**Plans**: 0 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 11 to break down)
+**Wave 1**
+- [ ] 11-01-PLAN.md -- LLMBackend Protocol + 3 adapters with response_format kwarg + AgentConfig.response_format_model field + REQUIREMENTS.md registration (RRECIPE-07/RLOAD-07/WF-10) + adapter & registry tests
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 11-02-PLAN.md -- workflow_runner refactor: _extract_task_output prefers structured_response, fail-loud on missing, free-text ladder removed; on_step_complete resolves expects_structured from AgentConfig
+- [ ] 11-03-PLAN.md -- bind 5 agents to Pydantic Outputs; bump prompts (V003/V002) stripping JSON boilerplate; thread response_format kwarg through run_task
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 11-04-PLAN.md -- decision record + STATE/CLAUDE.md updates + 3-query manual end-to-end checkpoint; flip RRECIPE-07/RLOAD-07/WF-10 to Complete after sign-off
 
 **Notes:**
 - This is the phase that retires the canelones-style bug class permanently. Phase 10 makes the API available; this phase uses it where it pays off.
 - Each agent's Pydantic output model already exists in `src/robotina/queue/task_types.py` (or wherever the QUEUE-* models live) -- this phase binds them to the agent, not authors new schemas.
-- Open question for planning: ToolStrategy vs. ProviderStrategy for `response_format`. ProviderStrategy uses OpenAI strict mode / Anthropic tool-use strict schemas (token-level constraint). ToolStrategy emulates via a final-emit tool. Ollama backend likely needs ToolStrategy; OpenAI/Anthropic should prefer ProviderStrategy.
+- Strategy decision (resolved in 11-CONTEXT.md / 11-RESEARCH.md): Ollama -> `ToolStrategy(Schema)` (correctness — `gpt-oss` is in `FALLBACK_MODELS_WITH_STRUCTURED_OUTPUT`, so AutoStrategy would route to ProviderStrategy on Ollama, which Ollama does not honor). Anthropic / OpenAI -> `ProviderStrategy(Schema)`.
+- New requirement ID note: the planning context proposed `WF-08` for the workflow-runner change; `WF-08` was already taken (Phase 5 step-failure handling). Plan 11-01 uses `WF-10` as the next free WF-* slot. Same scope; different number.
 
 ### Phase 12: Middleware-Based Agent Instrumentation
 **Goal**: Migrate the per-agent instrumentation layer (today implemented as `langchain_core.callbacks` handlers in `src/robotina/agent/callbacks.py`) to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`). This aligns Robotina with the LangChain 1.x recommended instrumentation pattern, gives a typed and composable place for span/log enrichment, and clears the way for additional pre/post-model guards (token-budget checks, prompt-injection filters) without further callback bolt-ons. LangWatch traces and the existing per-tool / per-LLM log lines must remain intact.
@@ -288,7 +297,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 8. recipe-research Agent | 4/4 | Complete   | 2026-03-30 |
 | 9. recipe-load Agent and End-to-End Integration | 2/2 | Complete   | 2026-05-12 |
 | 10. LangChain 1.x Agent API Migration | 3/3 | Complete   | 2026-05-13 |
-| 11. Structured Agent Output via response_format | 0/0 | Not started | - |
+| 11. Structured Agent Output via response_format | 0/4 | Planned | - |
 | 12. Middleware-Based Agent Instrumentation | 0/0 | Not started | - |
 
 ## Backlog
