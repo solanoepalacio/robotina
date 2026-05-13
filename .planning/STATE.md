@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Active
-stopped_at: Phase 10 Plan 02 complete (adapter migration + 4 test-file migrations + 7-file doc sweep; AGENT-12 lock test RED -> GREEN); Plan 03 next (CLAUDE.md/STATE.md/PROJECT.md updates + decision record + manual end-to-end Telegram checkpoint flips AGENT-12 to Complete)
-last_updated: "2026-05-13T01:56:21Z"
+stopped_at: "Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output)."
+last_updated: "2026-05-13T11:41:28.578Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 14
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 40
-  completed_plans: 34
-  percent: 85
+  completed_plans: 35
+  percent: 88
 ---
 
 # Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 10 (langchain-1-x-agent-api-migration) — EXECUTING
-Plan: 3 of 3 (Plans 01 + 02 complete; Plan 03 next)
+Phase: 10 (langchain-1-x-agent-api-migration) — COMPLETE (3/3 plans)
+Plan: 3 of 3 (all plans complete; awaiting phase verification, then Phase 11)
 
 ## Performance Metrics
 
@@ -85,6 +85,7 @@ Plan: 3 of 3 (Plans 01 + 02 complete; Plan 03 next)
 | Phase 09 P02 | 2min | 2 tasks | 1 files |
 | Phase 10-langchain-1-x-agent-api-migration P01 | 2min | 2 tasks | 2 files |
 | Phase 10-langchain-1-x-agent-api-migration P02 | 7min | 3 tasks | 12 files |
+| Phase 10-langchain-1-x-agent-api-migration P03 | 30min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -178,6 +179,9 @@ Recent decisions affecting current work:
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — AC1 grep-zero gate (no `create_react_agent` / `langgraph.prebuilt` matches under src/ tests/ experiments/) is interpreted by INTENT not literally: the lock test in tests/unit/test_llm_backend.py necessarily contains those tokens in its load-bearing forbidden-strings assertions. The intent (no remaining USAGE outside the lock test) is verified by `grep ... | grep -v test_llm_backend.py | wc -l == 0`
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — The Plan-verbatim Protocol docstring phrase `the previous ``create_react_agent`` path` would have failed the renamed source-grep lock test (which forbids the substring `create_react_agent` anywhere in src/robotina/llm/__init__.py); rephrased to `the previous prebuilt ReAct-agent path` — Rule 1 deviation, semantics preserved, lock satisfied
 - [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-02 — Pre-existing test pollution from tests/test_pyproject.py::test_experiment_mains_importable (importing experiments/* runs `load_dotenv()` at module top, leaking AGENT_OVERRIDES_FILEPATH=overrides/openai.json into agents_registry tests) fails 9 unit tests on order-dependence; reproduced on Plan 10-01 final commit daf2f7b — out of scope for Plan 10-02, candidate quick task for the future
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — AGENT-12 marked complete in REQUIREMENTS.md only AFTER the manual end-to-end Telegram verification approved by user; checkbox flip lives in a separate post-checkpoint task (3.3) from the docs rollover (3.1) so the requirement contract change is atomic and gated on real production behavior, not unit-test parity
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — Tangential pydantic optional-field bug (RecipeStep / RecipeIngredient / RecipeData fields without = None defaults) exposed during Task 3.2 end-to-end verification; fixed inline as quick task 260512-pyd (commit 19b3b9d). Pre-existing latent schema bug surfaced by an LLM model swap, NOT caused by the create_agent migration. Out of Plan 10-03 scope but unblocked the Task 3.2 end-to-end gate
+- [Phase 10-langchain-1-x-agent-api-migration]: Plan 10-03 — Phase 10 success criterion 4 closed: end-to-end add-recipe Telegram workflow runs to completion under langchain.agents.create_agent with no semantic regression; LangWatch traces appear with spans for each agent invocation; no LangGraphDeprecatedSinceV10 warnings in worker logs. Phase 10 migration functionally complete; Plans 11 and 12 unblocked
 
 ### Pending Todos
 
@@ -213,6 +217,6 @@ None yet.
 
 Last activity: 2026-05-13
 
-Last session: 2026-05-13T01:56:21Z
-Stopped at: Completed 10-02-PLAN.md (LLMBackend adapter migration to langchain.agents.create_agent + 4 test files + 7-file comment sweep). Plan 01's renamed source-grep lock test `test_create_agent_used_not_agent_executor` transitioned RED -> GREEN inside Task 2.1 commit `ecdfa02`. `return_direct=True` short-circuit and strict-args -> ToolMessage(status='error') parity verified under the new factory. 148 non-integration tests pass (the pre-existing AGENT_OVERRIDES_FILEPATH env-pollution from tests/test_pyproject.py::test_experiment_mains_importable is documented and out of scope). Next: 10-03-PLAN.md (CLAUDE.md / STATE.md / PROJECT.md / new decision record + manual end-to-end Telegram checkpoint to flip AGENT-12 to checked / Complete in REQUIREMENTS.md).
+Last session: 2026-05-13T11:41:28.568Z
+Stopped at: Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output).
 Resume file: None

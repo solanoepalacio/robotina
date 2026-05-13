@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 07.1: Deterministic Agent Termination (INSERTED)** - Engine-enforced single-round agent termination via `Command(goto=END)`; eliminates duplicate-message and rare infinite-loop bugs (completed 2026-05-08)
 - [x] **Phase 8: recipe-research Agent** - Recipe research agent performs structured web search and produces typed RecipeData output (completed 2026-03-30)
 - [x] **Phase 9: recipe-load Agent and End-to-End Integration** - Recipe loader resolves food/unit names and creates recipes; full add-recipe workflow works end-to-end (completed 2026-05-12)
-- [ ] **Phase 10: LangChain 1.x Agent API Migration** - Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters with strict behavior parity
+- [x] **Phase 10: LangChain 1.x Agent API Migration** - Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters with strict behavior parity (completed 2026-05-13)
 - [ ] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)`
 - [ ] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`)
 
@@ -224,7 +224,7 @@ Plans:
 - [x] 10-02-PLAN.md -- Adapter migration + 4 test files + 7-file comment sweep (Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 10-03-PLAN.md -- CLAUDE.md / STATE.md / PROJECT.md / new decision record + end-to-end Telegram checkpoint (Wave 3)
+- [x] 10-03-PLAN.md -- CLAUDE.md / STATE.md / PROJECT.md / new decision record + end-to-end Telegram checkpoint (Wave 3)
 
 **Notes:**
 - Pure mechanical swap with strict parity -- no `response_format`, no middleware, no state-schema changes. Those are Phases 11 and 12.
@@ -287,7 +287,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 07.1. Deterministic Agent Termination (INSERTED) | 3/3 | Complete   | 2026-05-08 |
 | 8. recipe-research Agent | 4/4 | Complete   | 2026-03-30 |
 | 9. recipe-load Agent and End-to-End Integration | 2/2 | Complete   | 2026-05-12 |
-| 10. LangChain 1.x Agent API Migration | 0/3 | In Progress | - |
+| 10. LangChain 1.x Agent API Migration | 3/3 | Complete   | 2026-05-13 |
 | 11. Structured Agent Output via response_format | 0/0 | Not started | - |
 | 12. Middleware-Based Agent Instrumentation | 0/0 | Not started | - |
 
