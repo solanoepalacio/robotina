@@ -4,6 +4,9 @@ Unit tests: mocked session + queue (D-13).
 """
 from unittest.mock import MagicMock
 
+import pytest
+from pydantic import BaseModel
+
 from robotina.queue.models import WorkflowStatus, WorkflowStepStatus
 from robotina.queue.task_types import RecipeResearchInput, RecipeLoadInput
 
@@ -290,7 +293,61 @@ def test_extract_task_output_handles_return_direct_toolmessage():
 
     result = {"messages": [human_msg, ai_msg, tool_msg]}
 
-    assert _extract_task_output(result) == {"tool_message": "Reply queued. job_id=abc"}
+    assert _extract_task_output(result, expects_structured=False) == {"tool_message": "Reply queued. job_id=abc"}
+
+
+class _Toy(BaseModel):
+    """Tiny Pydantic model used in structured-response branch tests (Phase 11)."""
+    x: int
+    y: str
+
+
+def test_extract_returns_model_dump_when_structured_response_present():
+    """WF-10: when expects_structured=True and result['structured_response'] is a
+    Pydantic instance, _extract_task_output returns its model_dump(mode='json')."""
+    from robotina.queue.workflow_runner import _extract_task_output
+
+    result = {
+        "messages": [],  # content irrelevant on structured path
+        "structured_response": _Toy(x=1, y="hi"),
+    }
+    assert _extract_task_output(result, expects_structured=True) == {"x": 1, "y": "hi"}
+
+
+def test_extract_raises_when_structured_expected_but_missing():
+    """WF-10: when expects_structured=True and structured_response is None,
+    _extract_task_output raises ValueError. No silent free-text fallback."""
+    from robotina.queue.workflow_runner import _extract_task_output
+
+    result = {"messages": [], "structured_response": None}
+    with pytest.raises(ValueError, match="structured_response missing"):
+        _extract_task_output(result, expects_structured=True)
+
+
+def test_extract_raises_when_structured_expected_but_key_absent():
+    """WF-10: when expects_structured=True and the 'structured_response' key
+    is entirely absent, _extract_task_output also raises ValueError."""
+    from robotina.queue.workflow_runner import _extract_task_output
+
+    result = {"messages": []}
+    with pytest.raises(ValueError, match="structured_response missing"):
+        _extract_task_output(result, expects_structured=True)
+
+
+def test_extract_raises_when_not_structured_and_no_tool_message():
+    """WF-10: when expects_structured=False AND the last message is NOT a
+    ToolMessage (no return_direct short-circuit), _extract_task_output
+    raises ValueError. The legacy free-text JSON parse ladder is gone —
+    non-structured agents that don't terminate via return_direct are a bug.
+    """
+    from robotina.queue.workflow_runner import _extract_task_output
+
+    ai_msg = MagicMock()
+    ai_msg.type = "ai"
+    ai_msg.content = "some prose"
+    result = {"messages": [ai_msg]}
+    with pytest.raises(ValueError, match="no terminal ToolMessage"):
+        _extract_task_output(result, expects_structured=False)
 
 
 def test_on_step_complete_advances_after_return_direct_ack():
