@@ -104,8 +104,8 @@ def test_adapter_reads_api_token_from_env(monkeypatch):
         })
 
 
-def test_create_react_agent_used_not_agent_executor():
-    """AGENT-11: create_react_agent from langgraph.prebuilt is used, not AgentExecutor."""
+def test_create_agent_used_not_agent_executor():
+    """AGENT-12: create_agent from langchain.agents is used, not AgentExecutor or the deprecated create_react_agent."""
     import robotina.llm as llm_module
     import inspect
 
@@ -114,5 +114,12 @@ def test_create_react_agent_used_not_agent_executor():
         source = f.read()
 
     assert "AgentExecutor" not in source, "AgentExecutor must not be used in robotina.llm"
-    assert "create_react_agent" in source, "create_react_agent must be imported from langgraph.prebuilt"
-    assert "from langgraph.prebuilt import create_react_agent" in source
+    assert "from langchain.agents import create_agent" in source, (
+        "robotina.llm must import create_agent from langchain.agents"
+    )
+    assert "create_react_agent" not in source, (
+        "robotina.llm must not reference the deprecated create_react_agent"
+    )
+    assert "from langgraph.prebuilt" not in source, (
+        "robotina.llm must not import from the deprecated langgraph.prebuilt module"
+    )
