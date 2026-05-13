@@ -17,6 +17,8 @@ import logging
 import os
 from dataclasses import dataclass, field
 
+from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +37,16 @@ class AgentConfig:
         skills: List of skill directory names under src/robotina/agent/skills/.
         tools: List of pre-built LangChain BaseTool instances. Empty in Phase 4;
                tools are added in the phase that implements each tool.
+        response_format_model: Optional Pydantic v2 BaseModel subclass to bind as
+               ``response_format=`` on ``langchain.agents.create_agent``. When set,
+               the LLM adapter wraps this in the provider-appropriate Strategy
+               (ToolStrategy for Ollama, ProviderStrategy for Anthropic/OpenAI)
+               and the agent's result populates state['structured_response'] with
+               a Pydantic instance. NOT overridable via AGENT_OVERRIDES_FILEPATH
+               — schema is a code contract, not config (Phase 11 RESEARCH.md
+               Anti-Patterns). Default None means the agent emits free-text /
+               tool-message artifacts and the workflow runner uses the
+               return_direct branch in _extract_task_output.
     """
 
     task_type: str
@@ -42,6 +54,7 @@ class AgentConfig:
     prompt_path: str
     skills: list[str] = field(default_factory=list)
     tools: list = field(default_factory=list)
+    response_format_model: type[BaseModel] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +169,8 @@ def get_agent_config(task_type: str) -> AgentConfig:
     Override behavior (D-05):
     - If AGENT_OVERRIDES_FILEPATH env var is set, the JSON file at that path is
       loaded on EVERY call (hot-reload — no restart required).
-    - Only model_config and prompt_path are overridable. Other fields are not.
+    - Only model_config and prompt_path are overridable. Other fields
+      (skills, tools, response_format_model) are NOT — they are code contracts.
     - Override format: {"task-type": {"model_config": {...}, "prompt_path": "..."}}
 
     Raises:

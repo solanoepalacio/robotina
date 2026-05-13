@@ -46,6 +46,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **WF-07**: On final step completion, task runner marks the `WorkflowRun` as `DONE`
 - [x] **WF-08**: On step failure, task runner marks the step `FAILED`, cancels all remaining `PENDING` steps, and marks the `WorkflowRun` `FAILED`
 - [x] **WF-09**: `reply_context` is stored in `WorkflowRun.shared_context` and never appears in intermediate task inputs (`RecipeResearchInput`, `RecipeLoadInput`)
+- [ ] **WF-10**: `_extract_task_output` reads `result["structured_response"]` when the executing step's agent has `response_format` bound, returning `instance.model_dump(mode="json")`; raises `ValueError("structured_response missing for task_type=...")` if missing on a structured agent. The legacy prose-strip / markdown-fence / first-`{`-scan / `json.loads` fallback ladder is removed. The `return_direct=True` tool-message branch is preserved for non-structured agents.
 
 ### Agent Infrastructure
 
@@ -88,6 +89,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **RRECIPE-04**: Agent produces a `RecipeData` output with all fields populated (name, description, servings, times, ingredients with human-readable names, steps, source_url)
 - [x] **RRECIPE-05**: `recipe-research/V001.md` system prompt exists
 - [x] **RRECIPE-06**: A standalone experiment script (`experiments/recipe_research.py`) runs the agent against hardcoded representative inputs and sends traces to LangWatch
+- [ ] **RRECIPE-07**: Each recipe-research sub-agent (`recipe-research-gather`, `recipe-research-instructions`, `recipe-research-ingredients`, `recipe-research-metadata`) binds `response_format=` on `langchain.agents.create_agent` so its final artifact is delivered via `state["structured_response"]` and never depends on free-text JSON parsing. Per D-CTX-01 of Phase 11: Ollama backend uses `ToolStrategy`; Anthropic/OpenAI use `ProviderStrategy`.
 
 ### Recipe Loader Agent
 
@@ -97,6 +99,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **RLOAD-04**: Agent uses `household-manager-api` tool to create the recipe; returns `recipe_id` and `recipe_name`
 - [x] **RLOAD-05**: `recipe-load/V001.md` system prompt exists
 - [x] **RLOAD-06**: A standalone experiment script (`experiments/recipe_load.py`) runs the agent against hardcoded representative inputs and sends traces to LangWatch
+- [ ] **RLOAD-07**: The `recipe-load` agent binds `response_format=RecipeLoadOutput`; the workflow runner reads `structured_response` and persists it as the step artifact.
 
 ### Observability
 
@@ -182,6 +185,7 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | WF-07 | Phase 5 | Complete |
 | WF-08 | Phase 5 | Complete |
 | WF-09 | Phase 5 | Complete |
+| WF-10 | Phase 11 | In Progress |
 | NOTIF-01 | Phase 6 | Complete |
 | NOTIF-02 | Phase 6 | Complete |
 | NOTIF-03 | Phase 6 | Complete |
@@ -202,6 +206,7 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RRECIPE-04 | Phase 8 | Complete |
 | RRECIPE-05 | Phase 8 | Complete |
 | RRECIPE-06 | Phase 8 | Complete |
+| RRECIPE-07 | Phase 11 | In Progress |
 | OBS-04 | Phase 8 | Complete |
 | RLOAD-01 | Phase 9 | Complete |
 | RLOAD-02 | Phase 9 | Complete |
@@ -209,12 +214,13 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RLOAD-04 | Phase 9 | Complete |
 | RLOAD-05 | Phase 9 | Complete |
 | RLOAD-06 | Phase 9 | Complete |
+| RLOAD-07 | Phase 11 | In Progress |
 
 **Coverage:**
-- v1 requirements: 69 total
-- Mapped to phases: 69
+- v1 requirements: 72 total
+- Mapped to phases: 72
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-05-12 after Phase 10 — added AGENT-12 (LangChain 1.x agent API migration), marked AGENT-11 superseded*
+*Last updated: 2026-05-13 — added RRECIPE-07, RLOAD-07, WF-10 for Phase 11 (structured agent output via response_format)*
