@@ -1,7 +1,7 @@
 ---
 phase: 14-prompt-cleanup-and-structural-standardization
-status: human_needed
-score: 5/5 automated must-haves verified
+status: passed
+score: 5/5 must-haves verified (3 automated + 2 human-approved)
 date: 2026-05-14
 ---
 
@@ -50,11 +50,11 @@ Each prompt-bump commit includes the new `Vxxx.md` prompt file, the updated `AGE
 2. **Pre-existing test breakage repaired in plan 14-01.** `test_recipe_load_registered` asserted `recipe-load/V002.md` while the registry has carried `V003.md` since a prior phase. Synced the assertion in plan 14-01 to unblock the suite; plan 14-07 bumps it to `V004.md`. One-line cleanup, not scope creep.
 3. **`overrides/openai.json` working-tree diff preserved.** A pre-existing uncommitted upgrade (`gpt-4o-mini` → `gpt-4.1-mini`) in the user's tree was kept out of Phase 14 commits (none of the prompt-bumps touch model_config).
 
-## Human verification needed
+## Human verification
 
-The user is asked to run a 3-input Telegram smoke and check LangWatch traces — ROADMAP success criteria 4 and 5. Specifically:
+**Approved by user on 2026-05-14** — criteria 4 and 5 confirmed:
 
-1. In Telegram, send three messages — "Hola", a meal-plan question, and "Agrega [some recipe]". Confirm behavior matches pre-phase.
-2. Open LangWatch and verify the run metadata shows the new prompt filenames (e.g. `robotina/V003.md`, `recipe-research-gather/V004.md`).
+1. 3-input Telegram smoke (Hola / meal-plan question / Agrega [recipe]) — behavior matches pre-phase.
+2. LangWatch run metadata shows the new prompt filenames.
 
-If both pass, the phase is fully verified. If either fails, run `/gsd:debug` on the regression.
+Phase fully verified.
