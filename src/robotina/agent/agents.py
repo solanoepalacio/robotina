@@ -169,7 +169,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/acknowledge-add-recipe/V001.md",
+        prompt_path="src/robotina/agent/prompts/acknowledge-add-recipe/V002.md",
         skills=[],
         tools=[],  # QueueTool injected per-job in run_task()
     ),

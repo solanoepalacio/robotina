@@ -92,7 +92,7 @@ def test_acknowledge_add_recipe_registered():
     config = get_agent_config("acknowledge-add-recipe")
     assert isinstance(config, AgentConfig)
     assert config.task_type == "acknowledge-add-recipe"
-    assert config.prompt_path == "src/robotina/agent/prompts/acknowledge-add-recipe/V001.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/acknowledge-add-recipe/V002.md"
     assert config.skills == []
     assert config.tools == []  # QueueTool injected per-job in run_task
     assert config.model_config["api_key_env"] == "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN"
