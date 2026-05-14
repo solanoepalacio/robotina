@@ -331,10 +331,55 @@ Plans:
 
 ### Phase 13: Queue Visibility Dashboard
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** A server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed Robotina workflows post-hoc — locate a run, see every step's input/output/status, and identify which step failed (exception class + message) and which steps were cancelled in the cascade. Read-only. Dev + staging only. Independent module: no other robotina.* module may import from `robotina.dashboard`.
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, DASH-09
 **Depends on:** Phase 12
+**Plans:** 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Persistence layer: migration 0005, model columns, workflow_runner.py wiring at 3 sites, jobs.py exception threading (DASH-01..03)
+- [ ] 13-02-PLAN.md — Dashboard module: FastAPI app, 6 Jinja templates, vendored HTMX 2.0.10, CSS, tests/dashboard/ suite, independence grep gate (DASH-04..08)
+- [ ] 13-03-PLAN.md — Deployment: Dockerfile, docker-compose dashboard service, .env.example, manual browser smoke checkpoint (DASH-09)
+
+### Phase 14: Prompt Cleanup and Structural Standardization
+
+**Goal:** All 7 active agent prompts share a single predictable skeleton (Role / Inputs / Tools / Process / Rules / Output), deduplicated language rules, and schema-deferring `## Output` sections — with zero behavioral change across the add-recipe workflow and chit-chat router paths.
+**Requirements**: TBD
+**Depends on:** Phase 12 (independent of Phase 13 — touches only prompt files, registry, and overrides)
+
+**Scope:**
+- Bump every active prompt to a new `Vxxx` adopting the standardized skeleton:
+  - `robotina/V002 → V003`
+  - `acknowledge-add-recipe/V001 → V002`
+  - `recipe-research-gather/V003 → V004`
+  - `recipe-research-instructions/V002 → V003`
+  - `recipe-research-ingredients/V002 → V003`
+  - `recipe-research-metadata/V002 → V003`
+  - `recipe-load/V003 → V004`
+- Update `AGENT_REGISTRY.prompt_path` in `src/robotina/agent/agents.py` and every `overrides/*.json` (anthropic, openai, staging.ollama) in lockstep per prompt-bump.
+- Delete the orphan `src/robotina/agent/prompts/hello-world/` directory.
+- Dedupe Spanish-language reminders; defer schema descriptions to Pydantic response models in `src/robotina/queue/task_types.py`.
+
+**Out of scope (deferred to future phases):**
+- Router occasionally emitting plain assistant text instead of a tool call
+- `recipe-research-gather` over-querying (the "no fixed cap" instruction)
+- `recipe-load` hallucinated `recipe_id` failure mode beyond the existing prose guardrail
+- Skill-file cleanup under `src/robotina/agent/skills/household-manager/`
+- Pydantic model field-name or schema changes
+- Workflow shape changes (step order, new workflows)
+
+**Success criteria** (what must be TRUE):
+  1. Every `AGENT_REGISTRY` entry's `prompt_path` resolves to an existing file
+  2. Every `overrides/*.json` `prompt_path` resolves to an existing file
+  3. `uv run pytest` passes (no behavioral change expected)
+  4. Smoke test 3 Telegram inputs (Hola / meal-plan question / add recipe) produces identical behavior to pre-phase
+  5. LangWatch traces show new prompt version filenames in run metadata
+
+**Planner note:** prompt + `agents.py` + 3 `overrides/*.json` must be committed atomically per prompt-bump (per `feedback_overrides_in_sync.md`). Prefer one sequential plan per prompt-bump rather than parallel plans.
+
+**Planning context:** `/home/solanoe/.claude/plans/correct-let-s-focus-this-optimized-ripple.md`
+
 **Plans:** 0 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 13 to break down)
+- [ ] TBD (run /gsd-plan-phase 14 to break down)

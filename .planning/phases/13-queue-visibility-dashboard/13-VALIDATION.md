@@ -1,15 +1,16 @@
 ---
 phase: 13
 slug: queue-visibility-dashboard
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-05-14
+updated: 2026-05-14
 ---
 
 # Phase 13 — Validation Strategy
 
-> Per-phase validation contract for feedback sampling during execution.
+> Per-phase validation contract for feedback sampling during execution. Updated by the planner after PLAN.md files were created so per-task IDs are concrete.
 
 ---
 
@@ -21,14 +22,15 @@ created: 2026-05-14
 | **Config file** | `pyproject.toml` [tool.pytest.ini_options] |
 | **Quick run command** | `uv run pytest -q tests/dashboard/ -m "not integration"` |
 | **Full suite command** | `uv run pytest -q` |
+| **Integration subset** | `uv run pytest -q -m integration` |
 | **Estimated runtime** | ~30 seconds (full); ~5 seconds (dashboard non-integration only) |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `uv run pytest -q tests/dashboard/ -m "not integration"`
-- **After every plan wave:** Run `uv run pytest -q` (full suite)
+- **After every task commit:** Run `uv run pytest -q tests/dashboard/ -m "not integration"` (and `tests/test_workflow_runner.py` for Plan 13-01 commits)
+- **After every plan wave:** Run `uv run pytest -q` (full suite, both markers)
 - **Before `/gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** 30 seconds
 
@@ -36,21 +38,23 @@ created: 2026-05-14
 
 ## Per-Task Verification Map
 
-> Concrete task IDs are assigned by the planner. This map seeds the verification commitments per SPEC AC.
+> Concrete task IDs are now assigned. Each SPEC AC maps to exactly one automated test or one human-checkpoint observation. AC#5, AC#8 (visual portion), and AC#9 (browser-observable portion) are gated by the manual checkpoint in Plan 13-03 Task 3.2.
 
-| AC# | Plan | Wave | Requirement (SPEC) | Test Type | Automated Command | Status |
-|-----|------|------|--------------------|-----------|-------------------|--------|
-| 1 | 01 | 1 | Migration upgrade/downgrade adds `step_input` + `failure_reason` | integration | `uv run pytest -q -m integration tests/dashboard/test_migration.py` | ⬜ pending |
-| 2 | 01 | 1 | After workflow run, every step row has `step_input` populated | integration | `uv run pytest -q -m integration tests/dashboard/test_persistence.py::test_step_input_populated` | ⬜ pending |
-| 3 | 01 | 1 | Failed step has `failure_reason` as `"ExceptionClass: message"`; non-failed = NULL | integration | `uv run pytest -q -m integration tests/dashboard/test_persistence.py::test_failure_reason_only_on_failed` | ⬜ pending |
-| 4 | 02 | 1 | `uv run dashboard` starts FastAPI on configurable port | manual | smoke: `uv run dashboard` + curl `http://localhost:8001/` returns 200 | ⬜ pending |
-| 5 | 02 | 2 | `docker-compose up dashboard` brings service up sharing `DATABASE_URL` | manual | smoke: compose-up then `curl http://localhost:8001/` returns 200 | ⬜ pending |
-| 6 | 02 | 1 | `GET /` returns latest 50 runs, newest first, each row links to detail | unit + integration | `uv run pytest -q tests/dashboard/test_list_view.py` | ⬜ pending |
-| 7 | 02 | 1 | `GET /workflows/{id}` shows ordered steps with input/output/status/failure | unit + integration | `uv run pytest -q tests/dashboard/test_detail_view.py` | ⬜ pending |
-| 8 | 02 | 1 | FAILED vs CANCELLED rendered visually distinct (grep-able class strings) | unit | `uv run pytest -q tests/dashboard/test_detail_view.py::test_failed_vs_cancelled_badges` | ⬜ pending |
-| 9 | 02 | 1 | List polls 10s, detail polls 3s; detail halts on terminal status | unit | `uv run pytest -q tests/dashboard/test_polling_halt.py` | ⬜ pending |
-| 10 | 02 | 2 | Grep enforcement: no `from robotina.dashboard` or `import robotina.dashboard` outside `src/robotina/dashboard/` | unit | `uv run pytest -q tests/dashboard/test_independence.py::test_no_reverse_imports` | ⬜ pending |
-| 11 | 02 | 1 | All dashboard routes return 200 without auth (matches internal-only) | unit | `uv run pytest -q tests/dashboard/test_no_auth.py` | ⬜ pending |
+| AC# (SPEC) | Requirement | Plan | Task | Wave | Test Type | Automated Command | Status |
+|-----|-------------|------|------|------|-----------|-------------------|--------|
+| 1 | DASH-01 | 13-01 | 1.1 | 1 | integration + unit | `uv run pytest -m integration tests/test_workflow_runner.py::test_migration_0005_upgrades_and_downgrades -x && uv run pytest tests/test_workflow_runner.py::test_workflow_run_step_model_has_new_columns -x` | ⬜ pending |
+| 2 | DASH-02 | 13-01 | 1.2 | 1 | integration | `uv run pytest -m integration tests/test_workflow_runner.py -k "step_input" -x` | ⬜ pending |
+| 3 | DASH-03 | 13-01 | 1.2 | 1 | integration | `uv run pytest -m integration tests/test_workflow_runner.py::test_failure_reason_set_with_exception_format_and_single_line -x` | ⬜ pending |
+| 4 | DASH-04 | 13-02 | 2.1 + 2.2 | 2 | unit + smoke | `uv run pytest tests/dashboard/test_app_starts.py -x` + boot smoke (verification block in 13-02) | ⬜ pending |
+| 5 | DASH-09 | 13-03 | 3.1 + 3.2 | 3 | smoke + checkpoint | `docker compose config --services \| grep -c '^dashboard$'` + manual `docker compose up dashboard` + checkpoint | ⬜ pending |
+| 6 | DASH-05 | 13-02 | 2.2 | 2 | unit + integration | `uv run pytest tests/dashboard/test_list_view.py -x` | ⬜ pending |
+| 7 | DASH-06 | 13-02 | 2.2 | 2 | unit + integration | `uv run pytest tests/dashboard/test_detail_view.py -x` | ⬜ pending |
+| 8 (markup) | DASH-07 | 13-02 | 2.2 | 2 | integration | `uv run pytest tests/dashboard/test_detail_view.py::test_failed_vs_cancelled_badges -x` | ⬜ pending |
+| 8 (visual) | DASH-07 | 13-03 | 3.2 | 3 | checkpoint | manual browser eyeball — visual gate B1 | ⬜ pending |
+| 9 (markup) | DASH-08 | 13-02 | 2.2 | 2 | integration | `uv run pytest tests/dashboard/test_polling_halt.py -x` | ⬜ pending |
+| 9 (browser) | DASH-08 | 13-03 | 3.2 | 3 | checkpoint | manual DevTools observation — visual gates B2 + B3 | ⬜ pending |
+| 10 | DASH-08 | 13-02 | 2.1 + 2.2 | 2 | unit | `uv run pytest tests/dashboard/test_independence.py -x` | ⬜ pending |
+| 11 | DASH-08 | 13-02 | 2.2 | 2 | unit | `uv run pytest tests/dashboard/test_no_auth.py -x` | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -58,32 +62,39 @@ created: 2026-05-14
 
 ## Wave 0 Requirements
 
-- [ ] `tests/dashboard/__init__.py` — package marker
-- [ ] `tests/dashboard/conftest.py` — fixtures: `session_factory`, `app_client` (httpx AsyncClient via ASGITransport), `make_workflow_run` (helper to insert a `WorkflowRun` with N `WorkflowRunStep` rows including failure + cancelled cascade), DB cleanup-by-UUID helper (NOT bulk delete)
-- [ ] `Jinja2 >= 3.1` added to `pyproject.toml` dependencies (only missing dep per RESEARCH.md)
-- [ ] `tests/dashboard/test_independence.py::test_no_reverse_imports` — single grep-based test asserting the SPEC AC
+Plan 13-02 Task 2.1 IS the Wave 0 step for the dashboard module:
 
-*Existing infrastructure: pytest + pytest-asyncio + httpx + SQLAlchemy 2.x + Alembic + FastAPI are all already installed. Only Jinja2 + HTMX (vendored) are new.*
+- [ ] `pyproject.toml`: `jinja2>=3.1` added to dependencies (RESEARCH.md confirmed sole missing dep)
+- [ ] `src/robotina/dashboard/__init__.py`: package marker with `main()` entry, no forbidden imports
+- [ ] `src/robotina/dashboard/static/htmx.min.js` + `htmx.version.txt`: HTMX 2.0.10 vendored with SHA-256
+- [ ] `tests/dashboard/__init__.py`: package marker
+- [ ] `tests/dashboard/conftest.py`: `client` (httpx AsyncClient via ASGITransport), `db_session` (ID-scoped cleanup per RESEARCH Pitfall 7), `make_failed_cascade_run` helper
+- [ ] `tests/dashboard/test_independence.py`: grep gate (SPEC AC #10) + inward-only audit — passes from Wave 0 onwards
+- [ ] `tests/dashboard/test_app_starts.py`: failing RED until Task 2.2 lands `app.py`
+
+*Existing infrastructure (already installed): pytest + pytest-asyncio + httpx + SQLAlchemy 2.x + Alembic + FastAPI + uvicorn + python-dotenv. Only Jinja2 + HTMX (vendored) are new.*
 
 ---
 
-## Manual-Only Verifications
+## Manual-Only Verifications (Plan 13-03 Task 3.2)
 
-| Behavior | Requirement (SPEC) | Why Manual | Test Instructions |
-|----------|--------------------|------------|-------------------|
-| Visual distinction between FAILED and CANCELLED badges renders correctly in a real browser | Req 8 | Pixel-level visual differentiation can be unit-asserted via class strings, but the actual visual readability requires a browser eyeball | Start `uv run dashboard`, navigate to a workflow with a failed step + cancelled cascade, confirm at-a-glance FAILED (red) vs CANCELLED (amber stripes) discrimination |
-| Polling cadence and halt are perceptible in the network tab | Req 9 | Browser dev tools observation; the automated test asserts the markup contract but not human-perceptible cadence | Start `uv run dashboard`, open a workflow detail page in browser with DevTools → Network, confirm `every 3s` GET on the fragment URL, confirm requests stop within ~3s of the workflow transitioning to DONE/FAILED |
-| `docker-compose up dashboard` brings service up alongside agent stack | Req 6 | Compose orchestration depends on host networking + image build; CI-flaky to automate | Run `docker-compose up dashboard postgres`, curl `http://localhost:8001/` from host, confirm 200 |
+All three discharged by the same checkpoint task:
+
+| Behavior | Requirement (SPEC) | Why Manual | Where Discharged |
+|----------|--------------------|------------|------------------|
+| Visual distinction between FAILED and CANCELLED badges renders correctly in a real browser | Req 8 (AC #8) | Pixel-level visual differentiation can be unit-asserted via class strings, but the actual visual readability requires a browser eyeball | Plan 13-03 Task 3.2 visual gate B1 |
+| Polling cadence and halt are perceptible in the network tab | Req 9 (AC #9) | Browser DevTools observation; the automated test asserts the markup contract but not human-perceptible cadence | Plan 13-03 Task 3.2 visual gates B2 + B3 |
+| `docker-compose up dashboard` brings service up alongside agent stack | Req 6 (AC #5) | Compose orchestration depends on host networking + image build; CI-flaky to automate | Plan 13-03 Task 3.1 automated curl + Task 3.2 visual gate (cross-confirmation) |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All 11 SPEC acceptance criteria have an automated or manual verification commitment
-- [ ] Sampling continuity: dashboard tests run on every commit; full suite on every wave
-- [ ] Wave 0 covers Jinja2 dependency + test scaffolding + independence grep gate
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter after planner assigns concrete task IDs and updates this map
+- [x] All 11 SPEC acceptance criteria have an automated or manual verification commitment
+- [x] Sampling continuity: dashboard tests run on every commit; full suite on every wave
+- [x] Wave 0 covers Jinja2 dependency + test scaffolding + independence grep gate (Plan 13-02 Task 2.1)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter after planner assigned concrete task IDs
 
-**Approval:** pending — planner will refine the per-task IDs and flip `nyquist_compliant: true` once mapping is complete.
+**Approval:** approved (planner refined per-task IDs and flipped `nyquist_compliant: true`).

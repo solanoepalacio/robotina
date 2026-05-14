@@ -110,6 +110,18 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
 - [x] **OBS-06**: Per-agent instrumentation uses `create_agent` middleware (`langchain.agents.middleware`); legacy `AgentLoggingHandler` callback is removed; the four log lines (`LLM stream start`, `Thinking`, `Tool call`, `Tool result`) are emitted by middleware and LangWatch traces are unchanged.
 
+### Dashboard
+
+- [ ] **DASH-01**: Alembic migration `0005_dashboard_columns` adds `step_input` (JSON, nullable) and `failure_reason` (Text, nullable) columns to `workflow_run_steps`; `uv run migrate` upgrades and `alembic downgrade -1` reverses cleanly
+- [ ] **DASH-02**: Every enqueued `WorkflowRunStep` has its `step_input` JSON populated to Postgres at both the first-step and subsequent-step enqueue sites in `workflow_runner.py`
+- [ ] **DASH-03**: Failed steps record `failure_reason` in Postgres as `f"{type(exc).__name__}: {exc}"` (newlines normalized to spaces); non-failed steps have `failure_reason = NULL`; `on_step_failed` signature extends to accept `exc: BaseException | None = None`
+- [ ] **DASH-04**: `src/robotina/dashboard/` module exists with a FastAPI app and a `dashboard = "robotina.dashboard:main"` entry in `pyproject.toml [project.scripts]`; `uv run dashboard` starts uvicorn on `DASHBOARD_PORT` (default 8001)
+- [ ] **DASH-05**: `GET /` returns 200 HTML listing the latest 50 `WorkflowRun` rows ordered by `created_at DESC`; empty state renders cleanly with zero runs
+- [ ] **DASH-06**: `GET /workflows/{id}` returns 200 HTML with workflow header + step rows ordered by `step_order` showing `step_key`, `status`, `step_input` (pretty JSON), `artifact` (pretty JSON if any), `failure_reason` (if any), `started_at`, `completed_at`; 404 when id not found
+- [ ] **DASH-07**: FAILED step renders with CSS class `badge--failed` (solid red) and CANCELLED step renders with `badge--cancelled` (diagonal-stripe amber) — visually + grep-ably distinct
+- [ ] **DASH-08**: HTMX polling — list view always polls `/fragments/runs` every 10s; detail view polls `/fragments/workflows/{id}` every 3s but the wrapper element OMITS `hx-trigger` when run status is `DONE` or `FAILED` (polling halts naturally); `grep -rE "from robotina\.dashboard|import robotina\.dashboard" src/robotina/ --exclude-dir=dashboard` returns zero matches; all routes return 200/404 without any auth headers
+- [ ] **DASH-09**: `docker compose up dashboard` brings the service up alongside `postgres`, using the same `DATABASE_URL`; `DASHBOARD_PORT` documented in `.env.example`; a Dockerfile at repo root supports `build: .` in compose
+
 ## v2 Requirements
 
 Deferred to a future milestone. Infrastructure (`household_id` field) is already in place.
@@ -217,12 +229,21 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RLOAD-06 | Phase 9 | Complete |
 | RLOAD-07 | Phase 11 | Complete |
 | OBS-06 | Phase 12 | Complete |
+| DASH-01 | Phase 13 | Planned |
+| DASH-02 | Phase 13 | Planned |
+| DASH-03 | Phase 13 | Planned |
+| DASH-04 | Phase 13 | Planned |
+| DASH-05 | Phase 13 | Planned |
+| DASH-06 | Phase 13 | Planned |
+| DASH-07 | Phase 13 | Planned |
+| DASH-08 | Phase 13 | Planned |
+| DASH-09 | Phase 13 | Planned |
 
 **Coverage:**
-- v1 requirements: 73 total
-- Mapped to phases: 73
+- v1 requirements: 82 total
+- Mapped to phases: 82
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-05-14 — OBS-06 flipped to Complete after Phase 12 manual smoke approval*
+*Last updated: 2026-05-14 — DASH-01..DASH-09 added for Phase 13 (Queue Visibility Dashboard) planning*
