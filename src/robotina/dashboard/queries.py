@@ -20,7 +20,7 @@ def list_recent_runs(db: Session, limit: int = 50) -> list[WorkflowRun]:
     return list(
         db.scalars(
             select(WorkflowRun)
-            .order_by(WorkflowRun.created_at.desc())
+            .order_by(WorkflowRun.created_at.desc(), WorkflowRun.id.desc())
             .limit(limit)
         )
     )

@@ -5,6 +5,8 @@ template-only tests render against the fixture-inserted empty / 1-row state.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from robotina.queue.models import WorkflowRun, WorkflowStatus
@@ -73,12 +75,16 @@ async def test_list_view_renders_rows_newest_first(client, db_session):
     """Insert 3 runs; GET /; assert all three appear with newest first."""
     session, ids = db_session
     runs = []
+    # Explicit created_at offsets so the newest-first ordering assertion is
+    # deterministic (single-transaction inserts can share a default timestamp).
+    base = datetime.now(timezone.utc) - timedelta(minutes=10)
     for i in range(3):
         r = WorkflowRun(
             workflow_type="add-recipe",
             household_id=f"h-{i}",
             status=WorkflowStatus.DONE,
             shared_context={},
+            created_at=base + timedelta(seconds=i),
         )
         session.add(r)
         session.flush()

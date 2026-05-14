@@ -229,14 +229,14 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RLOAD-06 | Phase 9 | Complete |
 | RLOAD-07 | Phase 11 | Complete |
 | OBS-06 | Phase 12 | Complete |
-| DASH-01 | Phase 13 | Planned |
-| DASH-02 | Phase 13 | Planned |
-| DASH-03 | Phase 13 | Planned |
-| DASH-04 | Phase 13 | Planned |
-| DASH-05 | Phase 13 | Planned |
-| DASH-06 | Phase 13 | Planned |
-| DASH-07 | Phase 13 | Planned |
-| DASH-08 | Phase 13 | Planned |
+| DASH-01 | Phase 13 | Complete |
+| DASH-02 | Phase 13 | Complete |
+| DASH-03 | Phase 13 | Complete |
+| DASH-04 | Phase 13 | Complete |
+| DASH-05 | Phase 13 | Complete |
+| DASH-06 | Phase 13 | Complete |
+| DASH-07 | Phase 13 | Complete |
+| DASH-08 | Phase 13 | Complete |
 | DASH-09 | Phase 13 | Complete |
 
 **Coverage:**
