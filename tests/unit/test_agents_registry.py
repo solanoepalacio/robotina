@@ -120,7 +120,7 @@ def test_recipe_research_gather_registered():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "recipe-research-gather"
     assert config.skills == []
-    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-gather/V003.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-gather/V004.md"
     assert config.tools == []
     assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_GATHER_API_TOKEN"
 
