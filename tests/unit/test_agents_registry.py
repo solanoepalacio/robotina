@@ -12,7 +12,7 @@ def test_get_agent_config_returns_agent_config():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.model_config["provider"] == "ollama"
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V002.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V003.md"
 
 
 def test_agent_config_has_required_fields():
@@ -104,7 +104,7 @@ def test_handle_incoming_message_registered_in_agent_registry():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.skills == ["household-manager"]
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V002.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V003.md"
     assert config.tools == []  # tools are injected per-job, not stored in registry
 
 
@@ -160,7 +160,7 @@ def test_recipe_load_registered():
     config = get_agent_config("recipe-load")
     assert isinstance(config, AgentConfig)
     assert config.task_type == "recipe-load"
-    assert config.prompt_path == "src/robotina/agent/prompts/recipe-load/V002.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-load/V003.md"
     assert config.tools == []
     assert config.model_config["api_key_env"] == "RECIPE_LOAD_API_TOKEN"
 
