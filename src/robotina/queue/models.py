@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, DateTime, Enum, JSON, ForeignKey, UniqueConstraint
+from sqlalchemy import String, DateTime, Enum, JSON, ForeignKey, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -49,5 +49,9 @@ class WorkflowRunStep(Base):
     task_job_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[WorkflowStepStatus] = mapped_column(Enum(WorkflowStepStatus, values_callable=lambda x: [e.value for e in x]), default=WorkflowStepStatus.PENDING, nullable=False)
     artifact: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Phase 13 / Plan 13-01 (DASH-01): dashboard persistence columns. Both nullable
+    # so historical rows backfill to NULL and the migration is non-blocking.
+    step_input: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
