@@ -19,9 +19,15 @@ def main() -> None:
 
     load_dotenv()
     port = int(os.environ.get("DASHBOARD_PORT", "8001"))
+    # WR-01: default to loopback. The dashboard has no auth (SPEC out of
+    # scope) and exposes shared_context / step_input / failure_reason —
+    # binding to 0.0.0.0 by default would leak data on any reachable
+    # interface. Compose sets DASHBOARD_HOST=0.0.0.0 explicitly because
+    # uvicorn must accept connections from outside its container.
+    host = os.environ.get("DASHBOARD_HOST", "127.0.0.1")
     uvicorn.run(
         "robotina.dashboard.app:app",
-        host="0.0.0.0",
+        host=host,
         port=port,
         log_level="info",
     )

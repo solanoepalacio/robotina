@@ -46,6 +46,10 @@ services:
     environment:
       DATABASE_URL: postgresql://robotina:robotina@postgres:5432/robotina
       DASHBOARD_PORT: "8001"
+      # WR-01: bind to all interfaces inside the container so the host's
+      # published port (8001:8001) can reach uvicorn. The Python default
+      # is 127.0.0.1 — safe-by-default outside compose.
+      DASHBOARD_HOST: "0.0.0.0"
     ports:
       - "8001:8001"
     depends_on:
