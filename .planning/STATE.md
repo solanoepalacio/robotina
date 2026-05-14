@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: "Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output)."
-last_updated: "2026-05-14T00:57:30.471Z"
+stopped_at: Phase 13 context gathered
+last_updated: "2026-05-14T14:45:44.259Z"
 last_activity: 2026-05-14
 progress:
-  total_phases: 14
-  completed_phases: 10
+  total_phases: 16
+  completed_phases: 11
   total_plans: 46
-  completed_plans: 40
-  percent: 87
+  completed_plans: 41
+  percent: 89
 ---
 
 # Project State
@@ -101,6 +101,7 @@ Plan: 2 of 2
 - Phase 11 added: Structured Agent Output via response_format (fixes canelones-class parse failures)
 - Phase 12 added: Middleware-Based Agent Instrumentation (callbacks -> @before_model/@after_model/@wrap_model_call)
 - Phase 13 added: Queue Visibility Dashboard (custom FastAPI dashboard for workflow-grouped task visibility)
+- Phase 14 added: Prompt Cleanup and Structural Standardization (re-version all 7 active prompts to a single skeleton; no behavioral change)
 - Phase 11 code complete (manual checkpoint pending): response_format adopted on 5 named agents; canelones-class parse failures structurally eliminated for those agents — pending 3-query end-to-end verification (Plan 11-04 Task 4.2)
 
 ### Decisions
@@ -233,6 +234,6 @@ None yet.
 
 Last activity: 2026-05-14
 
-Last session: 2026-05-14T00:56:39.531Z
-Stopped at: Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output).
-Resume file: None
+Last session: 2026-05-14T14:45:44.249Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/phases/13-queue-visibility-dashboard/13-CONTEXT.md
