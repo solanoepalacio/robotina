@@ -149,6 +149,110 @@ def test_backend_instantiated_per_job_not_module_level():
     assert not called, "LLM model was instantiated at module level during import!"
 
 
+# --- OBS-06 / Phase 12: regression guards for callback-list invariants ---
+# These two tests assert (1) the LangWatch tracer survives in the
+# RunnableConfig.callbacks list passed to agent.invoke and (2) the legacy
+# AgentLoggingHandler is no longer present. Both invariants are load-bearing:
+# (1) protects LangWatch trace fidelity (RESEARCH Pitfall 1); (2) acts as a
+# regression guard if a future hand re-adds the legacy callback.
+
+def _run_task_capturing_invoke_config(mock_task_input=None):
+    """Helper: drive run_task() once with a fully-mocked stack and return the
+    `config` kwarg that was passed to agent.invoke. Used by both OBS-06 tests
+    below. Uses recipe-load task type (deterministic non-LLM send-notification
+    path skips agent.invoke entirely)."""
+    mock_job = MagicMock()
+    mock_job.id = "job-obs06-001"
+    mock_job.meta = {"task_type": "recipe-load", "queue_name": "agent-tasks"}
+
+    mock_config = MagicMock()
+    mock_config.skills = []
+    mock_config.tools = []
+    mock_config.model_config = {
+        "provider": "ollama",
+        "url": "http://localhost:11434",
+        "model": "llama3.2",
+        "api_key_env": "TEST_TOKEN",
+    }
+    mock_config.prompt_path = "/tmp/test_prompt.md"
+
+    mock_backend = MagicMock()
+    mock_agent = MagicMock()
+    captured = {}
+
+    def capture_invoke(messages, config=None, **kwargs):
+        captured["config"] = config
+        return {"messages": []}
+
+    mock_agent.invoke.side_effect = capture_invoke
+    mock_backend.create_agent.return_value = mock_agent
+
+    mock_session = MagicMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+
+    if mock_task_input is None:
+        mock_task_input = MagicMock()
+        mock_task_input.chat_id = "test-chat-1"
+        mock_task_input.user_id = "test-user-1"
+        mock_task_input.platform = "telegram"
+        mock_task_input.household_id = "household-1"
+        mock_task_input.to_user_message.return_value = "test message"
+
+    with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
+         patch("robotina.agent.agents.get_agent_config", return_value=mock_config), \
+         patch("robotina.llm.make_backend", return_value=mock_backend), \
+         patch("pathlib.Path.read_text", return_value="system prompt"), \
+         patch("robotina.db.SessionLocal", mock_session_factory), \
+         patch("robotina.queue.workflow_runner.on_step_start"), \
+         patch("robotina.queue.workflow_runner.on_step_complete"), \
+         patch("robotina.queue.workflow_runner.on_step_failed"):
+        from robotina.queue.jobs import run_task
+        run_task(mock_task_input)
+
+    return captured.get("config")
+
+
+def _callback_class_names(config) -> list[str]:
+    """Extract class names of callbacks from a RunnableConfig-like object.
+    Handles both dict-style ({"callbacks": [...]}) and RunnableConfig (TypedDict
+    that subscripts like a dict). Returns [] if no callbacks were configured."""
+    if config is None:
+        return []
+    # RunnableConfig is a TypedDict — same subscription as dict.
+    callbacks = config.get("callbacks") if hasattr(config, "get") else None
+    if not callbacks:
+        return []
+    return [type(cb).__name__ for cb in callbacks]
+
+
+def test_run_task_passes_langwatch_tracer():
+    """OBS-06: agent.invoke is called with RunnableConfig.callbacks containing
+    a langwatch.langchain.LangChainTracer instance (regression guard for
+    Pitfall 1 — the LangWatch trace MUST survive the AgentLoggingHandler removal)."""
+    config = _run_task_capturing_invoke_config()
+    names = _callback_class_names(config)
+    assert "LangChainTracer" in names, (
+        f"Expected LangChainTracer in callbacks list. Got: {names}. "
+        f"This regression breaks ALL LangWatch traces (RESEARCH Pitfall 1)."
+    )
+
+
+def test_run_task_no_legacy_callback():
+    """OBS-06: agent.invoke callbacks list does NOT contain any AgentLoggingHandler
+    (regression guard — ensures the Phase 12 removal stays removed)."""
+    # The legacy module must not be importable after Plan 12-02 deletes it.
+    import importlib
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("robotina.agent.callbacks")
+
+    config = _run_task_capturing_invoke_config()
+    names = _callback_class_names(config)
+    assert "AgentLoggingHandler" not in names, (
+        f"Legacy AgentLoggingHandler reappeared in callbacks list: {names}. "
+        f"Phase 12 removal must stay removed."
+    )
+
+
 def test_agent_logging_handler_on_llm_start(caplog):
     """AGENT-10: AgentLoggingHandler.on_chat_model_start logs LLM stream start."""
     from robotina.agent.callbacks import AgentLoggingHandler
