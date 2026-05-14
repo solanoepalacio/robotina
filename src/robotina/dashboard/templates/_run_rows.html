@@ -1,0 +1,18 @@
+{# List-view polling target — UI-SPEC §Component Contract 2 + D-10.
+   This wrapper ALWAYS includes hx-trigger="every 10s"; list polling is
+   unconditional regardless of any workflow's status. #}
+{% from "_status_badge.html" import status_badge %}
+<tbody id="runs-body"
+       hx-get="/fragments/runs"
+       hx-trigger="every 10s"
+       hx-swap="outerHTML">
+  {% for run in runs %}
+  <tr class="run-row">
+    <td class="col-id"><a href="/workflows/{{ run.id }}" class="mono">{{ run.id[:8] }}</a></td>
+    <td class="col-type">{{ run.workflow_type }}</td>
+    <td class="col-household {% if not run.household_id %}muted{% endif %}">{{ run.household_id or "—" }}</td>
+    <td class="col-status">{{ status_badge(run.status.value.upper()) }}</td>
+    <td class="col-created mono">{{ run.created_at.strftime("%Y-%m-%d %H:%M:%S") if run.created_at else "" }}</td>
+  </tr>
+  {% endfor %}
+</tbody>

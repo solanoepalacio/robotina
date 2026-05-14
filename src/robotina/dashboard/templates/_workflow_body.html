@@ -1,0 +1,57 @@
+{# Detail-view polling target — D-09 polling-halt contract.
+   The hx-get / hx-trigger / hx-swap attributes are present ONLY when the
+   workflow is NOT in a terminal status (DONE / FAILED). When terminal,
+   the same wrapper element is returned WITHOUT those attributes, so
+   HTMX's outerHTML swap installs a trigger-less wrapper and polling
+   halts naturally (RESEARCH Pitfall 3). #}
+{% from "_status_badge.html" import status_badge %}
+<div id="workflow-body"
+{%- if not is_terminal %}
+     hx-get="/fragments/workflows/{{ run.id }}"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML"
+{%- endif %}>
+
+  <section class="steps">
+    <h2>Steps</h2>
+    {% if not steps %}
+      <p class="muted">This workflow has no steps recorded.</p>
+    {% endif %}
+    {% for step in steps %}
+    <article class="step-row" data-status="{{ step.status.value }}">
+      <header class="step-row__header">
+        <span class="step-key mono">{{ step.step_key }}</span>
+        {{ status_badge(step.status.value.upper()) }}
+        {% if step.started_at %}
+          <span class="muted mono">Started: {{ step.started_at.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+        {% endif %}
+        {% if step.completed_at %}
+          <span class="muted mono">Completed: {{ step.completed_at.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+        {% endif %}
+      </header>
+
+      {% if step.status.value == "failed" and step.failure_reason %}
+      <div class="failure-block">
+        <strong>Failure:</strong> <code class="mono">{{ step.failure_reason }}</code>
+      </div>
+      {% endif %}
+
+      <div class="step-row__field">
+        <div class="field-label">Input</div>
+        {% if step.step_input is not none %}
+          <pre class="json-block">{{ step.step_input | tojson(indent=2) }}</pre>
+        {% else %}
+          <p class="muted">(none)</p>
+        {% endif %}
+      </div>
+
+      {% if step.artifact is not none %}
+      <div class="step-row__field">
+        <div class="field-label">Output</div>
+        <pre class="json-block">{{ step.artifact | tojson(indent=2) }}</pre>
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+</div>

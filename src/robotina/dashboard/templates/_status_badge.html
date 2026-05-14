@@ -1,0 +1,7 @@
+{# Status badge macro — UI-SPEC §Component Contract 3.
+   Renders a single <span> whose class encodes both the generic badge and
+   the per-status modifier. The five status strings expected (uppercase):
+   PENDING | RUNNING | DONE | FAILED | CANCELLED. #}
+{%- macro status_badge(status) -%}
+<span class="badge badge--{{ status|lower }}">{{ status }}</span>
+{%- endmacro -%}

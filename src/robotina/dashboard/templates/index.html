@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Workflows · Robotina Dashboard{% endblock %}
+{% block content %}
+  <section class="page-intro">
+    <h1>Workflows</h1>
+    <p class="muted">Latest 50, newest first. Refreshes every 10s.</p>
+  </section>
+
+  {% if runs %}
+  <table class="runs">
+    <thead>
+      <tr>
+        <th class="col-id">ID</th>
+        <th class="col-type">TYPE</th>
+        <th class="col-household">HOUSEHOLD</th>
+        <th class="col-status">STATUS</th>
+        <th class="col-created">CREATED</th>
+      </tr>
+    </thead>
+    {% include "_run_rows.html" %}
+  </table>
+  {% else %}
+  <section class="empty-state">
+    <h2>No workflows yet</h2>
+    <p>Start a workflow from the agent stack and it will appear here.</p>
+  </section>
+  {% endif %}
+{% endblock %}
