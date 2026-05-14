@@ -138,7 +138,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_METADATA_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V002.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V003.md",
         skills=[],
         tools=[],  # no tools — produces structured output directly from user message
         response_format_model=RecipeResearchMetadataOutput,
