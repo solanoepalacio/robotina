@@ -108,7 +108,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **OBS-03**: The same instrumentation used in production is active during experiment runs; traces appear in the correct LangWatch experiment collection
 - [x] **OBS-04**: Each experiment script (`recipe-research`, `recipe-load`, `send-notification`) pins prompt version and model config via LangWatch tags/metadata
 - [x] **OBS-05**: A standalone experiment script (`experiments/send_notification.py`) exists for the send-notification agent
-- [ ] **OBS-06**: Per-agent instrumentation uses `create_agent` middleware (`langchain.agents.middleware`); legacy `AgentLoggingHandler` callback is removed; the four log lines (`LLM stream start`, `Thinking`, `Tool call`, `Tool result`) are emitted by middleware and LangWatch traces are unchanged.
+- [x] **OBS-06**: Per-agent instrumentation uses `create_agent` middleware (`langchain.agents.middleware`); legacy `AgentLoggingHandler` callback is removed; the four log lines (`LLM stream start`, `Thinking`, `Tool call`, `Tool result`) are emitted by middleware and LangWatch traces are unchanged.
 
 ## v2 Requirements
 
@@ -216,7 +216,7 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | RLOAD-05 | Phase 9 | Complete |
 | RLOAD-06 | Phase 9 | Complete |
 | RLOAD-07 | Phase 11 | Complete |
-| OBS-06 | Phase 12 | In Progress |
+| OBS-06 | Phase 12 | Complete |
 
 **Coverage:**
 - v1 requirements: 73 total
@@ -225,4 +225,4 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-05-13 — added OBS-06 for Phase 12 (middleware-based agent instrumentation); flips to Complete after Task 2.3 manual smoke approval*
+*Last updated: 2026-05-14 — OBS-06 flipped to Complete after Phase 12 manual smoke approval*

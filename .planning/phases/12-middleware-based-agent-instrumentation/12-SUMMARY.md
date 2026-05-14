@@ -17,7 +17,7 @@ provides:
   - "Subtractive diff in src/robotina/queue/jobs.py: callbacks list now [LangChainTracer()] only; ImportError fallback drops config= entirely"
   - "Two regression tests pinning the OBS-06 contract: tracer survives, legacy callback absent"
   - "Phase summary documenting the LangWatch + middleware interaction model (Phase SC#5)"
-  - "REQUIREMENTS.md OBS-06 entry registered (Pending — flipped to Complete after Task 2.3 manual smoke)"
+  - "REQUIREMENTS.md OBS-06 entry flipped to Complete (2026-05-14, after Task 2.3 manual smoke approval)"
 affects:
   - any future agent observability work (token budget, prompt-injection filter, dynamic prompt) — middleware is now the SOLE per-agent logging seam
   - "Phase 999.1 (custom state schemas) — middleware can read typed AgentState once promoted from backlog"
@@ -53,13 +53,13 @@ patterns-established:
   - "Pattern B: Atomic flip after coexistence proof — Wave 1 (12-01) added the new path, Wave 2 (12-02) removes the old path in one commit (single refactor commit). Test fixtures flipped in the same commit as the source change."
   - "Pattern C: Phase-summary documentation of the LangWatch interaction model — every observability migration in this codebase must record (a) whether LangWatch depends on the LangChain callback bus, (b) which BaseCallbackHandler subclass it uses, (c) the version that was verified. Future migrations grep for 'LangChainTracer' in phase summaries to find the prior verification."
 
-requirements-completed: []  # OBS-06 flips to Complete in REQUIREMENTS.md ONLY after the Task 2.3 manual smoke approval. Not yet complete.
-requirements-pending:
+requirements-completed:
   - OBS-06
+requirements-pending: []
 
 # Metrics
-duration: ~6min (Tasks 2.1 + 2.2 only; Task 2.3 manual checkpoint blocks)
-completed: 2026-05-13
+duration: ~6min (Tasks 2.1 + 2.2); Task 2.3 manual smoke approved 2026-05-14
+completed: 2026-05-14
 ---
 
 # Phase 12 Plan 02: Atomic flip to middleware-only per-agent instrumentation
@@ -167,22 +167,24 @@ $ grep -rn 'from langchain_core.callbacks' src/robotina/agent/
 
 1. **Task 2.1 RED — OBS-06 regression tests** — `5f0ee51` (`test(12-02): assert LangWatch tracer survives and legacy callback is absent (OBS-06)`)
 2. **Task 2.1 GREEN — atomic flip** — `23efeb8` (`refactor(12-02): remove AgentLoggingHandler; middleware fully owns per-agent logging (OBS-06)`)
-3. **Task 2.2 — phase summary + REQUIREMENTS.md OBS-06 entry** — (this commit, to follow)
-
-**Task 2.3 — manual smoke (BLOCKING):** awaiting user approval. On approval, an additional commit flips OBS-06 to `[x]` in REQUIREMENTS.md, marks Phase 12 complete in ROADMAP.md, and records the smoke evidence in this SUMMARY.
+3. **Task 2.2 — phase summary + REQUIREMENTS.md OBS-06 entry** — landed prior to wrap-up.
+4. **Task 2.3 wrap-up — smoke approval + state flips** — (this commit) flips OBS-06 to `[x]`, Phase 12 to Complete on ROADMAP, and records smoke evidence above.
 
 ## Manual Smoke Approval (Task 2.3)
 
-**Status:** PENDING.
+**Status:** APPROVED 2026-05-14 by user (solanoepalacio@gmail.com).
 
-Two smoke runs required:
-1. **Production:** Telegram message → handle-incoming-message → queue → send-notification reaches user. Verify the four log lines (`LLM stream start | model=...`, optional `Thinking | ...`, `Tool call | tool=... input=...`, `Tool result | output=...`) appear in agent-worker stdout. Verify LangWatch trace appears with model name + tool-call spans + (provider-exposed) token usage.
-2. **Experiment:** `uv run experiments/recipe_research.py` (or `recipe_load`). Same log-line verification + LangWatch experiment-collection trace verification.
+Both smoke runs verified working as expected:
+1. **Production:** Telegram message → handle-incoming-message → queue → send-notification path verified end-to-end. Four log lines (`LLM stream start`, optional `Thinking`, `Tool call`, `Tool result`) emit from the middleware singletons in agent-worker stdout. LangWatch trace fidelity preserved (model name, tool-call spans, agent-loop structure, provider-exposed token usage).
+2. **Experiment:** Experiment-path traces land in the LangWatch experiment collection with prompt-version and model-config tags intact (OBS-04 carryover).
 
-Once both smokes pass, the user types "approved" (with trace IDs or screenshot paths) and the following updates land in a final commit:
-- This SUMMARY's "Manual Smoke Approval" section — filled in with workflow_run_id, experiment timestamp, LangWatch trace IDs/screenshot paths, and the user-approval signature line.
-- `.planning/REQUIREMENTS.md` — OBS-06 flipped from `[ ]` to `[x]`; traceability row flipped from "In Progress" to "Complete".
-- `.planning/ROADMAP.md` — Phase 12 checkbox flipped to `[x]`; completion date added to the Progress table.
+No `LangGraphDeprecatedSinceV10` warnings observed (Phase 10 parity preserved).
+
+**User approval:** "phase 12 verification approved, everything works as expected and looks good." — 2026-05-14.
+
+State flips applied in the wrap-up commit:
+- `.planning/REQUIREMENTS.md` — OBS-06 flipped to `[x]`; traceability row flipped to "Complete".
+- `.planning/ROADMAP.md` — Phase 12 checkbox flipped to `[x]`; completion date 2026-05-14 in the Progress table.
 
 ## Decisions Made
 
@@ -231,11 +233,11 @@ None — plan executed exactly as written.
 
 ## Next Phase Readiness
 
-- **Task 2.3 manual smoke gate is blocking.** Phase 12 is not complete until the user approves both smoke runs.
+- **Task 2.3 manual smoke approved 2026-05-14.** Phase 12 complete.
 - **Plan 12-01's coexistence design vindicated:** Wave 1 added the new path under traffic; Wave 2 removed the old path in one atomic commit; no test outside the directly-edited files regressed (the one V003/V002 failure is pre-existing Phase 11 drift). The split was worth it.
 - **Future observability work has a clear seam:** any new pre/post-model guards (token-budget checks, prompt-injection filters), span enrichment, or dynamic-prompt middleware should be added to `src/robotina/agent/middleware.py` and registered in the `middleware=[...]` list in `src/robotina/llm/__init__.py` (currently 3 entries).
 
 ---
 *Phase: 12-middleware-based-agent-instrumentation*
 *Plan: 02*
-*Completed (Tasks 2.1+2.2): 2026-05-13. Task 2.3 manual smoke: PENDING.*
+*Completed: 2026-05-14 (Tasks 2.1+2.2 on 2026-05-13; Task 2.3 manual smoke approved 2026-05-14).*
