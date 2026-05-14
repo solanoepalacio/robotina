@@ -596,3 +596,190 @@ def test_migration_0005_upgrades_and_downgrades():
 
     # Re-apply so the DB is back at head for subsequent tests in the session.
     command.upgrade(cfg, "head")
+
+
+# ---------------------------------------------------------------------------
+# Phase 13 / Plan 13-01: workflow_runner wiring for step_input + failure_reason
+# ---------------------------------------------------------------------------
+# Note: these tests use the same mocked-session pattern as the existing
+# WF-06/WF-08 tests above (e.g. test_on_step_complete_enqueues_next_step).
+# The wiring being tested is purely "before .commit(), the code assigns
+# step.step_input / step.failure_reason on the step instance" — directly
+# observable on the MagicMock step object without a real Postgres session.
+# Driving these via queue_workflow + live DB would add fixture surface area
+# without strengthening the wiring assertions (Rule 3 deviation, scope-bounded).
+
+
+def test_step_input_persisted_on_first_enqueue():
+    """DASH-02: queue_workflow assigns step.step_input on the first step before
+    queue.enqueue and session.commit. The value is the build_input output
+    serialized via .model_dump(mode='json') when the input is a Pydantic model
+    (mirrors the existing artifact serialization pattern at workflow_runner.py
+    ~line 274-279).
+    """
+    from robotina.queue.workflow_runner import queue_workflow
+
+    # Capture every step added to the session so we can find the first step
+    # by step_key after queue_workflow returns.
+    added_steps: list = []
+    flushed_runs: list = []
+
+    session = MagicMock()
+
+    def _add(obj):
+        # WorkflowRun is added first (no step_key), then steps.
+        if hasattr(obj, "step_key") and obj.step_key:
+            added_steps.append(obj)
+        else:
+            flushed_runs.append(obj)
+
+    session.add.side_effect = _add
+    # session.flush is a no-op for the mock; queue.enqueue is fully mocked.
+
+    queue = MagicMock()
+    queue.name = "agent-tasks"
+
+    shared_context = {
+        "household_id": "hh-1",
+        "recipe_query": "spaghetti",
+        "reply_context": {
+            "platform": "telegram",
+            "chat_id": "c1",
+            "user_id": "u1",
+        },
+    }
+
+    queue_workflow(
+        workflow_type="add-recipe",
+        shared_context=shared_context,
+        household_id="hh-1",
+        queue=queue,
+        session=session,
+    )
+
+    # First step is "acknowledge" (per add-recipe workflow definition).
+    acknowledge_step = next(s for s in added_steps if s.step_key == "acknowledge")
+    # step_input was assigned BEFORE queue.enqueue (so the dashboard can read it).
+    assert acknowledge_step.step_input is not None, (
+        "step_input not set on the first enqueued step"
+    )
+    # Pydantic model_dump(mode='json') output — assert key fields are present
+    # (AcknowledgeAddRecipeInput uses recipe_query + reply_context).
+    assert isinstance(acknowledge_step.step_input, dict)
+    assert acknowledge_step.step_input.get("recipe_query") == "spaghetti"
+    assert acknowledge_step.step_input.get("reply_context") == shared_context["reply_context"]
+    # queue.enqueue actually called
+    assert queue.enqueue.called
+
+
+def test_step_input_persisted_on_subsequent_enqueue():
+    """DASH-02: on_step_complete assigns next_step.step_input before enqueue +
+    commit, using the same Pydantic-aware serialization pattern as the
+    first-step site.
+    """
+    from robotina.queue.workflow_runner import on_step_complete
+
+    # acknowledge -> gather transition. The gather build_input takes
+    # recipe_query + household_id from shared_context.
+    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
+    next_step = make_step(
+        step_key="gather", task_type="recipe-research-gather", task_job_id=None
+    )
+    # Explicit attribute so the assertion against None has a distinguishable
+    # baseline (vs MagicMock's auto-created attribute behavior).
+    next_step.step_input = None
+
+    run = make_run(
+        workflow_type="add-recipe",
+        shared_context={
+            "household_id": "hh-1",
+            "recipe_query": "spaghetti",
+            "reply_context": {
+                "platform": "telegram",
+                "chat_id": "c1",
+                "user_id": "u1",
+            },
+        },
+    )
+
+    session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter.return_value = query_mock
+    query_mock.order_by.return_value = query_mock
+    query_mock.first.side_effect = [step, run, next_step]
+    query_mock.all.return_value = [step]
+    session.query.return_value = query_mock
+
+    queue = MagicMock()
+    # Use a tool_message-style artifact so _extract_task_output takes the
+    # non-structured branch and doesn't try to read structured_response.
+    output = {"result": "acknowledged"}
+
+    on_step_complete("test-job-id", output, session, queue)
+
+    assert next_step.step_input is not None, (
+        "step_input not set on the next enqueued step"
+    )
+    assert isinstance(next_step.step_input, dict)
+    # RecipeResearchGatherInput shape: query + household_id
+    assert next_step.step_input.get("query") == "spaghetti"
+    assert next_step.step_input.get("household_id") == "hh-1"
+    assert queue.enqueue.called
+
+
+def test_failure_reason_set_with_exception_format_and_single_line():
+    """DASH-03: on_step_failed, when called with exc=<Exception>, sets
+    step.failure_reason to f'{type(exc).__name__}: {exc}' with embedded
+    newlines collapsed to spaces and trailing whitespace stripped
+    (RESEARCH Pitfall 2). When called WITHOUT exc=, leaves failure_reason
+    untouched (backward compat for the legacy direct-task callers).
+    """
+    from robotina.queue.workflow_runner import on_step_failed
+
+    # --- case 1: with exc=, multi-line message -> single line ---
+    step = make_step(status=WorkflowStepStatus.RUNNING)
+    step.failure_reason = None  # explicit baseline
+    pending_step = make_step(step_key="step2", status=WorkflowStepStatus.PENDING)
+    pending_step.failure_reason = None
+    run = make_run(status=WorkflowStatus.RUNNING)
+
+    session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter.return_value = query_mock
+    query_mock.first.side_effect = [step, run]
+    query_mock.all.return_value = [pending_step]
+    session.query.return_value = query_mock
+
+    on_step_failed(
+        "test-job-id",
+        session,
+        queue=None,
+        exc=ValueError("multi\nline\nmessage"),
+    )
+
+    assert step.status == WorkflowStepStatus.FAILED
+    assert step.failure_reason == "ValueError: multi line message", (
+        f"unexpected failure_reason format: {step.failure_reason!r}"
+    )
+    # Cancelled sibling step retains NULL failure_reason (SPEC AC #3).
+    assert pending_step.status == WorkflowStepStatus.CANCELLED
+    assert pending_step.failure_reason is None
+
+    # --- case 2: without exc= (legacy caller / direct task) -> leaves NULL ---
+    step2 = make_step(status=WorkflowStepStatus.RUNNING)
+    step2.failure_reason = None
+    run2 = make_run(status=WorkflowStatus.RUNNING)
+
+    session2 = MagicMock()
+    query_mock2 = MagicMock()
+    query_mock2.filter.return_value = query_mock2
+    query_mock2.first.side_effect = [step2, run2]
+    query_mock2.all.return_value = []
+    session2.query.return_value = query_mock2
+
+    on_step_failed("test-job-id", session2)  # no exc, no queue
+
+    assert step2.status == WorkflowStepStatus.FAILED
+    assert step2.failure_reason is None, (
+        "legacy caller (no exc=) must leave failure_reason untouched (NULL)"
+    )
