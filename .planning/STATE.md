@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 15 in progress (Plans 15-01..15-04 complete)
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-05-14T20:30:00.000Z"
-last_activity: "2026-05-14 - Completed Plan 15-04: recipe-research-ingredients V004 (validation tools + accumulating artifact)"
+status: Phase 15 in progress (Plans 15-01..15-05 complete)
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-05-14T19:27:07.000Z"
+last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
 progress:
   total_phases: 18
   completed_phases: 13
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — IN PROGRESS
-Plans: 4 of (TBD; expected 6 — foundation + 5 prompt bumps)
+Plans: 5 of (TBD; expected 6 — foundation + 5 prompt bumps)
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ Plans: 4 of (TBD; expected 6 — foundation + 5 prompt bumps)
 | Phase 13-queue-visibility-dashboard P01 | 25min | 2 tasks | 5 files |
 | Phase 13-queue-visibility-dashboard PP02 | 6min | 2 tasks | 21 files |
 | Phase 15 P02 | 181s | 2 tasks | 3 files |
+| Phase 15 P05 | 65s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 13-02: Template + static dirs resolved via Path(__file__).parent (not CWD-relative strings) — Jinja2Templates and StaticFiles both take str(Path(__file__).parent / 'templates'|'static') so the app works under uv run from any directory and under pytest
 - [Phase ?]: Phase 13-02: D-01 (USER-LOCKED) enforced by tests/dashboard/test_independence.py — grep gate + inward-only import audit run as normal pytest assertions; cannot be silently bypassed
 - [Phase ?]: Plan 15-02: prefer canonical RecipeData symbol over RecipeResearchGatherOutput alias in AGENT_REGISTRY[recipe-research-gather].response_format_model
+- [Phase 15]: Plan 15-05: metadata V004 nulls `gathered_sources` on emit per D-04 — clean-payload contract for recipe-load. Owned fields: servings_qty, servings_unit, prep_time, cook_time, total_time, source_url. V003's never-null-always-estimate rule (default servings_qty=4, servings_unit="porciones") reversed: `null` now preferable to invented metadata; household-manager API accepts null.
 
 ### Pending Todos
 
@@ -246,9 +248,9 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-05-14 - Completed quick task 260514-ix8: Remove redundant Output section from 5 recipe research prompts
+Last activity: 2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)
 
-Last session: 2026-05-14T19:20:15.677Z
-Stopped at: Phase 15 context gathered
+Last session: 2026-05-14T19:27:07.000Z
+Stopped at: Completed 15-05-PLAN.md
 Resume file: 
 None
