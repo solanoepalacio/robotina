@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 15 in progress (Plans 15-01..15-03 complete)
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-05-14T20:00:00.000Z"
-last_activity: "2026-05-14 - Completed Plan 15-03: recipe-research-instructions V004 (accumulating artifact contract)"
+status: Phase 15 in progress (Plans 15-01..15-04 complete)
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-05-14T20:30:00.000Z"
+last_activity: "2026-05-14 - Completed Plan 15-04: recipe-research-ingredients V004 (validation tools + accumulating artifact)"
 progress:
   total_phases: 18
   completed_phases: 13
   total_plans: 63
-  completed_plans: 55
-  percent: 87
+  completed_plans: 56
+  percent: 89
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — IN PROGRESS
-Plans: 3 of (TBD; expected 6 — foundation + 5 prompt bumps)
+Plans: 4 of (TBD; expected 6 — foundation + 5 prompt bumps)
 
 ## Performance Metrics
 
