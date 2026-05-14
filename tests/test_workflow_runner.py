@@ -420,9 +420,15 @@ def test_reply_context_not_in_recipe_research_input():
     assert "reply_context" not in RecipeResearchInput.model_fields
 
 
-def test_reply_context_not_in_recipe_load_input():
-    """WF-09: RecipeLoadInput has no reply_context field (enforced at model level)."""
-    assert "reply_context" not in RecipeLoadInput.model_fields
+def test_recipe_load_input_has_reply_context():
+    """Phase 15 supersedes WF-09 for RecipeLoadInput.
+
+    The accumulating-artifact contract collapses every downstream Recipe*Input
+    to ``{recipe, reply_context, household_id}``; reply_context is threaded
+    via ``build_input`` from ``shared_context``. ``RecipeResearchInput`` (the
+    legacy single-shot task) is unchanged and still omits reply_context.
+    """
+    assert "reply_context" in RecipeLoadInput.model_fields
 
 
 # ---------------------------------------------------------------------------

@@ -6,11 +6,26 @@ This module is the shared contract imported by:
 - robotina.task_runner (workflow advancement, Phase 5)
 
 IMPORTANT:
-- reply_context is NOT present in RecipeResearchInput or RecipeLoadInput.
-  It lives in WorkflowRun.shared_context and is resolved by the task runner.
+- reply_context lives in WorkflowRun.shared_context and is resolved by the task
+  runner. For research sub-step / load inputs, it is threaded into the per-step
+  Pydantic input model so the agent has the platform/chat/user identifiers
+  available during its turn — but the user does NOT see it in the user-message
+  body (it stays metadata).
 - All models use Pydantic v2 syntax: list[...], str | None, Literal[...]
 - All models are pickle-serializable (RQ default serializer)
 - When storing model output to a JSON column, use model.model_dump(mode='json')
+
+Phase 15 — accumulating-artifact contract:
+- ``RecipeData`` is the single shared artifact shape across the whole
+  recipe-research pipeline (gather → instructions → ingredients → metadata →
+  load). Every field except ``name`` is Optional with a sensible default; each
+  sub-agent receives a partial ``RecipeData`` and emits a fuller copy. The four
+  ``Recipe*Output`` sentinels are kept as aliases for ``RecipeData`` so existing
+  imports keep working.
+- All four downstream ``Recipe*Input`` models (instructions, ingredients,
+  metadata, load) collapse to ``{recipe, reply_context, household_id}``.
+  ``RecipeResearchGatherInput`` keeps ``{query, reply_context, household_id}``
+  because gather has no prior artifact to thread.
 """
 from __future__ import annotations
 
@@ -38,10 +53,14 @@ class ReplyContext(BaseModel):
 
 
 class RecipeIngredient(BaseModel):
-    food_name: str        # human-readable name — resolved to foodId by recipe-load
+    food_name: str                     # human-readable Spanish name
     unit_name: str | None = None
     quantity: float | None = None
     note: str | None = None
+    # Phase 15: resolved catalog ids (populated by ingredients step's
+    # validate-foods / validate-units tools; recipe-load reads these).
+    food_id: str | None = None
+    unit_id: str | None = None
 
 
 class RecipeStep(BaseModel):
@@ -50,6 +69,23 @@ class RecipeStep(BaseModel):
 
 
 class RecipeData(BaseModel):
+    """Shared accumulating artifact across the recipe-research pipeline.
+
+    Only ``name`` is required (must be present once the artifact reaches
+    recipe-load). Every other field is Optional / defaulted so that each
+    sub-agent can emit a partially-populated copy and the next sub-agent can
+    add or refine its owned fields without losing upstream data.
+
+    Field ownership (per pipeline step):
+    - gather:        ``gathered_sources``
+    - instructions:  ``name``, ``description``, ``steps``
+    - ingredients:   ``ingredients``, ``missing_ingredients``
+    - metadata:      ``servings_qty``, ``servings_unit``, ``prep_time``,
+                     ``cook_time``, ``total_time``, ``source_url``; clears
+                     ``gathered_sources`` to ``None`` on emit.
+    Other fields must be preserved verbatim from the incoming artifact.
+    """
+
     name: str
     description: str | None = None
     servings_qty: int | None = None
@@ -58,8 +94,11 @@ class RecipeData(BaseModel):
     cook_time: int | None = None       # minutes
     total_time: int | None = None      # minutes
     source_url: str | None = None      # original recipe URL if found
-    ingredients: list[RecipeIngredient]
-    steps: list[RecipeStep]
+    ingredients: list[RecipeIngredient] = []
+    steps: list[RecipeStep] = []
+    # Phase 15 additions:
+    gathered_sources: list[dict] | None = None
+    missing_ingredients: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +126,7 @@ class IncomingMessageOutput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# recipe-research
+# recipe-research (legacy single-shot task — retained for back-compat)
 # reply_context is NOT here — it lives in WorkflowRun.shared_context
 # ---------------------------------------------------------------------------
 
@@ -104,104 +143,89 @@ class RecipeResearchOutput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# recipe-research-gather (Step 1 of recipe research pipeline)
+# recipe-research pipeline — Phase 15 accumulating-artifact shape
+#
+# Every downstream sub-agent receives the prior step's RecipeData snapshot
+# verbatim and emits a fuller copy. Only the gather step has no prior
+# artifact, so it keeps the original {query, reply_context, household_id}
+# shape.
 # ---------------------------------------------------------------------------
 
 class RecipeResearchGatherInput(BaseModel):
-    query: str            # meal name, e.g. "Pasta Bolognesa"
+    query: str
+    reply_context: ReplyContext
     household_id: str
 
     def to_user_message(self) -> str:
         return self.query
 
 
-class RecipeResearchGatherOutput(BaseModel):
-    recipes: list[dict]   # list of scraped/extracted recipe dicts from web search
-
-
-# ---------------------------------------------------------------------------
-# recipe-research-instructions (Step 2 of recipe research pipeline)
-# ---------------------------------------------------------------------------
-
 class RecipeResearchInstructionsInput(BaseModel):
-    query: str
-    gathered_recipes: list[dict]  # from gather step artifact
-
-    def to_user_message(self) -> str:
-        import json
-        return f"Create baseline instructions for: {self.query}\n\nGathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
-
-
-class RecipeResearchInstructionsOutput(BaseModel):
-    draft_name: str
-    draft_description: str
-    draft_instructions: list[RecipeStep]
-
-
-# ---------------------------------------------------------------------------
-# recipe-research-ingredients (Step 3 of recipe research pipeline)
-# ---------------------------------------------------------------------------
-
-class RecipeResearchIngredientsInput(BaseModel):
-    query: str
-    draft_instructions: list[RecipeStep]
-    gathered_recipes: list[dict]  # for substitute lookup (D-15)
+    recipe: RecipeData
+    reply_context: ReplyContext
     household_id: str
 
     def to_user_message(self) -> str:
         import json
-        instructions_text = "\n".join(f"- {s.body}" for s in self.draft_instructions)
-        return f"Extract and verify ingredients for: {self.query}\n\nDraft instructions:\n{instructions_text}\n\nGathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
-
-
-class RecipeResearchIngredientsOutput(BaseModel):
-    ingredients: list[RecipeIngredient]
-
-
-# ---------------------------------------------------------------------------
-# recipe-research-metadata (Step 4 of recipe research pipeline)
-# ---------------------------------------------------------------------------
-
-class RecipeResearchMetadataInput(BaseModel):
-    query: str
-    draft_name: str
-    draft_description: str
-    draft_instructions: list[RecipeStep]
-    ingredients: list[RecipeIngredient]
-    gathered_recipes: list[dict]  # for metadata hints
-    source_url: str | None = None
-
-    def to_user_message(self) -> str:
-        import json
-        instructions_text = "\n".join(f"- {s.body}" for s in self.draft_instructions)
-        ingredients_text = "\n".join(f"- {i.food_name}: {i.quantity} {i.unit_name}" for i in self.ingredients)
         return (
-            f"Estimate metadata for: {self.query}\n\n"
-            f"Name: {self.draft_name}\n"
-            f"Description: {self.draft_description}\n\n"
-            f"Instructions:\n{instructions_text}\n\n"
-            f"Ingredients:\n{ingredients_text}\n\n"
-            f"Gathered recipes:\n{json.dumps(self.gathered_recipes, ensure_ascii=False, indent=2)}"
+            "Continue the recipe-research pipeline (instructions step). "
+            "Preserve every field of the incoming RecipeData; only add/refine "
+            "`steps`, `description`, and `name`.\n\n"
+            + json.dumps(self.recipe.model_dump(mode="json"), ensure_ascii=False, indent=2)
         )
 
 
-class RecipeResearchMetadataOutput(BaseModel):
-    recipe: RecipeData    # final fully-populated RecipeData (D-19)
+class RecipeResearchIngredientsInput(BaseModel):
+    recipe: RecipeData
+    reply_context: ReplyContext
+    household_id: str
+
+    def to_user_message(self) -> str:
+        import json
+        return (
+            "Continue the recipe-research pipeline (ingredients step). "
+            "Preserve every field of the incoming RecipeData; resolve "
+            "ingredients via validate-foods / validate-units.\n\n"
+            + json.dumps(self.recipe.model_dump(mode="json"), ensure_ascii=False, indent=2)
+        )
+
+
+class RecipeResearchMetadataInput(BaseModel):
+    recipe: RecipeData
+    reply_context: ReplyContext
+    household_id: str
+
+    def to_user_message(self) -> str:
+        import json
+        return (
+            "Continue the recipe-research pipeline (metadata step). "
+            "Preserve every field of the incoming RecipeData; only add/refine "
+            "servings / times / source_url. Clear `gathered_sources` to null.\n\n"
+            + json.dumps(self.recipe.model_dump(mode="json"), ensure_ascii=False, indent=2)
+        )
+
+
+# Sentinel aliases — every sub-agent's response_format target IS RecipeData.
+# Kept as aliases so existing imports (agents.py, tests) keep working.
+RecipeResearchGatherOutput = RecipeData
+RecipeResearchInstructionsOutput = RecipeData
+RecipeResearchIngredientsOutput = RecipeData
+RecipeResearchMetadataOutput = RecipeData
 
 
 # ---------------------------------------------------------------------------
 # recipe-load
-# reply_context is NOT here — it lives in WorkflowRun.shared_context
 # ---------------------------------------------------------------------------
 
 class RecipeLoadInput(BaseModel):
     recipe: RecipeData    # resolved from prior step's artifact by the task runner
+    reply_context: ReplyContext
     household_id: str
 
     def to_user_message(self) -> str:
         import json
         return (
-            "Load this recipe into the household-manager system:\n\n"
+            "Load this recipe into household-manager:\n\n"
             + json.dumps(self.recipe.model_dump(mode="json"), ensure_ascii=False, indent=2)
         )
 
@@ -211,7 +235,6 @@ class RecipeLoadOutput(BaseModel):
     recipe_name: str      # persisted to WorkflowRunStep.artifact by the task runner
     recipe_description: str | None = None
     recipe_slug: str = ""
-    missing_ingredients: list[str] = []
 
 
 # ---------------------------------------------------------------------------

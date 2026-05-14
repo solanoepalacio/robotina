@@ -20,13 +20,12 @@ from pydantic import BaseModel, ConfigDict
 from robotina.queue.task_types import (
     AcknowledgeAddRecipeInput,
     RecipeData,
-    RecipeIngredient,
     RecipeLoadInput,
     RecipeResearchGatherInput,
     RecipeResearchIngredientsInput,
     RecipeResearchInstructionsInput,
     RecipeResearchMetadataInput,
-    RecipeStep,
+    ReplyContext,
     SendNotificationInput,
 )
 
@@ -59,30 +58,23 @@ class WorkflowDefinition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _recipes(gather_artifact) -> list:
-    """Extract recipe list from a gather artifact.
-
-    The gather agent may return {"recipes": [...]} or a bare list.
-    """
-    if isinstance(gather_artifact, list):
-        return gather_artifact
-    return gather_artifact.get("recipes", [])
-
-
-# ---------------------------------------------------------------------------
 # Notification helpers
 # ---------------------------------------------------------------------------
 
-def _build_notify_text(load_artifact: dict) -> str:
-    """Compose notification text from recipe-load step artifact (D-07)."""
+def _build_notify_text(metadata_artifact: dict, load_artifact: dict) -> str:
+    """Compose notification text from the metadata and load step artifacts.
+
+    Phase 15: ``missing_ingredients`` now lives on the metadata-step's
+    ``RecipeData`` snapshot (the ingredients step writes it; metadata
+    preserves it). ``RecipeLoadOutput`` no longer carries it. Pull the
+    recipe-name/description/slug from ``load_artifact`` and the missing
+    list from ``metadata_artifact``.
+    """
     base_url = os.environ.get("HOUSEHOLD_MANAGER_BASE_URL", "http://localhost:3001")
     name = load_artifact.get("recipe_name", "Unknown recipe")
     description = load_artifact.get("recipe_description")
     slug = load_artifact.get("recipe_slug", "")
-    missing = load_artifact.get("missing_ingredients", [])
+    missing = metadata_artifact.get("missing_ingredients", [])
 
     parts = [f"Receta agregada: {name}"]
     if description:
@@ -118,26 +110,26 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 task_type="recipe-research-gather",
                 build_input=lambda ctx, _: RecipeResearchGatherInput(
                     query=ctx["recipe_query"],
+                    reply_context=ReplyContext(**ctx["reply_context"]),
                     household_id=ctx["household_id"],
                 ),
             ),
             WorkflowStepDef(
                 step_key="instructions",
                 task_type="recipe-research-instructions",
+                # Phase 15: artifacts["gather"] is now a RecipeData dump.
                 build_input=lambda ctx, artifacts: RecipeResearchInstructionsInput(
-                    query=ctx["recipe_query"],
-                    gathered_recipes=_recipes(artifacts["gather"]),
+                    recipe=RecipeData(**artifacts["gather"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
                 ),
             ),
             WorkflowStepDef(
                 step_key="ingredients",
                 task_type="recipe-research-ingredients",
                 build_input=lambda ctx, artifacts: RecipeResearchIngredientsInput(
-                    query=ctx["recipe_query"],
-                    draft_instructions=[
-                        RecipeStep(**s) for s in artifacts["instructions"]["draft_instructions"]
-                    ],
-                    gathered_recipes=_recipes(artifacts["gather"]),
+                    recipe=RecipeData(**artifacts["instructions"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
                     household_id=ctx["household_id"],
                 ),
             ),
@@ -145,26 +137,18 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 step_key="metadata",
                 task_type="recipe-research-metadata",
                 build_input=lambda ctx, artifacts: RecipeResearchMetadataInput(
-                    query=ctx["recipe_query"],
-                    draft_name=artifacts["instructions"]["draft_name"],
-                    draft_description=artifacts["instructions"]["draft_description"],
-                    draft_instructions=[
-                        RecipeStep(**s) for s in artifacts["instructions"]["draft_instructions"]
-                    ],
-                    ingredients=[
-                        RecipeIngredient(**i) for i in artifacts["ingredients"]["ingredients"]
-                    ],
-                    gathered_recipes=_recipes(artifacts["gather"]),
-                    source_url=_recipes(artifacts["gather"])[0].get("url") if _recipes(artifacts["gather"]) else None,
+                    recipe=RecipeData(**artifacts["ingredients"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
                 ),
             ),
             WorkflowStepDef(
                 step_key="load",
                 task_type="recipe-load",
-                # artifacts["metadata"]["recipe"] is a dict from model_dump(mode='json')
-                # -- must reconstruct RecipeData before passing to RecipeLoadInput
+                # Phase 15: artifacts["metadata"] IS the RecipeData dump (no "recipe" wrapper).
                 build_input=lambda ctx, artifacts: RecipeLoadInput(
-                    recipe=RecipeData(**artifacts["metadata"]["recipe"]),
+                    recipe=RecipeData(**artifacts["metadata"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
                     household_id=ctx["household_id"],
                 ),
             ),
@@ -173,7 +157,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 task_type="send-notification",
                 build_input=lambda ctx, artifacts: SendNotificationInput(
                     **ctx["reply_context"],
-                    text=_build_notify_text(artifacts["load"]),
+                    text=_build_notify_text(artifacts["metadata"], artifacts["load"]),
                 ),
             ),
         ],

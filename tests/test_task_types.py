@@ -2,11 +2,25 @@
 
 No Docker required — all tests are pure Python.
 Run: uv run pytest tests/test_task_types.py -x -q
+
+Phase 15 contract:
+- ``RecipeData`` is the single shared artifact across the recipe-research
+  pipeline. Only ``name`` is required; every other field is Optional/defaulted.
+- ``RecipeIngredient`` carries ``food_id`` and ``unit_id`` (resolved by the
+  ingredients-step validation tools).
+- All four downstream ``Recipe*Input`` models collapse to
+  ``{recipe, reply_context, household_id}``. ``RecipeResearchGatherInput``
+  keeps ``{query, reply_context, household_id}`` because gather has no
+  prior artifact.
+- ``RecipeLoadOutput`` no longer carries ``missing_ingredients``.
 """
 import pickle
 from datetime import datetime, timezone
 
-import pytest
+
+def _reply_ctx():
+    from robotina.queue.task_types import ReplyContext
+    return ReplyContext(platform="telegram", chat_id="c1", user_id="u1")
 
 
 def _make_recipe_data():
@@ -32,7 +46,7 @@ def _make_recipe_data():
 
 
 def test_all_models_importable():
-    """All 13 model classes must import without error."""
+    """All model classes must import without error."""
     from robotina.queue.task_types import (
         Message, ReplyContext, RecipeIngredient, RecipeStep, RecipeData,
         IncomingMessageInput, IncomingMessageOutput,
@@ -53,29 +67,144 @@ def test_all_models_importable():
 
 def test_incoming_message_input_has_history_field():
     """IncomingMessageInput must have a history: list[Message] field."""
-    from robotina.queue.task_types import IncomingMessageInput, Message
+    from robotina.queue.task_types import IncomingMessageInput
     hints = IncomingMessageInput.model_fields
     assert "history" in hints, "IncomingMessageInput missing 'history' field"
 
 
 def test_recipe_research_input_has_no_reply_context():
-    """RecipeResearchInput must NOT have a reply_context field (it lives in WorkflowRun.shared_context)."""
+    """Legacy RecipeResearchInput (single-shot) must NOT have a reply_context field."""
     from robotina.queue.task_types import RecipeResearchInput
-    assert "reply_context" not in RecipeResearchInput.model_fields, (
-        "reply_context must NOT be in RecipeResearchInput — it lives in WorkflowRun.shared_context"
+    assert "reply_context" not in RecipeResearchInput.model_fields
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — RecipeData / RecipeIngredient / RecipeLoadOutput shape
+# ---------------------------------------------------------------------------
+
+def test_recipe_data_only_name_required():
+    """RecipeData(name='X') must construct with every other field defaulted."""
+    from robotina.queue.task_types import RecipeData
+    r = RecipeData(name="X")
+    assert r.name == "X"
+    assert r.description is None
+    assert r.servings_qty is None
+    assert r.ingredients == []
+    assert r.steps == []
+    assert r.gathered_sources is None
+    assert r.missing_ingredients == []
+
+
+def test_recipe_ingredient_food_id_unit_id_default_none():
+    """RecipeIngredient has new food_id / unit_id fields, both default None."""
+    from robotina.queue.task_types import RecipeIngredient
+    i = RecipeIngredient(food_name="cebolla")
+    assert i.food_id is None
+    assert i.unit_id is None
+
+
+def test_recipe_data_dump_round_trip_preserves_phase15_fields():
+    from robotina.queue.task_types import RecipeData, RecipeIngredient
+    r = RecipeData(
+        name="X",
+        gathered_sources=[{"url": "http://example.com"}],
+        missing_ingredients=["paprika"],
+        ingredients=[RecipeIngredient(food_name="cebolla", food_id="f1", unit_id="u1")],
     )
+    dumped = r.model_dump(mode="json")
+    restored = RecipeData(**dumped)
+    assert restored.gathered_sources == [{"url": "http://example.com"}]
+    assert restored.missing_ingredients == ["paprika"]
+    assert restored.ingredients[0].food_id == "f1"
+    assert restored.ingredients[0].unit_id == "u1"
 
 
-def test_recipe_load_input_has_no_reply_context():
-    """RecipeLoadInput must NOT have a reply_context field."""
-    from robotina.queue.task_types import RecipeLoadInput
-    assert "reply_context" not in RecipeLoadInput.model_fields, (
-        "reply_context must NOT be in RecipeLoadInput — it lives in WorkflowRun.shared_context"
+def test_recipe_load_output_no_missing_ingredients():
+    """Phase 15 / D-19: RecipeLoadOutput must NOT carry missing_ingredients."""
+    from robotina.queue.task_types import RecipeLoadOutput
+    assert "missing_ingredients" not in RecipeLoadOutput.model_fields
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — Recipe*Input collapse
+# ---------------------------------------------------------------------------
+
+def test_research_inputs_collapse_to_recipe_reply_context_household_id():
+    """All four downstream Recipe*Input models have exactly {recipe, reply_context, household_id}."""
+    from robotina.queue.task_types import (
+        RecipeResearchInstructionsInput,
+        RecipeResearchIngredientsInput,
+        RecipeResearchMetadataInput,
+        RecipeLoadInput,
     )
+    expected = {"recipe", "reply_context", "household_id"}
+    for M in (
+        RecipeResearchInstructionsInput,
+        RecipeResearchIngredientsInput,
+        RecipeResearchMetadataInput,
+        RecipeLoadInput,
+    ):
+        assert set(M.model_fields) == expected, (M.__name__, set(M.model_fields))
 
+
+def test_gather_input_keeps_query_shape():
+    """RecipeResearchGatherInput stays {query, reply_context, household_id}."""
+    from robotina.queue.task_types import RecipeResearchGatherInput
+    assert set(RecipeResearchGatherInput.model_fields) == {"query", "reply_context", "household_id"}
+
+
+def test_collapsed_inputs_construct_and_round_trip():
+    from robotina.queue.task_types import (
+        RecipeResearchInstructionsInput,
+        RecipeResearchIngredientsInput,
+        RecipeResearchMetadataInput,
+        RecipeLoadInput,
+    )
+    r = _make_recipe_data()
+    for M in (
+        RecipeResearchInstructionsInput,
+        RecipeResearchIngredientsInput,
+        RecipeResearchMetadataInput,
+        RecipeLoadInput,
+    ):
+        m = M(recipe=r, reply_context=_reply_ctx(), household_id="h1")
+        restored = pickle.loads(pickle.dumps(m))
+        assert restored == m
+
+
+def test_gather_input_to_user_message_is_query():
+    from robotina.queue.task_types import RecipeResearchGatherInput
+    m = RecipeResearchGatherInput(
+        query="Pasta Bolognesa",
+        reply_context=_reply_ctx(),
+        household_id="h1",
+    )
+    assert m.to_user_message() == "Pasta Bolognesa"
+
+
+def test_research_output_sentinels_are_recipe_data_aliases():
+    """Per Plan 15-01: the four Recipe*Output sentinels alias RecipeData."""
+    from robotina.queue.task_types import (
+        RecipeData,
+        RecipeResearchGatherOutput,
+        RecipeResearchInstructionsOutput,
+        RecipeResearchIngredientsOutput,
+        RecipeResearchMetadataOutput,
+    )
+    for sentinel in (
+        RecipeResearchGatherOutput,
+        RecipeResearchInstructionsOutput,
+        RecipeResearchIngredientsOutput,
+        RecipeResearchMetadataOutput,
+    ):
+        assert sentinel is RecipeData
+
+
+# ---------------------------------------------------------------------------
+# Pickle round-trips (RQ serialization)
+# ---------------------------------------------------------------------------
 
 def test_incoming_message_input_pickle_round_trip():
-    """IncomingMessageInput must survive pickle round-trip (RQ serialization)."""
     from robotina.queue.task_types import IncomingMessageInput, Message
     now = datetime(2026, 3, 25, 12, 0, 0, tzinfo=timezone.utc)
     model = IncomingMessageInput(
@@ -88,167 +217,55 @@ def test_incoming_message_input_pickle_round_trip():
         text="Hello Robotina",
         history=[Message(message_id="msg-000", role="user", text="Hi", sent_at=now)],
     )
-    restored = pickle.loads(pickle.dumps(model))
-    assert restored == model
+    assert pickle.loads(pickle.dumps(model)) == model
 
 
 def test_recipe_research_input_pickle_round_trip():
-    """RecipeResearchInput must survive pickle round-trip."""
+    """Legacy single-shot RecipeResearchInput must still survive pickle."""
     from robotina.queue.task_types import RecipeResearchInput
     model = RecipeResearchInput(query="carbonara", household_id="hh-789")
-    restored = pickle.loads(pickle.dumps(model))
-    assert restored == model
+    assert pickle.loads(pickle.dumps(model)) == model
 
 
 def test_recipe_load_input_pickle_round_trip():
-    """RecipeLoadInput with nested RecipeData must survive pickle round-trip."""
     from robotina.queue.task_types import RecipeLoadInput
-    model = RecipeLoadInput(recipe=_make_recipe_data(), household_id="hh-789")
-    restored = pickle.loads(pickle.dumps(model))
-    assert restored == model
+    model = RecipeLoadInput(
+        recipe=_make_recipe_data(),
+        reply_context=_reply_ctx(),
+        household_id="hh-789",
+    )
+    assert pickle.loads(pickle.dumps(model)) == model
 
 
 def test_send_notification_input_pickle_round_trip():
-    """SendNotificationInput must survive pickle round-trip."""
     from robotina.queue.task_types import SendNotificationInput
     model = SendNotificationInput(
         platform="telegram", chat_id="chat-123", user_id="user-456",
-        text="Recipe added: Carbonara"
+        text="Recipe added: Carbonara",
     )
-    restored = pickle.loads(pickle.dumps(model))
-    assert restored == model
+    assert pickle.loads(pickle.dumps(model)) == model
 
 
 def test_recipe_data_empty_lists_pickle_round_trip():
-    """RecipeData with empty ingredient/step lists must survive pickle round-trip."""
     from robotina.queue.task_types import RecipeData
-    model = RecipeData(
-        name="Empty Recipe",
-        description=None, servings_qty=None, servings_unit=None,
-        prep_time=None, cook_time=None, total_time=None, source_url=None,
-        ingredients=[], steps=[],
-    )
-    restored = pickle.loads(pickle.dumps(model))
-    assert restored == model
-
-
-# ---------------------------------------------------------------------------
-# recipe-research sub-task I/O model tests (RRECIPE-04)
-# ---------------------------------------------------------------------------
-
-
-def test_recipe_research_gather_input_round_trip():
-    """RRECIPE-04: RecipeResearchGatherInput is pickle-serializable."""
-    from robotina.queue.task_types import RecipeResearchGatherInput
-    m = RecipeResearchGatherInput(query="Pasta Bolognesa", household_id="h1")
-    assert m.to_user_message() == "Pasta Bolognesa"
-    assert pickle.loads(pickle.dumps(m)) == m
-
-
-def test_recipe_research_gather_output_accepts_list_of_dicts():
-    """RRECIPE-04: RecipeResearchGatherOutput stores list[dict]."""
-    from robotina.queue.task_types import RecipeResearchGatherOutput
-    m = RecipeResearchGatherOutput(recipes=[{"title": "test", "url": "http://x.com"}])
-    assert len(m.recipes) == 1
-
-
-def test_recipe_research_instructions_input_round_trip():
-    from robotina.queue.task_types import RecipeResearchInstructionsInput
-    m = RecipeResearchInstructionsInput(query="Pasta", gathered_recipes=[{"title": "t"}])
-    assert "Pasta" in m.to_user_message()
-    assert pickle.loads(pickle.dumps(m)) == m
-
-
-def test_recipe_research_instructions_output_has_draft_fields():
-    from robotina.queue.task_types import RecipeResearchInstructionsOutput, RecipeStep
-    m = RecipeResearchInstructionsOutput(
-        draft_name="Pasta Bolognesa",
-        draft_description="Classic pasta dish",
-        draft_instructions=[RecipeStep(body="Cook pasta", title=None)],
-    )
-    assert m.draft_name == "Pasta Bolognesa"
-    assert len(m.draft_instructions) == 1
-
-
-def test_recipe_research_ingredients_input_round_trip():
-    from robotina.queue.task_types import RecipeResearchIngredientsInput, RecipeStep
-    m = RecipeResearchIngredientsInput(
-        query="Pasta",
-        draft_instructions=[RecipeStep(body="Cook", title=None)],
-        gathered_recipes=[],
-        household_id="h1",
-    )
-    assert "Pasta" in m.to_user_message()
-    assert pickle.loads(pickle.dumps(m)) == m
-
-
-def test_recipe_research_ingredients_output_has_ingredients():
-    from robotina.queue.task_types import RecipeResearchIngredientsOutput, RecipeIngredient
-    m = RecipeResearchIngredientsOutput(
-        ingredients=[RecipeIngredient(food_name="cebolla", unit_name="unidad", quantity=1.0, note=None)]
-    )
-    assert len(m.ingredients) == 1
-    assert m.ingredients[0].food_name == "cebolla"
-
-
-def test_recipe_research_metadata_input_round_trip():
-    from robotina.queue.task_types import RecipeResearchMetadataInput, RecipeStep, RecipeIngredient
-    m = RecipeResearchMetadataInput(
-        query="Pasta",
-        draft_name="Pasta Bolognesa",
-        draft_description="Desc",
-        draft_instructions=[RecipeStep(body="Cook", title=None)],
-        ingredients=[RecipeIngredient(food_name="pasta", unit_name="g", quantity=500.0, note=None)],
-        gathered_recipes=[],
-    )
-    assert "Pasta" in m.to_user_message()
-    assert pickle.loads(pickle.dumps(m)) == m
-
-
-def test_recipe_research_metadata_output_conforms_to_recipe_data():
-    """RRECIPE-04: Final metadata output uses RecipeData model."""
-    from robotina.queue.task_types import RecipeResearchMetadataOutput, RecipeData
-    m = RecipeResearchMetadataOutput(
-        recipe=RecipeData(
-            name="Pasta Bolognesa",
-            description="Classic",
-            servings_qty=4,
-            servings_unit="porciones",
-            prep_time=15,
-            cook_time=30,
-            total_time=45,
-            source_url="http://example.com",
-            ingredients=[],
-            steps=[],
-        )
-    )
-    assert m.recipe.name == "Pasta Bolognesa"
-    assert m.recipe.servings_qty == 4
+    model = RecipeData(name="Empty Recipe", ingredients=[], steps=[])
+    assert pickle.loads(pickle.dumps(model)) == model
 
 
 def test_recipe_load_input_user_message_contains_full_recipe():
-    """The recipe-load agent needs the full structured recipe — not just the name —
-    to resolve foods, build the compound payload, and POST /api/recipes. A prior
-    bug rendered only `f"Load recipe: {self.recipe.name}"`, so the agent
-    (correctly) refused to proceed and the workflow advanced to a misleading
-    "Receta agregada: unknown recipe" notification with no recipe actually
-    created. This test pins the contract.
-    """
+    """recipe-load agent gets the full structured recipe in its user message."""
     from robotina.queue.task_types import RecipeLoadInput
-
     recipe = _make_recipe_data()
-    msg = RecipeLoadInput(recipe=recipe, household_id="hh-789").to_user_message()
-
-    assert msg.startswith("Load this recipe into the household-manager system:")
-    # Top-level fields
+    msg = RecipeLoadInput(
+        recipe=recipe,
+        reply_context=_reply_ctx(),
+        household_id="hh-789",
+    ).to_user_message()
+    assert msg.startswith("Load this recipe into household-manager")
     assert recipe.name in msg
     assert recipe.description in msg
     assert recipe.source_url in msg
-    # Every ingredient food_name and (non-null) unit_name
     for ing in recipe.ingredients:
         assert ing.food_name in msg
-        if ing.unit_name is not None:
-            assert ing.unit_name in msg
-    # Every step body
     for step in recipe.steps:
         assert step.body in msg
