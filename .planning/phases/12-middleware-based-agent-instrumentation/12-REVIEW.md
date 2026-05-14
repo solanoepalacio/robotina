@@ -1,6 +1,7 @@
 ---
 phase: 12-middleware-based-agent-instrumentation
 reviewed: 2026-05-13T00:00:00Z
+fix_applied_at: 2026-05-13T00:00:00Z
 depth: standard
 files_reviewed: 6
 files_reviewed_list:
@@ -15,7 +16,16 @@ findings:
   warning: 2
   info: 5
   total: 7
-status: issues_found
+findings_resolved:
+  - WR-01  # middleware.py docstring — sync-only constraint added
+  - IN-01  # middleware.py docstring — class-name reference updated
+  - IN-04  # test_agent_runner.py — AsyncMock substitution for send_message
+  - IN-05  # test_agent_runner.py — split test_run_task_no_legacy_callback in two
+findings_deferred:
+  - WR-02  # pre-existing jobs.py session leak — out of Phase 12 diff scope
+  - IN-02  # log-injection hardening — separate observability item; legacy parity intentional
+  - IN-03  # pre-existing _RetryingChatOllama assert under -O — out of Phase 12 diff scope
+status: review_fixes_applied
 ---
 
 # Phase 12: Code Review Report
@@ -167,3 +177,23 @@ with patch("robotina.gateway.send.send_message", new=async_send):
 _Reviewed: 2026-05-13T00:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Fix status (2026-05-13)
+
+Review-fix pass applied via `/gsd-code-review --fix --auto` against the Phase 12 diff.
+
+| Finding | Status | Commit / Notes |
+|---------|--------|----------------|
+| WR-01   | **Resolved** | Sync-only constraint added to `middleware.py` module docstring. Async parity (NotImplementedError-raising base hooks) called out explicitly. |
+| WR-02   | **Deferred** | Pre-existing `jobs.py` session leak, predates Phase 12. Tracked in `deferred-items.md`. Out of Phase 12 diff scope. |
+| IN-01   | **Resolved** | `log_around_model_call` docstring updated — names `_RetryingChatOllama` for Ollama and notes the wrapper. |
+| IN-02   | **Skipped** | Log-injection hardening — minimal `\n`-only sanitization would create false sense of safety (does not handle `\r`, `\t`, ANSI escapes). Tracked in `deferred-items.md` as a separate observability item. |
+| IN-03   | **Deferred** | Pre-existing `_RetryingChatOllama` `assert` under `python -O`. Out of Phase 12 diff scope. Tracked in `deferred-items.md`. |
+| IN-04   | **Resolved** | `test_run_task_send_notification_takes_deterministic_path` now uses `AsyncMock` for `send_message`, removing reliance on quirky `asyncio.run` tolerance of `MagicMock`. |
+| IN-05   | **Resolved** | `test_run_task_no_legacy_callback` split into `test_legacy_callbacks_module_deleted` + `test_run_task_does_not_pass_agent_logging_handler`. |
+
+**Verification:** After each commit, `uv run pytest tests/unit/test_agent_middleware.py tests/unit/test_agent_runner.py tests/unit/test_llm_backend.py -x` stayed green (24 passed after the IN-05 split — was 23 before).
+
+**Phase 12 manual smoke gate:** Unchanged. None of the applied fixes touch runtime behavior of agent invocation, middleware log emission, or the callbacks list passed to `agent.invoke`. They are docstring-only edits in `middleware.py` and test-only edits in `test_agent_runner.py`.
