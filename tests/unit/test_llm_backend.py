@@ -123,3 +123,107 @@ def test_create_agent_used_not_agent_executor():
     assert "from langgraph.prebuilt" not in source, (
         "robotina.llm must not import from the deprecated langgraph.prebuilt module"
     )
+
+
+# ---------------------------------------------------------------------------
+# OBS-06 / Phase 12: middleware wiring
+# Assert all three backend.create_agent methods pass middleware=[
+#     log_around_model_call, log_after_model, log_wrap_tool_call
+# ] to _create_agent. Coexists with AgentLoggingHandler in jobs.py (Plan 12-02
+# removes that legacy path atomically in Wave 2).
+# ---------------------------------------------------------------------------
+
+
+def test_ollama_create_agent_passes_middleware_to_factory():
+    """OBS-06: OllamaBackend.create_agent installs the middleware list."""
+    from robotina.llm import OllamaBackend
+    from robotina.agent.middleware import (
+        log_around_model_call,
+        log_after_model,
+        log_wrap_tool_call,
+    )
+
+    mock_agent = MagicMock()
+    mock_agent.invoke = MagicMock()
+
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
+        with patch("langchain_ollama.ChatOllama", return_value=MagicMock()):
+            adapter = OllamaBackend({"model": "test", "api_key_env": "HELLO_WORLD_API_TOKEN"})
+            adapter.create_agent("hello")
+
+    call_kwargs = mock_cra.call_args.kwargs
+    assert "middleware" in call_kwargs, (
+        f"Expected 'middleware' kwarg on _create_agent. Got: {list(call_kwargs)}"
+    )
+    middleware_list = call_kwargs["middleware"]
+    assert middleware_list[0] is log_around_model_call
+    assert middleware_list[1] is log_after_model
+    assert middleware_list[2] is log_wrap_tool_call
+    assert len(middleware_list) == 3
+
+
+def test_anthropic_create_agent_passes_middleware_to_factory(monkeypatch):
+    """OBS-06: AnthropicBackend.create_agent installs the middleware list."""
+    from robotina.llm import AnthropicBackend
+    from robotina.agent.middleware import (
+        log_around_model_call,
+        log_after_model,
+        log_wrap_tool_call,
+    )
+
+    monkeypatch.setenv("HELLO_WORLD_API_TOKEN", "test-api-key")
+
+    mock_agent = MagicMock()
+    mock_agent.invoke = MagicMock()
+
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
+        with patch("langchain_anthropic.ChatAnthropic", return_value=MagicMock()):
+            adapter = AnthropicBackend({
+                "model": "claude-3-5-haiku",
+                "api_key_env": "HELLO_WORLD_API_TOKEN",
+            })
+            adapter.create_agent("hello")
+
+    call_kwargs = mock_cra.call_args.kwargs
+    assert "middleware" in call_kwargs, (
+        f"Expected 'middleware' kwarg on _create_agent. Got: {list(call_kwargs)}"
+    )
+    middleware_list = call_kwargs["middleware"]
+    assert middleware_list[0] is log_around_model_call
+    assert middleware_list[1] is log_after_model
+    assert middleware_list[2] is log_wrap_tool_call
+    assert len(middleware_list) == 3
+
+
+def test_openai_create_agent_passes_middleware_to_factory(monkeypatch):
+    """OBS-06: OpenAIBackend.create_agent installs the middleware list."""
+    from robotina.llm import OpenAIBackend
+    from robotina.agent.middleware import (
+        log_around_model_call,
+        log_after_model,
+        log_wrap_tool_call,
+    )
+
+    monkeypatch.setenv("HELLO_WORLD_API_TOKEN", "test-api-key")
+
+    mock_agent = MagicMock()
+    mock_agent.invoke = MagicMock()
+
+    with patch("robotina.llm._create_agent", return_value=mock_agent) as mock_cra:
+        with patch("langchain_openai.ChatOpenAI", return_value=MagicMock()):
+            adapter = OpenAIBackend({
+                "model": "gpt-4",
+                "model_name": "gpt-4",
+                "api_key_env": "HELLO_WORLD_API_TOKEN",
+            })
+            adapter.create_agent("hello")
+
+    call_kwargs = mock_cra.call_args.kwargs
+    assert "middleware" in call_kwargs, (
+        f"Expected 'middleware' kwarg on _create_agent. Got: {list(call_kwargs)}"
+    )
+    middleware_list = call_kwargs["middleware"]
+    assert middleware_list[0] is log_around_model_call
+    assert middleware_list[1] is log_after_model
+    assert middleware_list[2] is log_wrap_tool_call
+    assert len(middleware_list) == 3
