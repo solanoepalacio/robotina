@@ -17,6 +17,16 @@ services:
       - .env
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
   rq-dashboard:
     image: eoranged/rq-dashboard:latest
     ports:
