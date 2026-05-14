@@ -37,6 +37,21 @@ services:
     depends_on:
       - redis
 
+  # Phase 13 / DASH-09: Queue Visibility Dashboard. Independent (D-01) —
+  # NO other service depends_on this one; agent/gateway (when they land in
+  # compose) must NOT add dashboard as a dependency. Reads Postgres only.
+  dashboard:
+    build: .
+    command: uv run dashboard
+    environment:
+      DATABASE_URL: postgresql://robotina:robotina@postgres:5432/robotina
+      DASHBOARD_PORT: "8001"
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
