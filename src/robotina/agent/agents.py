@@ -23,7 +23,6 @@ from robotina.agent.tools._catalog_match import SemanticMatchResult
 from robotina.queue.task_types import (
     RecipeData,
     RecipeLoadOutput,
-    RecipeResearchMetadataOutput,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,10 +136,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_METADATA_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V003.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-metadata/V004.md",
         skills=[],
         tools=[],  # no tools — produces structured output directly from user message
-        response_format_model=RecipeResearchMetadataOutput,
+        response_format_model=RecipeData,
     ),
     "recipe-load": AgentConfig(
         task_type="recipe-load",
