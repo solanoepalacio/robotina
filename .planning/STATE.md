@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
 stopped_at: Plan 13-01 complete; ready for 13-02 (dashboard module)
-last_updated: "2026-05-14T16:08:32.620Z"
+last_updated: "2026-05-14T16:18:23.944Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 16
   completed_phases: 12
   total_plans: 57
-  completed_plans: 50
-  percent: 88
+  completed_plans: 51
+  percent: 89
 ---
 
 # Project State
@@ -92,6 +92,7 @@ Plan: 2 of 2
 | Phase 11-structured-agent-output-via-response-format P04 | TBD | 2 tasks | 4 files |
 | Phase 12-middleware-based-agent-instrumentation P01 | 4min | 2 tasks | 5 files |
 | Phase 13-queue-visibility-dashboard P01 | 25min | 2 tasks | 5 files |
+| Phase 13-queue-visibility-dashboard PP02 | 6min | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,10 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 13-01: step_input column populated via Pydantic .model_dump(mode='json') mirroring artifact pattern; failure_reason format f'{type(exc).__name__}: {exc}' with newline→space sanitization (D-16)
 - [Phase ?]: Phase 13-01: on_step_failed signature extended with keyword-only exc: BaseException | None = None; backward-compatible (default None leaves failure_reason NULL for legacy callers)
 - [Phase ?]: Phase 13-01: jobs.py threads live exception via 'except Exception as exc' + exc=exc kwarg (not bare except — KeyboardInterrupt/SystemExit must not be persisted)
+- [Phase ?]: Phase 13-02: HTMX vendored at 2.0.10 (SHA-256 71ea67…c0de in htmx.version.txt) — no CDN runtime per D-13
+- [Phase ?]: Phase 13-02: Polling-halt by attribute-absent re-render on the wrapper element with hx-swap='outerHTML' — wrapper replaces itself trigger-less when run.status in (DONE, FAILED); HTMX's per-element timer ends naturally (D-09 / RESEARCH Pitfall 3)
+- [Phase ?]: Phase 13-02: Template + static dirs resolved via Path(__file__).parent (not CWD-relative strings) — Jinja2Templates and StaticFiles both take str(Path(__file__).parent / 'templates'|'static') so the app works under uv run from any directory and under pytest
+- [Phase ?]: Phase 13-02: D-01 (USER-LOCKED) enforced by tests/dashboard/test_independence.py — grep gate + inward-only import audit run as normal pytest assertions; cannot be silently bypassed
 
 ### Pending Todos
 
@@ -238,6 +243,7 @@ None yet.
 
 Last activity: 2026-05-14
 
-Last session: 2026-05-14T16:08:27.001Z
+Last session: 2026-05-14T16:17:52.878Z
 Stopped at: Plan 13-01 complete; ready for 13-02 (dashboard module)
 Resume file: 
+None

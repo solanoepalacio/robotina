@@ -338,7 +338,7 @@ Plans:
 
 Plans:
 - [x] 13-01-PLAN.md — Persistence layer: migration 0005, model columns, workflow_runner.py wiring at 3 sites, jobs.py exception threading (DASH-01..03)
-- [ ] 13-02-PLAN.md — Dashboard module: FastAPI app, 6 Jinja templates, vendored HTMX 2.0.10, CSS, tests/dashboard/ suite, independence grep gate (DASH-04..08)
+- [x] 13-02-PLAN.md — Dashboard module: FastAPI app, 6 Jinja templates, vendored HTMX 2.0.10, CSS, tests/dashboard/ suite, independence grep gate (DASH-04..08)
 - [ ] 13-03-PLAN.md — Deployment: Dockerfile, docker-compose dashboard service, .env.example, manual browser smoke checkpoint (DASH-09)
 
 ### Phase 14: Prompt Cleanup and Structural Standardization
