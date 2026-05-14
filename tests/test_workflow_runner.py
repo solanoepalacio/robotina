@@ -515,3 +515,84 @@ def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog):
         and "run-abc" in rec.getMessage()
         for rec in caplog.records
     ), f"Expected WARN log mentioning run-abc; got: {[r.getMessage() for r in caplog.records]}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 13 / Plan 13-01: dashboard persistence columns
+# ---------------------------------------------------------------------------
+
+
+def test_workflow_run_step_model_has_new_columns():
+    """DASH-01: WorkflowRunStep has step_input (JSON, nullable) and failure_reason
+    (Text, nullable) columns added in migration 0005. Pure in-memory model
+    inspection — no DB connection required."""
+    from robotina.queue.models import WorkflowRunStep
+
+    cols = WorkflowRunStep.__table__.columns
+    assert "step_input" in cols, "step_input column missing on WorkflowRunStep"
+    assert "failure_reason" in cols, "failure_reason column missing on WorkflowRunStep"
+    # step_input is JSON-typed (python_type is dict)
+    assert cols["step_input"].type.python_type is dict
+    # both columns are nullable (migration safety: no full-table rewrite)
+    assert cols["step_input"].nullable is True
+    assert cols["failure_reason"].nullable is True
+
+
+@pytest.mark.integration
+def test_migration_0005_upgrades_and_downgrades():
+    """DASH-01 AC #1: migration 0005 adds step_input + failure_reason as nullable
+    columns; alembic downgrade -1 reverses cleanly; subsequent upgrade re-adds them.
+    Touches the live test Postgres."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    from robotina.db import SessionLocal
+
+    cfg = Config("alembic.ini")
+
+    # Ensure DB is at head (0005) — this is the test's starting precondition AND
+    # exercises the upgrade path.
+    command.upgrade(cfg, "head")
+
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            text(
+                "SELECT column_name, data_type, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'workflow_run_steps' "
+                "AND column_name IN ('step_input', 'failure_reason')"
+            )
+        ).all()
+        by_name = {r[0]: (r[1], r[2]) for r in rows}
+        assert "step_input" in by_name, f"step_input missing after upgrade; columns: {by_name}"
+        assert "failure_reason" in by_name, f"failure_reason missing after upgrade; columns: {by_name}"
+        assert by_name["step_input"][0] == "json"
+        assert by_name["failure_reason"][0] == "text"
+        assert by_name["step_input"][1] == "YES"
+        assert by_name["failure_reason"][1] == "YES"
+    finally:
+        session.close()
+
+    # Downgrade -1: revert 0005 → 0004. Both columns should be gone.
+    command.downgrade(cfg, "-1")
+
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            text(
+                "SELECT column_name "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'workflow_run_steps' "
+                "AND column_name IN ('step_input', 'failure_reason')"
+            )
+        ).all()
+        names = {r[0] for r in rows}
+        assert "step_input" not in names, "step_input still present after downgrade"
+        assert "failure_reason" not in names, "failure_reason still present after downgrade"
+    finally:
+        session.close()
+
+    # Re-apply so the DB is back at head for subsequent tests in the session.
+    command.upgrade(cfg, "head")
