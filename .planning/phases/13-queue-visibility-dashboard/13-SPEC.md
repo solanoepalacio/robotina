@@ -65,7 +65,7 @@ The relevant data already exists in `WorkflowRun` and `WorkflowRunStep` (`src/ro
 
 **In scope:**
 - Alembic migration adding `step_input` (JSON, nullable) and `failure_reason` (Text, nullable) to `workflow_run_steps`
-- Wiring in `src/robotina/queue/workflow_runner.py` to populate `step_input` at enqueue time and `failure_reason` in `on_step_failed`
+- Wiring in `src/robotina/queue/workflow_runner.py` to populate `step_input` at enqueue time and `failure_reason` in `on_step_failed`, plus a two-line exception-threading edit in `src/robotina/queue/jobs.py` so the existing exception object reaches `on_step_failed` via a new keyword-only `exc=` argument (Option A from RESEARCH.md Open Question 1)
 - New `src/robotina/dashboard/` module: FastAPI app, Jinja2 templates, optional small HTMX include
 - Read-only list view (`GET /`) and detail view (`GET /workflows/{id}`)
 - `uv run dashboard` script entry in `pyproject.toml`
@@ -89,7 +89,7 @@ The relevant data already exists in `WorkflowRun` and `WorkflowRunStep` (`src/ro
 ## Constraints
 
 - **Tech stack:** FastAPI (already in stack for scheduler API), Jinja2, HTMX. No other frontend dependencies. No node, no Vite, no React.
-- **Data source:** Postgres only. The dashboard MUST NOT import from `rq`, `redis`, or the queue's RQ-facing modules for read paths. (The wiring change to `workflow_runner.py` to persist `step_input`/`failure_reason` is the only Phase 13 code that touches non-dashboard modules.)
+- **Data source:** Postgres only. The dashboard MUST NOT import from `rq`, `redis`, or the queue's RQ-facing modules for read paths. (The wiring changes to `workflow_runner.py` to persist `step_input`/`failure_reason` AND the two-line exception-threading edit in `src/robotina/queue/jobs.py` — which simply passes the existing `as exc` exception object into `on_step_failed(..., exc=exc)` — are the only Phase 13 code that touches non-dashboard modules. `jobs.py` is touched only to make the exception object reachable; it gains no awareness of the dashboard.)
 - **Dependency direction:** `robotina.dashboard` may import from `robotina.queue.models`, `robotina.db`, and `robotina.queue.task_types`. No module under `robotina.*` outside `dashboard/` may import from `robotina.dashboard`. This is enforced by grep, not by hope.
 - **DB access:** Uses the existing `SessionLocal()` factory in `src/robotina/db.py:24`. No new engine, no new connection pool.
 - **failure_reason format:** Exactly `f"{type(exc).__name__}: {exc}"`. No traceback, no chained exceptions, no formatting beyond the colon-separator. Keeps the UI single-line and the column small.

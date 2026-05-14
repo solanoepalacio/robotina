@@ -21,7 +21,7 @@ Downstream agents MUST read `13-SPEC.md` before planning or implementing. Requir
 
 **In scope (from SPEC.md):**
 - Alembic migration adding `step_input` (JSON, nullable) and `failure_reason` (Text, nullable) to `workflow_run_steps`
-- Wiring in `src/robotina/queue/workflow_runner.py` to populate `step_input` at enqueue time (both first step and subsequent steps) and `failure_reason` in `on_step_failed`
+- Wiring in `src/robotina/queue/workflow_runner.py` to populate `step_input` at enqueue time (both first step and subsequent steps) and `failure_reason` in `on_step_failed`, plus a two-line exception-threading edit in `src/robotina/queue/jobs.py` so the existing `as exc` object reaches `on_step_failed` via a new keyword-only `exc=` argument (Option A from RESEARCH Open Q 1; necessary because `on_step_failed` has no `exc` parameter today)
 - New `src/robotina/dashboard/` module: FastAPI app, Jinja2 templates, optional small HTMX include
 - Read-only list view (`GET /`) and detail view (`GET /workflows/{id}`)
 - `uv run dashboard` script entry in `pyproject.toml`
@@ -151,7 +151,7 @@ The user delegated all areas to Claude's discretion **except** D-01 (module inde
 - **Sequential single worker** (concurrency=1) — no race conditions to worry about in dashboard polling; the worker advances workflows one at a time and the dashboard reflects the latest committed state.
 
 ### Integration Points
-- `workflow_runner.py` is the ONLY non-dashboard module modified in this phase (to populate `step_input`/`failure_reason`). Touch is surgical: add a kwarg to the existing session.add/commit dance at each of the 3 sites.
+- `workflow_runner.py` is the PRIMARY non-dashboard module modified in this phase (to populate `step_input`/`failure_reason`). Touch is surgical: add a kwarg to the existing session.add/commit dance at each of the 3 sites. A secondary two-line edit in `src/robotina/queue/jobs.py` threads the `as exc` object into `on_step_failed(..., exc=exc)` at the two `except Exception as exc:` blocks (send-notification branch ~line 109; generic branch ~line 217); this is mechanically required to reach the exception object since `on_step_failed` has no `exc` parameter today, and is the implementation of RESEARCH Open Q 1 Option A. `jobs.py` itself remains unaware of the dashboard.
 - New migration revision attaches to the current Alembic head.
 - New compose service shares the postgres dependency.
 

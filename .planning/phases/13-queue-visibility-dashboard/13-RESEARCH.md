@@ -798,19 +798,19 @@ def test_dashboard_does_not_import_forbidden_modules():
 | A6 | The `--exclude-dir=dashboard` flag in the SPEC grep AC is interpreted by `grep -r` correctly without requiring quoting in CI | Code Example 4 | Verified to work in bash invocation; if CI uses a different shell or grep variant, syntax may differ. |
 | A7 | No FastAPI app currently runs at port 8001 in the staging compose environment | Example 3 | Standard staging port assignment; verify by checking if `8001` is used elsewhere. The default `DASHBOARD_PORT=8001` is from D-22. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exception propagation to `on_step_failed`** (resolves Pitfall 1).
+1. **Exception propagation to `on_step_failed`** (resolves Pitfall 1). **RESOLVED:** Option A — extend `on_step_failed` signature with keyword-only `exc: BaseException | None = None`; `src/robotina/queue/jobs.py` threads `exc=exc` from its two `except Exception as exc:` blocks (send-notification branch ~line 109; generic branch ~line 217). Backward compatible (legacy positional callers unaffected). Implemented in **Plan 13-01 Task 1.2**.
    - What we know: `on_step_failed(job_id, session, queue=None)` currently has no `exc` parameter.
    - What's unclear: Whether the caller in `queue/jobs.py` (or `runner.py`) has the exception in scope, and whether the cleanest change is signature extension or a sibling function.
    - Recommendation: Planner reads `src/robotina/queue/jobs.py` to locate the failure path before writing the plan task. Use Option A (extend signature) unless the call site reveals a complication.
 
-2. **Compose service: which image / build context?**
+2. **Compose service: which image / build context?** **RESOLVED:** No Dockerfile exists in the repo today (verified by `ls` in plan-time codebase audit). **Plan 13-03 Task 3.1** creates the first one at repo root with an explicit allow-list `COPY` (no `COPY . .`) so secrets/`.env` cannot enter the image. The compose `dashboard` service uses `build: .` against this new Dockerfile and reads the same `DATABASE_URL` env as the rest of the stack.
    - What we know: docker-compose.yml has no `agent` or `gateway` services today — only infra (postgres, redis, rq-dashboard).
    - What's unclear: Does staging build a Dockerfile in repo root, or is there a `staging/` compose overlay elsewhere?
    - Recommendation: Plan task should treat the dashboard service as additive ("first non-infra service"). If a Dockerfile doesn't exist, the planner must either (a) defer the compose service entry to a follow-up (and document), or (b) include "create Dockerfile" as a sibling task. The user's memory `project_local_dev_setup.md` says staging is fully containerized, so a Dockerfile likely exists somewhere — verify.
 
-3. **Test integration with existing `db_session` fixture.**
+3. **Test integration with existing `db_session` fixture.** **RESOLVED:** **Plan 13-02 Task 2.1** adds `tests/dashboard/conftest.py` with a `db_session` fixture whose teardown cleans **only the rows it inserted (by UUID)** — never bulk-deletes `workflow_runs` or `workflow_run_steps` (Pitfall 7). The fixture is package-scoped to `tests/dashboard/` so other suites are unaffected.
    - What we know: `tests/conftest.py:11-22` cleans `stored_messages` and `conversations` after each test. It does NOT touch `workflow_runs`/`workflow_run_steps`.
    - What's unclear: Whether `tests/test_workflow_runner.py` and `tests/test_queue_models.py` rely on a clean workflow tables state.
    - Recommendation: Planner should add a dashboard-specific fixture that cleans only the rows it inserted (by UUID), not the whole table. Run the new dashboard test file in isolation first to verify; then run the full suite.
