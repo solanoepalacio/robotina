@@ -438,9 +438,14 @@ def on_step_failed(
     for pending in pending_steps:
         pending.status = WorkflowStepStatus.CANCELLED
 
-    # Mark WorkflowRun FAILED
+    # Mark WorkflowRun FAILED. The next dead-letter block defensively
+    # treats `run` as possibly None (e.g., the parent row was deleted or
+    # archived between the step write and this fetch), so we mirror that
+    # nil-check here — otherwise the assignment crashes the worker on
+    # the failure path (CR-01).
     run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
-    run.status = WorkflowStatus.FAILED
+    if run is not None:
+        run.status = WorkflowStatus.FAILED
     session.commit()
 
     logger.error(
