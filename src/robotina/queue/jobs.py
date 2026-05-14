@@ -20,7 +20,8 @@ from pathlib import Path
 
 from rq import get_current_job
 
-from robotina.agent.callbacks import AgentLoggingHandler
+# AGENT-13 / Phase 12: AgentLoggingHandler removed; per-agent log lines are now
+# emitted by robotina.agent.middleware (wired through LLMBackend.create_agent).
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def run_task(task_input) -> object:
     4. Build skill context (SkillSet instances + ReadSkillTool)
     5. Load versioned system prompt from AgentConfig.prompt_path
     6. Append skill index content to system prompt
-    7. Create and invoke the ReAct agent with AgentLoggingHandler
+    7. Create and invoke the agent (per-agent logging emitted by middleware; LangWatch trace via callback bus).
     8. Return agent output
 
     Phase 5: Workflow state management wraps the agent execution via inline calls
@@ -192,13 +193,17 @@ def run_task(task_input) -> object:
                 result = agent.invoke(
                     {"messages": [{"role": "user", "content": user_message}]},
                     config=RunnableConfig(
-                        callbacks=[AgentLoggingHandler(), langwatch.langchain.LangChainTracer()]
+                        # AGENT-13 / Phase 12: subtractive — AgentLoggingHandler removed,
+                        # LangWatch tracer retained (RESEARCH Pitfall 1: list must be non-empty
+                        # for LangWatch traces to be emitted via the callback bus).
+                        callbacks=[langwatch.langchain.LangChainTracer()]
                     ),
                 )
         except ImportError:
+            # AGENT-13 / Phase 12: middleware now emits per-agent log lines without needing
+            # a callback. langwatch missing → no tracer needed; drop the config= kwarg entirely.
             result = agent.invoke(
                 {"messages": [{"role": "user", "content": user_message}]},
-                config={"callbacks": [AgentLoggingHandler()]},
             )
 
         logger.info("Agent run complete | task_type=%s", task_type)

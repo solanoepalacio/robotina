@@ -1,11 +1,12 @@
-"""Tests for run_task() universal job function and AgentLoggingHandler.
+"""Tests for run_task() universal job function.
 
 Tests verify:
 - AGENT-06: run_task reads task_type from RQ job meta, not from input model
 - AGENT-07: LLM backend is created inside run_task, not at module level
-- AGENT-10: AgentLoggingHandler logs LLM start, tool start, and tool end events
+- OBS-06 (Phase 12): RunnableConfig.callbacks retains LangWatch tracer and
+  drops the legacy AgentLoggingHandler (which now lives in middleware — see
+  tests/unit/test_agent_middleware.py for the four log-line assertions).
 """
-import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -253,33 +254,6 @@ def test_run_task_no_legacy_callback():
     )
 
 
-def test_agent_logging_handler_on_llm_start(caplog):
-    """AGENT-10: AgentLoggingHandler.on_chat_model_start logs LLM stream start."""
-    from robotina.agent.callbacks import AgentLoggingHandler
-
-    handler = AgentLoggingHandler()
-    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
-        handler.on_chat_model_start({"name": "ChatOllama"}, [[]])
-
-    assert any("ChatOllama" in record.message for record in caplog.records), \
-        f"Expected 'ChatOllama' in log. Got: {[r.message for r in caplog.records]}"
-
-
-def test_agent_logging_handler_on_tool_start(caplog):
-    """AGENT-10: AgentLoggingHandler.on_tool_start logs tool name and input."""
-    from robotina.agent.callbacks import AgentLoggingHandler
-
-    handler = AgentLoggingHandler()
-    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
-        handler.on_tool_start({"name": "read-skill"}, "household-manager/index.md")
-
-    messages = [r.message for r in caplog.records]
-    assert any("read-skill" in m for m in messages), \
-        f"Expected 'read-skill' in log. Got: {messages}"
-    assert any("household-manager/index.md" in m for m in messages), \
-        f"Expected input path in log. Got: {messages}"
-
-
 def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     """ROBOT-01/D-04: run_task() injects HouseholdManagerApiTool, QueueTool, StartWorkflowTool
     for task_type == 'handle-incoming-message'."""
@@ -424,21 +398,3 @@ def test_run_task_injects_queue_tool_for_acknowledge_add_recipe():
     assert q_tools[0].platform == "telegram"
     # No other tools — ack agent only has queue.
     assert len(injected_tools) == 1
-
-
-def test_agent_logging_handler_on_tool_end(caplog):
-    """AGENT-10: AgentLoggingHandler.on_tool_end logs tool output (truncated to 200 chars)."""
-    from robotina.agent.callbacks import AgentLoggingHandler
-
-    handler = AgentLoggingHandler()
-    long_output = "x" * 500
-    with caplog.at_level(logging.INFO, logger="robotina.agent.callbacks"):
-        handler.on_tool_end(long_output)
-
-    messages = [r.message for r in caplog.records]
-    assert len(messages) > 0, "Expected at least one log message"
-    # Verify output is truncated — logged message should not contain more than 200 'x' chars
-    combined = " ".join(messages)
-    assert "x" * 201 not in combined, "Output was not truncated to 200 chars"
-    assert "x" * 200 in combined or "x" * 199 in combined, \
-        f"Expected truncated output in log. Got: {combined[:100]}"
