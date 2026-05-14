@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 14 complete
-stopped_at: Phase 14 verified (human approval)
-last_updated: "2026-05-14T18:00:00.000Z"
-last_activity: "2026-05-14 - Phase 14 (Prompt Cleanup and Structural Standardization) verified: human approval recorded for Telegram smoke + LangWatch trace checks"
+status: Phase 15 in progress (Plan 15-01 complete)
+stopped_at: Phase 15 Plan 01 complete; Plans 15-02..15-06 = prompt bumps
+last_updated: "2026-05-14T21:00:00.000Z"
+last_activity: "2026-05-14 - Completed Phase 15 Plan 01: foundational refactor (accumulating RecipeData artifact, validate-foods/units tools, validate-catalog matcher, per-job tool injection)"
 progress:
-  total_phases: 17
-  completed_phases: 14
-  total_plans: 57
+  total_phases: 18
+  completed_phases: 13
+  total_plans: 63
   completed_plans: 52
-  percent: 91
+  percent: 83
 ---
 
 # Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 14 (prompt-cleanup-and-structural-standardization) — COMPLETE
-Plans: 8 of 8
+Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — IN PROGRESS
+Plans: 1 of (TBD; expected 6 — foundation + 5 prompt bumps)
 
 ## Performance Metrics
 
@@ -106,6 +106,7 @@ Plans: 8 of 8
 - Phase 14 added: Prompt Cleanup and Structural Standardization (re-version all 7 active prompts to a single skeleton; no behavioral change)
 - Phase 11 code complete (manual checkpoint pending): response_format adopted on 5 named agents; canelones-class parse failures structurally eliminated for those agents — pending 3-query end-to-end verification (Plan 11-04 Task 4.2)
 - Phase 15 added: Recipe artifact accumulation and food/unit validation
+- Phase 16 added: Fix empty-string household_id propagation through gateway and workflow_run
 
 ### Decisions
 
