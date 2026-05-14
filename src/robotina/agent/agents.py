@@ -124,7 +124,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_INGREDIENTS_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V002.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-ingredients/V003.md",
         skills=[],
         tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
         response_format_model=RecipeResearchIngredientsOutput,
