@@ -2,49 +2,56 @@
   "handle-incoming-message": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "acknowledge-add-recipe": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "recipe-research-gather": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "recipe-research-instructions": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "recipe-research-ingredients": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "recipe-research-metadata": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
   "recipe-load": {
     "model_config": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-4.1-mini",
+      "api_key_env": "API_TOKEN_OPENAI"
+    }
+  },
+  "validate-catalog": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
       "api_key_env": "API_TOKEN_OPENAI"
     }
   }

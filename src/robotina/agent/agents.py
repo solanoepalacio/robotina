@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from robotina.agent.tools._catalog_match import SemanticMatchResult
 from robotina.queue.task_types import (
     RecipeLoadOutput,
     RecipeResearchGatherOutput,
@@ -160,6 +161,25 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
     # Phase 07.1: per-workflow acknowledgment agent. Runs as add-recipe step 1,
     # composes a brief Spanish ack and delivers via queue tool. Per-workflow
     # (not generic) per feedback_avoid_premature_abstraction.md.
+    # Phase 15: matcher LLM for validate-foods / validate-units tools. Not a
+    # workflow task type — invoked synchronously from inside a tool call
+    # (see robotina.agent.tools._catalog_match.resolve_catalog). Registered
+    # here so it picks up AGENT_OVERRIDES_FILEPATH hot-reload like every other
+    # LLM call site.
+    "validate-catalog": AgentConfig(
+        task_type="validate-catalog",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "VALIDATE_CATALOG_API_TOKEN",
+            "reasoning": False,
+        },
+        prompt_path="src/robotina/agent/prompts/validate-catalog/V001.md",
+        skills=[],
+        tools=[],
+        response_format_model=SemanticMatchResult,
+    ),
     "acknowledge-add-recipe": AgentConfig(
         task_type="acknowledge-add-recipe",
         model_config={
