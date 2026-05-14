@@ -21,8 +21,8 @@ from pydantic import BaseModel
 
 from robotina.agent.tools._catalog_match import SemanticMatchResult
 from robotina.queue.task_types import (
+    RecipeData,
     RecipeLoadOutput,
-    RecipeResearchGatherOutput,
     RecipeResearchIngredientsOutput,
     RecipeResearchInstructionsOutput,
     RecipeResearchMetadataOutput,
@@ -97,10 +97,10 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_RESEARCH_GATHER_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V004.md",
+        prompt_path="src/robotina/agent/prompts/recipe-research-gather/V005.md",
         skills=[],
         tools=[],  # WebSearchTool injected per-job in run_task()
-        response_format_model=RecipeResearchGatherOutput,
+        response_format_model=RecipeData,
     ),
     "recipe-research-instructions": AgentConfig(
         task_type="recipe-research-instructions",
