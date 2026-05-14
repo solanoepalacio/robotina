@@ -10,7 +10,10 @@
   <tr class="run-row">
     <td class="col-id"><a href="/workflows/{{ run.id }}" class="mono">{{ run.id[:8] }}</a></td>
     <td class="col-type">{{ run.workflow_type }}</td>
-    <td class="col-household {% if not run.household_id %}muted{% endif %}">{{ run.household_id or "—" }}</td>
+    {# WR-05: WorkflowRun.household_id is NOT NULL (models.py); the prior
+       {% if not run.household_id %}muted{% endif %} branch + or "—" fallback
+       were dead and falsely suggested null was possible. Render directly. #}
+    <td class="col-household">{{ run.household_id }}</td>
     <td class="col-status">{{ status_badge(run.status.value.upper()) }}</td>
     <td class="col-created mono">{{ run.created_at.strftime("%Y-%m-%d %H:%M:%S") if run.created_at else "" }}</td>
   </tr>
