@@ -38,7 +38,11 @@ findings:
   warning: 6
   info: 4
   total: 11
-status: issues_found
+status: fixed
+fixed_at: 2026-05-14T00:00:00Z
+fixed_findings: [CR-01, WR-01, WR-02, WR-03, WR-04, WR-05, WR-06]
+remaining_findings: [IN-01, IN-02, IN-03, IN-04]
+remaining_note: info-only; out of default --fix scope
 ---
 
 # Phase 13: Code Review Report
