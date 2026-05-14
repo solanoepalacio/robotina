@@ -162,8 +162,17 @@ def run_task(task_input) -> object:
             tools.append(ValidateFoodsTool())
             tools.append(ValidateUnitsTool())
         elif task_type == "recipe-load":
+            # Phase 15: recipe-load V005 happy path is a thin POST that trusts
+            # the food_id / unit_id already on each ingredient. The two
+            # validation tools are injected for RECOVERY ONLY — on a non-2xx
+            # POST response the agent can re-resolve an offending id and retry
+            # (D-17). Zero-arg per D-10 (catalog is shared per household).
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+            from robotina.agent.tools.validate_foods import ValidateFoodsTool
+            from robotina.agent.tools.validate_units import ValidateUnitsTool
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
+            tools.append(ValidateFoodsTool())
+            tools.append(ValidateUnitsTool())
         elif task_type == "acknowledge-add-recipe":
             from robotina.agent.tools.queue import QueueTool
             tools.append(QueueTool(

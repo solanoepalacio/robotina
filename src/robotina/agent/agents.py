@@ -150,9 +150,9 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "RECIPE_LOAD_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/recipe-load/V004.md",
+        prompt_path="src/robotina/agent/prompts/recipe-load/V005.md",
         skills=["household-manager"],
-        tools=[],  # HouseholdManagerApiTool injected per-job in run_task()
+        tools=[],  # HouseholdManagerApiTool + ValidateFoodsTool + ValidateUnitsTool injected per-job in run_task()
         response_format_model=RecipeLoadOutput,
     ),
     # Phase 07.1: per-workflow acknowledgment agent. Runs as add-recipe step 1,

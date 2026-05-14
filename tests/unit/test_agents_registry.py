@@ -160,7 +160,7 @@ def test_recipe_load_registered():
     config = get_agent_config("recipe-load")
     assert isinstance(config, AgentConfig)
     assert config.task_type == "recipe-load"
-    assert config.prompt_path == "src/robotina/agent/prompts/recipe-load/V004.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-load/V005.md"
     assert config.tools == []
     assert config.model_config["api_key_env"] == "RECIPE_LOAD_API_TOKEN"
 
