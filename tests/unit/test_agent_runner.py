@@ -7,7 +7,7 @@ Tests verify:
   drops the legacy AgentLoggingHandler (which now lives in middleware — see
   tests/unit/test_agent_middleware.py for the four log-line assertions).
 """
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -80,8 +80,13 @@ def test_run_task_send_notification_takes_deterministic_path():
     mock_task_input.platform = "telegram"
     mock_task_input.text = "hola"
 
+    # send_message is async (awaited under asyncio.run in jobs.py). AsyncMock
+    # ensures the returned object is awaitable — avoids relying on quirky
+    # asyncio.run() tolerance of a MagicMock return value (IN-04).
+    mock_send = AsyncMock(return_value=mock_send_result)
+
     with patch("robotina.queue.jobs.get_current_job", return_value=mock_job), \
-         patch("robotina.gateway.send.send_message", return_value=mock_send_result) as mock_send, \
+         patch("robotina.gateway.send.send_message", new=mock_send), \
          patch("robotina.db.SessionLocal", return_value=mock_session), \
          patch("robotina.queue.workflow_runner.on_step_start"), \
          patch("robotina.queue.workflow_runner.on_step_complete") as mock_complete, \
@@ -238,14 +243,23 @@ def test_run_task_passes_langwatch_tracer():
     )
 
 
-def test_run_task_no_legacy_callback():
-    """OBS-06: agent.invoke callbacks list does NOT contain any AgentLoggingHandler
-    (regression guard — ensures the Phase 12 removal stays removed)."""
-    # The legacy module must not be importable after Plan 12-02 deletes it.
+def test_legacy_callbacks_module_deleted():
+    """OBS-06: the legacy ``robotina.agent.callbacks`` module is deleted and
+    not importable. Split from ``test_run_task_does_not_pass_agent_logging_handler``
+    so a failure here points unambiguously at module re-introduction (IN-05).
+    """
     import importlib
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("robotina.agent.callbacks")
 
+
+def test_run_task_does_not_pass_agent_logging_handler():
+    """OBS-06: agent.invoke callbacks list does NOT contain any
+    AgentLoggingHandler. Split from ``test_legacy_callbacks_module_deleted``
+    (IN-05) so a failure here points unambiguously at callback-wiring
+    regression (someone re-added the handler to the callbacks list), rather
+    than at module re-introduction.
+    """
     config = _run_task_capturing_invoke_config()
     names = _callback_class_names(config)
     assert "AgentLoggingHandler" not in names, (
