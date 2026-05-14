@@ -66,7 +66,11 @@ def detail_view(request: Request, run_id: str, db: DbDep):
         raise HTTPException(status_code=404, detail="Workflow not found")
     # RESEARCH Pitfall 5: WorkflowRun.steps relationship has no order_by;
     # sort in Python by step_order so the detail view renders deterministically.
-    steps = sorted(run.steps, key=lambda s: s.step_order)
+    # WR-06: step_order has no DB uniqueness constraint on
+    # (workflow_run_id, step_order). Use s.id as a deterministic tie-breaker
+    # so the detail view renders reproducibly even if two rows share the
+    # same step_order (manual SQL edits, future migrations).
+    steps = sorted(run.steps, key=lambda s: (s.step_order, s.id))
     return templates.TemplateResponse(
         request=request,
         name="workflow.html",
@@ -95,7 +99,11 @@ def fragment_workflow(request: Request, run_id: str, db: DbDep):
     run = get_workflow_with_steps(db, run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    steps = sorted(run.steps, key=lambda s: s.step_order)
+    # WR-06: step_order has no DB uniqueness constraint on
+    # (workflow_run_id, step_order). Use s.id as a deterministic tie-breaker
+    # so the detail view renders reproducibly even if two rows share the
+    # same step_order (manual SQL edits, future migrations).
+    steps = sorted(run.steps, key=lambda s: (s.step_order, s.id))
     return templates.TemplateResponse(
         request=request,
         name="_workflow_body.html",
