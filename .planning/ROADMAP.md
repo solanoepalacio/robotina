@@ -334,10 +334,10 @@ Plans:
 **Goal:** A server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed Robotina workflows post-hoc — locate a run, see every step's input/output/status, and identify which step failed (exception class + message) and which steps were cancelled in the cascade. Read-only. Dev + staging only. Independent module: no other robotina.* module may import from `robotina.dashboard`.
 **Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, DASH-09
 **Depends on:** Phase 12
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 13-01-PLAN.md — Persistence layer: migration 0005, model columns, workflow_runner.py wiring at 3 sites, jobs.py exception threading (DASH-01..03)
+- [x] 13-01-PLAN.md — Persistence layer: migration 0005, model columns, workflow_runner.py wiring at 3 sites, jobs.py exception threading (DASH-01..03)
 - [ ] 13-02-PLAN.md — Dashboard module: FastAPI app, 6 Jinja templates, vendored HTMX 2.0.10, CSS, tests/dashboard/ suite, independence grep gate (DASH-04..08)
 - [ ] 13-03-PLAN.md — Deployment: Dockerfile, docker-compose dashboard service, .env.example, manual browser smoke checkpoint (DASH-09)
 

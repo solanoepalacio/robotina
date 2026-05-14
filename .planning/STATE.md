@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: Phase 13 planned (3 plans across 3 waves; blocker fixes applied)
-last_updated: "2026-05-14T15:53:18.906Z"
+stopped_at: Plan 13-01 complete; ready for 13-02 (dashboard module)
+last_updated: "2026-05-14T16:08:32.620Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 16
   completed_phases: 12
   total_plans: 57
-  completed_plans: 49
-  percent: 86
+  completed_plans: 50
+  percent: 88
 ---
 
 # Project State
@@ -91,6 +91,7 @@ Plan: 2 of 2
 | Phase 11-structured-agent-output-via-response-format P03 | 6min | 6 tasks | 9 files |
 | Phase 11-structured-agent-output-via-response-format P04 | TBD | 2 tasks | 4 files |
 | Phase 12-middleware-based-agent-instrumentation P01 | 4min | 2 tasks | 5 files |
+| Phase 13-queue-visibility-dashboard P01 | 25min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,9 @@ Recent decisions affecting current work:
 - [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Middleware list is provider-agnostic: the SAME middleware=[log_around_model_call, log_after_model, log_wrap_tool_call] kwarg is passed by all three LLMBackend adapters (Ollama / Anthropic / OpenAI). Decorator-yields-an-instance pattern (RESEARCH.md Pitfall 3) means singletons are imported, not constructed per call.
 - [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Bound-method invocation is the testing convention: log_around_model_call.wrap_model_call(request, handler) etc. Sidesteps needing a full create_agent graph (langchain/agents/middleware/types.py:1880-1892).
 - [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — OBS-06 not yet declared in REQUIREMENTS.md. Plan 12-02 (which actually deletes the legacy path) is the better place to register OBS-06 with 'Complete' status, since OBS-06 success is gated on the legacy callback being gone, not just on the new middleware module existing.
+- [Phase ?]: Phase 13-01: step_input column populated via Pydantic .model_dump(mode='json') mirroring artifact pattern; failure_reason format f'{type(exc).__name__}: {exc}' with newline→space sanitization (D-16)
+- [Phase ?]: Phase 13-01: on_step_failed signature extended with keyword-only exc: BaseException | None = None; backward-compatible (default None leaves failure_reason NULL for legacy callers)
+- [Phase ?]: Phase 13-01: jobs.py threads live exception via 'except Exception as exc' + exc=exc kwarg (not bare except — KeyboardInterrupt/SystemExit must not be persisted)
 
 ### Pending Todos
 
@@ -234,6 +238,6 @@ None yet.
 
 Last activity: 2026-05-14
 
-Last session: 2026-05-14T15:53:18.898Z
-Stopped at: Phase 13 planned (3 plans across 3 waves; blocker fixes applied)
-Resume file: .planning/phases/13-queue-visibility-dashboard/13-01-PLAN.md
+Last session: 2026-05-14T16:08:27.001Z
+Stopped at: Plan 13-01 complete; ready for 13-02 (dashboard module)
+Resume file: 

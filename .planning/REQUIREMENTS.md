@@ -112,9 +112,9 @@ Requirements for the initial milestone. All map to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Alembic migration `0005_dashboard_columns` adds `step_input` (JSON, nullable) and `failure_reason` (Text, nullable) columns to `workflow_run_steps`; `uv run migrate` upgrades and `alembic downgrade -1` reverses cleanly
-- [ ] **DASH-02**: Every enqueued `WorkflowRunStep` has its `step_input` JSON populated to Postgres at both the first-step and subsequent-step enqueue sites in `workflow_runner.py`
-- [ ] **DASH-03**: Failed steps record `failure_reason` in Postgres as `f"{type(exc).__name__}: {exc}"` (newlines normalized to spaces); non-failed steps have `failure_reason = NULL`; `on_step_failed` signature extends to accept `exc: BaseException | None = None`
+- [x] **DASH-01**: Alembic migration `0005_dashboard_columns` adds `step_input` (JSON, nullable) and `failure_reason` (Text, nullable) columns to `workflow_run_steps`; `uv run migrate` upgrades and `alembic downgrade -1` reverses cleanly
+- [x] **DASH-02**: Every enqueued `WorkflowRunStep` has its `step_input` JSON populated to Postgres at both the first-step and subsequent-step enqueue sites in `workflow_runner.py`
+- [x] **DASH-03**: Failed steps record `failure_reason` in Postgres as `f"{type(exc).__name__}: {exc}"` (newlines normalized to spaces); non-failed steps have `failure_reason = NULL`; `on_step_failed` signature extends to accept `exc: BaseException | None = None`
 - [ ] **DASH-04**: `src/robotina/dashboard/` module exists with a FastAPI app and a `dashboard = "robotina.dashboard:main"` entry in `pyproject.toml [project.scripts]`; `uv run dashboard` starts uvicorn on `DASHBOARD_PORT` (default 8001)
 - [ ] **DASH-05**: `GET /` returns 200 HTML listing the latest 50 `WorkflowRun` rows ordered by `created_at DESC`; empty state renders cleanly with zero runs
 - [ ] **DASH-06**: `GET /workflows/{id}` returns 200 HTML with workflow header + step rows ordered by `step_order` showing `step_key`, `status`, `step_input` (pretty JSON), `artifact` (pretty JSON if any), `failure_reason` (if any), `started_at`, `completed_at`; 404 when id not found
