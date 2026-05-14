@@ -391,9 +391,24 @@ Plans:
 
 **Goal:** Refactor the recipe-research workflow so that artifacts are successive snapshots of the recipe rather than disjoint side-data — each step (gather → instructions → ingredients → metadata) adds fields to a single growing artifact, and by the time recipe-load runs, the artifact is a fully-validated, insert-ready recipe payload. Food and unit validation move into the ingredients step via two new tools that (1) fetch all items of the category (foods or units) from household-manager, (2) match the agent's list programmatically by direct match, (3) fall back to LLM-based semantic matching (e.g. instructor) for unmatched items, and (4) return the original list paired with resolved ids. This eliminates the convoluted payload-building and re-validation that today causes recipe-load to fail.
 
-**Requirements**: TBD
+**Requirements**: RRECIPE-04, RRECIPE-07, RLOAD-03, RLOAD-04, RLOAD-07
 **Depends on:** Phase 14
+**Plans:** 2/6 plans executed
+
+Plans:
+- [x] 15-01-PLAN.md — Shared types + catalog-match helper + validation tools + validate-catalog registry + overrides + .env.example + matcher prompt + workflow rewiring
+- [x] 15-02-PLAN.md — recipe-research-gather V005 prompt bump (emit name + gathered_sources)
+- [ ] 15-03-PLAN.md — recipe-research-instructions V004 prompt bump (read gathered_sources, populate steps + description)
+- [ ] 15-04-PLAN.md — recipe-research-ingredients V004 prompt bump (use validate-foods / validate-units, surface missing_ingredients)
+- [ ] 15-05-PLAN.md — recipe-research-metadata V004 prompt bump (populate servings/times/source_url, clear gathered_sources)
+- [ ] 15-06-PLAN.md — recipe-load V005 prompt bump (happy-path POST + recovery via validation tools) + end-to-end smoke
+
+### Phase 16: Fix empty-string household_id propagation through gateway and workflow_run
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 15
 **Plans:** 0 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 15 to break down)
+- [ ] TBD (run /gsd-plan-phase 16 to break down)

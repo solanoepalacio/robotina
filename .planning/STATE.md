@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 15 in progress (Plan 15-01 complete)
-stopped_at: Phase 15 Plan 01 complete; Plans 15-02..15-06 = prompt bumps
-last_updated: "2026-05-14T21:00:00.000Z"
-last_activity: "2026-05-14 - Completed Phase 15 Plan 01: foundational refactor (accumulating RecipeData artifact, validate-foods/units tools, validate-catalog matcher, per-job tool injection)"
+stopped_at: Phase 15 context gathered
+last_updated: "2026-05-14T19:17:29.733Z"
+last_activity: "2026-05-14 - Completed quick task 260514-ix8: Remove redundant Output section from 5 recipe research prompts"
 progress:
   total_phases: 18
   completed_phases: 13
   total_plans: 63
-  completed_plans: 52
-  percent: 83
+  completed_plans: 54
+  percent: 86
 ---
 
 # Project State
@@ -93,6 +93,7 @@ Plans: 1 of (TBD; expected 6 — foundation + 5 prompt bumps)
 | Phase 12-middleware-based-agent-instrumentation P01 | 4min | 2 tasks | 5 files |
 | Phase 13-queue-visibility-dashboard P01 | 25min | 2 tasks | 5 files |
 | Phase 13-queue-visibility-dashboard PP02 | 6min | 2 tasks | 21 files |
+| Phase 15 P02 | 181s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 13-02: Polling-halt by attribute-absent re-render on the wrapper element with hx-swap='outerHTML' — wrapper replaces itself trigger-less when run.status in (DONE, FAILED); HTMX's per-element timer ends naturally (D-09 / RESEARCH Pitfall 3)
 - [Phase ?]: Phase 13-02: Template + static dirs resolved via Path(__file__).parent (not CWD-relative strings) — Jinja2Templates and StaticFiles both take str(Path(__file__).parent / 'templates'|'static') so the app works under uv run from any directory and under pytest
 - [Phase ?]: Phase 13-02: D-01 (USER-LOCKED) enforced by tests/dashboard/test_independence.py — grep gate + inward-only import audit run as normal pytest assertions; cannot be silently bypassed
+- [Phase ?]: Plan 15-02: prefer canonical RecipeData symbol over RecipeResearchGatherOutput alias in AGENT_REGISTRY[recipe-research-gather].response_format_model
 
 ### Pending Todos
 
@@ -246,7 +248,7 @@ None yet.
 
 Last activity: 2026-05-14 - Completed quick task 260514-ix8: Remove redundant Output section from 5 recipe research prompts
 
-Last session: 2026-05-14T17:42:28.223Z
+Last session: 2026-05-14T19:17:29.725Z
 Stopped at: Phase 15 context gathered
 Resume file: 
-.planning/phases/15-recipe-artifact-accumulation-and-food-unit-validation/15-CONTEXT.md
+None
