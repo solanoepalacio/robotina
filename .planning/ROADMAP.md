@@ -28,6 +28,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)` (completed 2026-05-13)
 - [x] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`) (completed 2026-05-14)
 - [x] **Phase 13: Queue Visibility Dashboard** - Server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed workflows post-hoc; persistence of `step_input`/`failure_reason`; HTMX polling halts on terminal status; module is fully independent of other robotina.* modules (grep + AST enforced) (completed 2026-05-14)
+- [x] **Phase 14: Prompt Cleanup and Structural Standardization** - All 7 active agent prompts share a single skeleton (Role / Inputs / Tools / Process / Rules / Output), deduplicated language rules, and schema-deferring Output sections — zero behavioral change (completed 2026-05-14)
+- [ ] **Phase 15: Recipe Artifact Accumulation and Food/Unit Validation** - Refactor recipe-research pipeline so each step accumulates fields onto a single growing RecipeData artifact; food/unit validation moves into the ingredients step via two new tools (validate-foods / validate-units) that combine normalized direct match with batched LLM-based semantic match; recipe-load shrinks to happy-path POST + targeted error recovery
 
 ## Phase Details
 
