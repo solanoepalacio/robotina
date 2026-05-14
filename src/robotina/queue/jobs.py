@@ -151,8 +151,16 @@ def run_task(task_input) -> object:
             from robotina.agent.tools.web_search import WebSearchTool
             tools.append(WebSearchTool())
         elif task_type == "recipe-research-ingredients":
+            # Phase 15: ingredients agent gets the two validation tools so it
+            # can resolve Spanish food/unit names to household-manager catalog
+            # ids before emitting the next RecipeData snapshot. Tools are
+            # zero-arg (per D-10 — catalog is shared per household).
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+            from robotina.agent.tools.validate_foods import ValidateFoodsTool
+            from robotina.agent.tools.validate_units import ValidateUnitsTool
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
+            tools.append(ValidateFoodsTool())
+            tools.append(ValidateUnitsTool())
         elif task_type == "recipe-load":
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
