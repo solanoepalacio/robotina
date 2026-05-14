@@ -27,6 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: LangChain 1.x Agent API Migration** - Replace `langgraph.prebuilt.create_react_agent` with `langchain.agents.create_agent` across all three LLMBackend adapters with strict behavior parity (completed 2026-05-13)
 - [x] **Phase 11: Structured Agent Output via response_format** - Replace free-text JSON emission from recipe-research and recipe-load agents with schema-constrained output via `create_agent(response_format=...)` (completed 2026-05-13)
 - [x] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`) (completed 2026-05-14)
+- [x] **Phase 13: Queue Visibility Dashboard** - Server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed workflows post-hoc; persistence of `step_input`/`failure_reason`; HTMX polling halts on terminal status; module is fully independent of other robotina.* modules (grep + AST enforced) (completed 2026-05-14)
 
 ## Phase Details
 
