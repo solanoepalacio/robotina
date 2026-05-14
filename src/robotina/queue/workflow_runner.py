@@ -155,6 +155,14 @@ def queue_workflow(
     first_job_id = str(uuid.uuid4())
     task_input = first_step_def.build_input(dict(shared_context), {})
 
+    # DASH-02 / Phase 13: persist step_input before commit so the dashboard
+    # can display the exact input the agent was invoked with. Mirrors the
+    # artifact serialization pattern in on_step_complete (~line 274-279).
+    if hasattr(task_input, "model_dump"):
+        first_step.step_input = task_input.model_dump(mode="json")
+    else:
+        first_step.step_input = task_input
+
     queue.enqueue(
         "robotina.queue.jobs.run_task",
         task_input,
@@ -319,6 +327,13 @@ def on_step_complete(
         next_job_id = str(uuid.uuid4())
         task_input = next_step_def.build_input(dict(run.shared_context), accumulated_artifacts)
 
+        # DASH-02 / Phase 13: persist step_input before commit (same pattern as
+        # the first-step site in queue_workflow).
+        if hasattr(task_input, "model_dump"):
+            next_step.step_input = task_input.model_dump(mode="json")
+        else:
+            next_step.step_input = task_input
+
         queue.enqueue(
             "robotina.queue.jobs.run_task",
             task_input,
@@ -348,7 +363,13 @@ def on_step_complete(
         )
 
 
-def on_step_failed(job_id: str, session: Session, queue=None) -> None:
+def on_step_failed(
+    job_id: str,
+    session: Session,
+    queue=None,
+    *,
+    exc: BaseException | None = None,
+) -> None:
     """Mark step FAILED, cancel all remaining PENDING steps, mark WorkflowRun FAILED.
 
     The failed RQ job is retained in RQ's FailedJobRegistry by the caller
@@ -361,12 +382,22 @@ def on_step_failed(job_id: str, session: Session, queue=None) -> None:
     the dead-letter block is logged and swallowed (the workflow is already
     FAILED; we don't cascade).
 
+    When ``exc`` is provided (DASH-03 / Phase 13), persist a one-line
+    ``failure_reason`` on the step using the format
+    ``f"{type(exc).__name__}: {exc}"`` with embedded newlines collapsed to
+    spaces (RESEARCH Pitfall 2). The format is fixed by SPEC constraint D-16
+    — no traceback, no chained exceptions. The default ``exc=None`` preserves
+    backward compatibility for direct-task callers (the early-return branch
+    when ``step is None``) and for legacy tests that don't pass an exception.
+
     Args:
         job_id: RQ job ID of the failing job.
         session: SQLAlchemy session.
         queue: RQ Queue instance connected to "agent-tasks". Optional; when
                omitted, the dead-letter hook is skipped (preserves
                backward-compatibility for tests that don't pass a queue).
+        exc: The live exception that caused the failure. Optional, keyword-only.
+             When provided, drives the ``failure_reason`` column write.
     """
     from robotina.queue.models import (
         WorkflowRun,
@@ -385,6 +416,14 @@ def on_step_failed(job_id: str, session: Session, queue=None) -> None:
         return
 
     step.status = WorkflowStepStatus.FAILED
+    # DASH-03 / Phase 13: record one-line failure reason (D-16 format) when an
+    # exception was threaded through by the caller. Newlines in exc.__str__()
+    # are collapsed to spaces per RESEARCH Pitfall 2; .strip() removes any
+    # trailing whitespace left by the substitution.
+    if exc is not None:
+        step.failure_reason = (
+            f"{type(exc).__name__}: {exc}".replace("\n", " ").strip()
+        )
     session.flush()
 
     # Cancel all remaining PENDING steps

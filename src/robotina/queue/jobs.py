@@ -105,8 +105,8 @@ def run_task(task_input) -> object:
             )
             workflow_runner.on_step_complete(job.id, artifact, _session, _queue)
             return artifact
-        except Exception:
-            workflow_runner.on_step_failed(job.id, _session, _queue)
+        except Exception as exc:  # DASH-03 / Phase 13
+            workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
             raise
         finally:
             _session.close()
@@ -212,9 +212,9 @@ def run_task(task_input) -> object:
         workflow_runner.on_step_complete(job.id, result, _session, _queue)
         return result
 
-    except Exception:
+    except Exception as exc:  # DASH-03 / Phase 13
         # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
-        workflow_runner.on_step_failed(job.id, _session, _queue)
+        workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
         raise  # re-raise so RQ moves the job to FailedJobRegistry
 
     finally:
