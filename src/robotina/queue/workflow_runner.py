@@ -25,6 +25,13 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+# WR-02: cap stored failure_reason length. The D-16 format string
+# (f"{type(exc).__name__}: {exc}") is SPEC-locked, so we cannot scrub
+# content — only bound it. 500 chars accommodates typical exception
+# messages (HTTP error bodies tend to be the long tail) while keeping
+# the dashboard cell render legible.
+_FAILURE_REASON_MAX_CHARS = 500
+
 
 def _extract_task_output(result: dict, *, expects_structured: bool = False) -> dict:
     """Extract a JSON-serializable artifact from a langchain.agents.create_agent result.
@@ -420,10 +427,19 @@ def on_step_failed(
     # exception was threaded through by the caller. Newlines in exc.__str__()
     # are collapsed to spaces per RESEARCH Pitfall 2; .strip() removes any
     # trailing whitespace left by the substitution.
+    #
+    # WR-02: the D-16 format is SPEC-locked, so we cannot redact env-var
+    # names, URLs, or payload fragments that some exception classes embed
+    # in str(exc) (KeyError, httpx.HTTPStatusError, Pydantic ValidationError).
+    # Trade-off accepted: cap the stored string at _FAILURE_REASON_MAX_CHARS
+    # to bound blast radius, and rely on WR-01's loopback default so the
+    # dashboard is not reachable by untrusted networks by default. Operators
+    # who opt into DASHBOARD_HOST=0.0.0.0 inherit the residual leak risk.
     if exc is not None:
-        step.failure_reason = (
-            f"{type(exc).__name__}: {exc}".replace("\n", " ").strip()
-        )
+        reason = f"{type(exc).__name__}: {exc}".replace("\n", " ").strip()
+        if len(reason) > _FAILURE_REASON_MAX_CHARS:
+            reason = reason[: _FAILURE_REASON_MAX_CHARS - 1] + "…"
+        step.failure_reason = reason
     session.flush()
 
     # Cancel all remaining PENDING steps
