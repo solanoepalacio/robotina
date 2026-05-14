@@ -269,10 +269,11 @@ Plans:
   3. `uv run pytest` is green; instrumentation-related tests are updated to assert middleware presence and ordering rather than callback registration
   4. No `from langchain_core.callbacks` imports remain in `src/robotina/agent/` except where the LangWatch SDK itself requires them internally (verified by grep + a brief written rationale per remaining import in the phase summary)
   5. The phase summary documents the LangWatch + middleware interaction model -- specifically whether LangWatch's OTel bridge picks up traces independent of callbacks, or whether a thin shim is needed
-**Plans**: 0 plans
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 12 to break down)
+- [x] 12-01-PLAN.md -- Create middleware module + wire into all 3 LLMBackend.create_agent methods (additive only; coexists with legacy callback) + middleware unit tests
+- [ ] 12-02-PLAN.md -- Delete callbacks.py + remove AgentLoggingHandler from jobs.py (keep LangWatch tracer) + prune legacy tests + phase summary + manual smoke checkpoint
 
 **Notes:**
 - Sequencing matters: this phase runs **after** Phase 11 so middleware sees the `response_format` plumbing already in place. Running them in parallel would create merge friction in `src/robotina/llm/__init__.py`.
@@ -298,7 +299,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. recipe-load Agent and End-to-End Integration | 2/2 | Complete   | 2026-05-12 |
 | 10. LangChain 1.x Agent API Migration | 3/3 | Complete   | 2026-05-13 |
 | 11. Structured Agent Output via response_format | 0/4 | Planned | - |
-| 12. Middleware-Based Agent Instrumentation | 0/0 | Not started | - |
+| 12. Middleware-Based Agent Instrumentation | 1/2 | In Progress|  |
 
 ## Backlog
 

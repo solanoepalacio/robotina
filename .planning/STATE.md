@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 11 complete
-stopped_at: "Phase 11 complete (4/4 plans). LLMBackend.create_agent gains an optional response_format kwarg with per-provider Strategy wrap (ToolStrategy on Ollama, ProviderStrategy on Anthropic/OpenAI); AgentConfig grows a non-overridable response_format_model field; 5 named agents bound to their Pydantic Output models (recipe-research-{gather,instructions,ingredients,metadata} + recipe-load); 5 new prompt versions strip JSON-emission boilerplate; _extract_task_output rewritten to read structured_response first with fail-loud on missing (prose-strip/code-fence/JSON-scan ladder removed). 119 unit tests green. Manual checkpoint APPROVED 2026-05-13 on workflow_run_id f1d930d4-a409-45b5-a59f-55eb504ea311 (one representative add-recipe run, zero canelones-class parse failures). RRECIPE-07/RLOAD-07/WF-10 flipped to Complete. Two debts uncovered during verification but explicitly out-of-scope per user: recipe-load emits hallucinated recipe_id without POST /api/recipes (response_format schema becomes the exit ramp; V003 prompt rewrite did not hold; deterministic fix needs Phase 12 middleware) and WorkflowRun.shared_context.household_id propagates as empty string from handle-incoming-message (Phase 999.1 scope). Next: Phase 12 (middleware-based agent instrumentation)."
-last_updated: "2026-05-13T19:50:00.000Z"
-last_activity: 2026-05-13
+status: Executing Phase 12
+stopped_at: "Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output)."
+last_updated: "2026-05-14T00:57:30.471Z"
+last_activity: 2026-05-14
 progress:
   total_phases: 14
   completed_phases: 10
-  total_plans: 44
-  completed_plans: 39
-  percent: 89
+  total_plans: 46
+  completed_plans: 40
+  percent: 87
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 11 — structured-agent-output-via-response-format
+**Current focus:** Phase 12 — middleware-based-agent-instrumentation
 
 ## Current Position
 
-Phase: 11 — COMPLETE
-Plan: 4 of 4 (all plans complete; manual checkpoint APPROVED 2026-05-13; RRECIPE-07/RLOAD-07/WF-10 → Complete; Next: Phase 12)
+Phase: 12 (middleware-based-agent-instrumentation) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Plan: 4 of 4 (all plans complete; manual checkpoint APPROVED 2026-05-13; RRECIPE
 | Phase 11-structured-agent-output-via-response-format P02 | 6min | 2 tasks | 2 files |
 | Phase 11-structured-agent-output-via-response-format P03 | 6min | 6 tasks | 9 files |
 | Phase 11-structured-agent-output-via-response-format P04 | TBD | 2 tasks | 4 files |
+| Phase 12-middleware-based-agent-instrumentation P01 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,11 @@ Recent decisions affecting current work:
 - [Phase 11-structured-agent-output-via-response-format]: Per-provider Strategy mapping: Ollama → ToolStrategy (correctness — gpt-oss is in FALLBACK_MODELS_WITH_STRUCTURED_OUTPUT so AutoStrategy would silently route to ProviderStrategy and call bind_tools(strict=True, response_format=...) which Ollama does not honor); Anthropic / OpenAI → ProviderStrategy. Strategy selected inside each LLMBackend adapter, not in run_task.
 - [Phase 11-structured-agent-output-via-response-format]: AgentConfig.response_format_model is NOT overridable via AGENT_OVERRIDES_FILEPATH — schema is a code contract, not config. get_agent_config only propagates model_config and prompt_path; the response_format_model field flows directly from AGENT_REGISTRY.
 - [Phase 11-structured-agent-output-via-response-format]: _extract_task_output in workflow_runner.py rewritten — prefers result['structured_response'] when expects_structured=True (resolved by on_step_complete via get_agent_config(step.task_type).response_format_model is not None); raises ValueError loudly on missing. The prose-strip / markdown-fence / first-{-scan / json.loads fallback ladder + TEMP DIAGNOSTIC logger.error block are REMOVED. handle-incoming-message and acknowledge-add-recipe continue to use the return_direct tool-message branch (out of scope for Phase 11).
+- [Phase ?]: [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Used @wrap_model_call (not @before_model) for the 'LLM stream start | model=%s' line because before_model has no access to the model object; ModelRequest.model is only available in wrap_model_call. type(request.model).__name__ yields 'ChatOllama' / 'ChatAnthropic' / 'ChatOpenAI' for byte-for-byte parity with the legacy on_chat_model_start log.
+- [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Coexistence wave boundary intentional. AgentLoggingHandler remains wired in robotina/queue/jobs.py and the three legacy callback tests in test_agent_runner.py:152-176, 325-340 stay green. Plan 12-02 (Wave 2) atomically removes the callback file + jobs.py wiring + the three legacy tests. The new-path-lands-additively-then-old-path-flips boundary mirrors Phase 10's lock-test-flip pattern.
+- [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Middleware list is provider-agnostic: the SAME middleware=[log_around_model_call, log_after_model, log_wrap_tool_call] kwarg is passed by all three LLMBackend adapters (Ollama / Anthropic / OpenAI). Decorator-yields-an-instance pattern (RESEARCH.md Pitfall 3) means singletons are imported, not constructed per call.
+- [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — Bound-method invocation is the testing convention: log_around_model_call.wrap_model_call(request, handler) etc. Sidesteps needing a full create_agent graph (langchain/agents/middleware/types.py:1880-1892).
+- [Phase 12-middleware-based-agent-instrumentation]: Plan 12-01 — OBS-06 not yet declared in REQUIREMENTS.md. Plan 12-02 (which actually deletes the legacy path) is the better place to register OBS-06 with 'Complete' status, since OBS-06 success is gated on the legacy callback being gone, not just on the new middleware module existing.
 
 ### Pending Todos
 
@@ -224,8 +230,8 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-05-13
+Last activity: 2026-05-14
 
-Last session: 2026-05-13T11:41:28.568Z
+Last session: 2026-05-14T00:56:39.531Z
 Stopped at: Completed 10-03-PLAN.md (CLAUDE.md/STATE.md/PROJECT.md/decision record committed in 705f511; manual end-to-end Telegram add-recipe checkpoint APPROVED by user 2026-05-13; AGENT-12 flipped to [x] / Complete in REQUIREMENTS.md in commit 386374b). Phase 10 functionally complete (3/3 plans). 148 non-integration tests green; grep-zero intent satisfied (5 remaining create_react_agent/langgraph.prebuilt matches are all load-bearing assertions inside the lock test). Tangential pydantic optional-field fix (quick task 260512-pyd / 19b3b9d) committed during the verification gate — pre-existing schema bug, not Phase 10 scope. Next: Phase 10 verification, then Phase 11 (response_format structured output).
 Resume file: None
