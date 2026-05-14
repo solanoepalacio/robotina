@@ -100,6 +100,7 @@ Plan: 2 of 2
 - Phase 10 added: LangChain 1.x Agent API Migration (create_react_agent -> create_agent)
 - Phase 11 added: Structured Agent Output via response_format (fixes canelones-class parse failures)
 - Phase 12 added: Middleware-Based Agent Instrumentation (callbacks -> @before_model/@after_model/@wrap_model_call)
+- Phase 13 added: Queue Visibility Dashboard (custom FastAPI dashboard for workflow-grouped task visibility)
 - Phase 11 code complete (manual checkpoint pending): response_format adopted on 5 named agents; canelones-class parse failures structurally eliminated for those agents — pending 3-query end-to-end verification (Plan 11-04 Task 4.2)
 
 ### Decisions
