@@ -11,27 +11,37 @@ from robotina.queue.models import WorkflowRun, WorkflowStatus
 
 
 @pytest.mark.asyncio
-async def test_list_view_returns_200_when_empty(client, db_session):
-    """When there are zero workflow runs visible, the page renders the empty state."""
-    session, _ids = db_session
-    # Save and temporarily hide all existing rows by selecting against an
-    # impossible filter — we cannot truncate the table (Pitfall 7). Instead,
-    # we just verify the empty-state markup is in the response when zero
-    # rows happen to be returned. To make the assertion deterministic, we
-    # require that the response is 200 AND contains the empty-state heading
-    # OR — if rows do exist — the runs-body wrapper.
-    resp = await client.get("/")
+async def test_list_view_renders_empty_state_when_zero_runs(monkeypatch):
+    """WR-03: deterministically exercise the empty-state render path.
+
+    The previous version of this test substring-matched "Workflows" — which
+    appears in BOTH the populated header and the empty-state page — so it
+    couldn't tell the two apart and the docstring was a lie. Here we
+    monkeypatch list_recent_runs (called directly inside list_view, not via
+    Depends, so dependency_overrides cannot intercept it) to return [],
+    then assert two things the empty path uniquely produces:
+      1. The empty-state copy ("No workflows yet") from index.html.
+      2. Absence of `<tr class="run-row"` — the row marker from _run_rows.html.
+
+    No shared-DB mutation; Pitfall 7 still respected.
+    """
+    import httpx
+
+    from robotina.dashboard import app as app_mod
+
+    monkeypatch.setattr(app_mod, "list_recent_runs", lambda *a, **kw: [])
+
+    transport = httpx.ASGITransport(app=app_mod.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.get("/")
+
     assert resp.status_code == 200
-    # Either rows are rendered (table) OR the empty state. We assert the
-    # page handles both cases — but the load-bearing AC #6 test is that the
-    # empty-state copy is reachable when there are no rows. To guarantee
-    # the empty path here, we don't insert anything and we filter by a
-    # newly-inserted run's id only — but the page renders against all rows.
-    # So: this test verifies 200 + either marker. The dedicated empty-state
-    # text is asserted in the template-rendering pathway below; the strict
-    # zero-rows scenario is exercised in CI-with-clean-DB or by the
-    # template unit (`render_index_empty`) check below.
-    assert "Workflows" in resp.text
+    assert "No workflows yet" in resp.text, (
+        "empty-state copy from index.html should render when runs=[]"
+    )
+    assert '<tr class="run-row"' not in resp.text, (
+        "no run rows should render when runs=[]"
+    )
 
 
 @pytest.mark.asyncio
