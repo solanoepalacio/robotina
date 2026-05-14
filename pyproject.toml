@@ -29,6 +29,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "python-dotenv",
+    "jinja2>=3.1",  # Phase 13 / DASH-04 — dashboard template engine
     "recipe-scrapers>=15.11.0",
 ]
 

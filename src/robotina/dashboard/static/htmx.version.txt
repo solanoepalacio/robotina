@@ -1,0 +1,2 @@
+2.0.10
+71ea67185bfa8c98c39d31717c6fce5d852370fcdfd129db4543774d3145c0de  src/robotina/dashboard/static/htmx.min.js
