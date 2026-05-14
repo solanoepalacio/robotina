@@ -131,7 +131,7 @@ def test_recipe_research_instructions_registered():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "recipe-research-instructions"
     assert config.skills == []
-    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-instructions/V002.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/recipe-research-instructions/V003.md"
     assert config.model_config["api_key_env"] == "RECIPE_RESEARCH_INSTRUCTIONS_API_TOKEN"
 
 
