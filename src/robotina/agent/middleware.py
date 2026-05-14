@@ -25,6 +25,18 @@ constructing the three ``AgentMiddleware`` singletons (no I/O, no network, no
 env reads). The singletons are shared across all jobs in the process — they
 MUST hold no per-job state and MUST NOT close over per-job context
 (RESEARCH.md Pitfall 4).
+
+CONSTRAINT — sync-only invocation path:
+    The decorators below (``@wrap_model_call``, ``@after_model``,
+    ``@wrap_tool_call``) generate ``AgentMiddleware`` subclasses that populate
+    ONLY the sync hooks. The async counterparts (``awrap_model_call``,
+    ``awrap_tool_call``, ``aafter_model``) inherit the base-class
+    implementation, which raises ``NotImplementedError``. Robotina's task
+    runner invokes agents synchronously today (``agent.invoke(...)`` in
+    ``robotina.queue.jobs``); a future caller that switches to
+    ``agent.ainvoke()`` / ``agent.astream()`` will hit ``NotImplementedError``
+    at the first tool or model call. Revisit by adding async parity decorators
+    (mirroring the sync logic) if async invocation is introduced.
 """
 from __future__ import annotations
 
@@ -55,8 +67,13 @@ def log_around_model_call(
     """Log ``LLM stream start | model=<ChatClassName>`` before each model call.
 
     Replaces ``AgentLoggingHandler.on_chat_model_start``. The class name comes
-    from ``type(request.model).__name__`` — ``request.model`` is the
-    ``BaseChatModel`` instance (ChatOllama / ChatAnthropic / ChatOpenAI).
+    from ``type(request.model).__name__`` — ``request.model`` is the underlying
+    ``BaseChatModel`` instance configured for this run. In practice that's
+    ``_RetryingChatOllama`` for the Ollama backend (a local retry subclass —
+    see ``robotina.llm._RetryingChatOllama``), ``ChatAnthropic`` for Anthropic,
+    and ``ChatOpenAI`` for OpenAI. The log line therefore carries the actual
+    runtime class name, not a normalized provider label — parity with the
+    legacy callback (which used ``serialized.get("name")``).
     """
     model_name = type(request.model).__name__
     logger.info("LLM stream start | model=%s", model_name)
