@@ -120,7 +120,7 @@ Requirements for the initial milestone. All map to roadmap phases.
 - [x] **DASH-06**: `GET /workflows/{id}` returns 200 HTML with workflow header + step rows ordered by `step_order` showing `step_key`, `status`, `step_input` (pretty JSON), `artifact` (pretty JSON if any), `failure_reason` (if any), `started_at`, `completed_at`; 404 when id not found
 - [x] **DASH-07**: FAILED step renders with CSS class `badge--failed` (solid red) and CANCELLED step renders with `badge--cancelled` (diagonal-stripe amber) — visually + grep-ably distinct
 - [x] **DASH-08**: HTMX polling — list view always polls `/fragments/runs` every 10s; detail view polls `/fragments/workflows/{id}` every 3s but the wrapper element OMITS `hx-trigger` when run status is `DONE` or `FAILED` (polling halts naturally); `grep -rE "from robotina\.dashboard|import robotina\.dashboard" src/robotina/ --exclude-dir=dashboard` returns zero matches; all routes return 200/404 without any auth headers
-- [ ] **DASH-09**: `docker compose up dashboard` brings the service up alongside `postgres`, using the same `DATABASE_URL`; `DASHBOARD_PORT` documented in `.env.example`; a Dockerfile at repo root supports `build: .` in compose
+- [x] **DASH-09**: `docker compose up dashboard` brings the service up alongside `postgres`, using the same `DATABASE_URL`; `DASHBOARD_PORT` documented in `.env.example`; a Dockerfile at repo root supports `build: .` in compose
 
 ## v2 Requirements
 
@@ -237,7 +237,7 @@ Deferred to a future milestone. Infrastructure (`household_id` field) is already
 | DASH-06 | Phase 13 | Planned |
 | DASH-07 | Phase 13 | Planned |
 | DASH-08 | Phase 13 | Planned |
-| DASH-09 | Phase 13 | Planned |
+| DASH-09 | Phase 13 | Complete |
 
 **Coverage:**
 - v1 requirements: 82 total

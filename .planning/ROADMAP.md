@@ -334,12 +334,12 @@ Plans:
 **Goal:** A server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed Robotina workflows post-hoc — locate a run, see every step's input/output/status, and identify which step failed (exception class + message) and which steps were cancelled in the cascade. Read-only. Dev + staging only. Independent module: no other robotina.* module may import from `robotina.dashboard`.
 **Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, DASH-06, DASH-07, DASH-08, DASH-09
 **Depends on:** Phase 12
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 13-01-PLAN.md — Persistence layer: migration 0005, model columns, workflow_runner.py wiring at 3 sites, jobs.py exception threading (DASH-01..03)
 - [x] 13-02-PLAN.md — Dashboard module: FastAPI app, 6 Jinja templates, vendored HTMX 2.0.10, CSS, tests/dashboard/ suite, independence grep gate (DASH-04..08)
-- [ ] 13-03-PLAN.md — Deployment: Dockerfile, docker-compose dashboard service, .env.example, manual browser smoke checkpoint (DASH-09)
+- [x] 13-03-PLAN.md — Deployment: Dockerfile, docker-compose dashboard service, .env.example, manual browser smoke checkpoint (DASH-09)
 
 ### Phase 14: Prompt Cleanup and Structural Standardization
 
@@ -383,3 +383,14 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 14 to break down)
+
+### Phase 15: Recipe Artifact Accumulation and Food/Unit Validation
+
+**Goal:** Refactor the recipe-research workflow so that artifacts are successive snapshots of the recipe rather than disjoint side-data — each step (gather → instructions → ingredients → metadata) adds fields to a single growing artifact, and by the time recipe-load runs, the artifact is a fully-validated, insert-ready recipe payload. Food and unit validation move into the ingredients step via two new tools that (1) fetch all items of the category (foods or units) from household-manager, (2) match the agent's list programmatically by direct match, (3) fall back to LLM-based semantic matching (e.g. instructor) for unmatched items, and (4) return the original list paired with resolved ids. This eliminates the convoluted payload-building and re-validation that today causes recipe-load to fail.
+
+**Requirements**: TBD
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 15 to break down)
