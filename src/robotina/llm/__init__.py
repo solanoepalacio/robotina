@@ -33,6 +33,12 @@ from langchain.agents import create_agent as _create_agent  # AGENT-12
 from ollama import ResponseError as OllamaResponseError
 from pydantic import BaseModel
 
+from robotina.agent.middleware import (  # AGENT-13 / Phase 12
+    log_around_model_call,
+    log_after_model,
+    log_wrap_tool_call,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -197,6 +203,9 @@ class LLMBackend(Protocol):
         The agent's invoke result will populate ``state['structured_response']``
         with a Pydantic instance of ``response_format``. See Phase 11
         RESEARCH.md "Pattern 1" / "Pattern 2" for full citations.
+
+        Per-agent logging is installed via ``langchain.agents.middleware``
+        (Phase 12 / OBS-06); see ``robotina.agent.middleware``.
         """
         ...
 
@@ -232,6 +241,11 @@ class OllamaBackend:
             "model": self._model,
             "tools": tools or [],
             "system_prompt": system_prompt,
+            "middleware": [  # AGENT-13 / Phase 12
+                log_around_model_call,
+                log_after_model,
+                log_wrap_tool_call,
+            ],
         }
         if response_format is not None:
             # Explicit ToolStrategy: ChatOllama has no profile, but "gpt-oss"
@@ -276,6 +290,11 @@ class AnthropicBackend:
             "model": self._model,
             "tools": tools or [],
             "system_prompt": system_prompt,
+            "middleware": [  # AGENT-13 / Phase 12
+                log_around_model_call,
+                log_after_model,
+                log_wrap_tool_call,
+            ],
         }
         if response_format is not None:
             from langchain.agents.structured_output import ProviderStrategy
@@ -314,6 +333,11 @@ class OpenAIBackend:
             "model": self._model,
             "tools": tools or [],
             "system_prompt": system_prompt,
+            "middleware": [  # AGENT-13 / Phase 12
+                log_around_model_call,
+                log_after_model,
+                log_wrap_tool_call,
+            ],
         }
         if response_format is not None:
             from langchain.agents.structured_output import ProviderStrategy
