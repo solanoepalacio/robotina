@@ -113,18 +113,26 @@ class StartWorkflowTool(BaseTool):
 
         # Auto-inject reply_context and household_id from constructor fields
         # so the LLM never needs to know about chat_id/user_id/platform.
-        shared_context.setdefault("reply_context", {
+        #
+        # WR-02: use explicit assignment (NOT setdefault) so the constructor
+        # identity is authoritative. setdefault would let an LLM-emitted
+        # ``shared_context={"household_id": "wrong-house", "reply_context": {...}}``
+        # shadow the trusted constructor values — a tenant-isolation defect
+        # once multi-household support is added, and a chat_id redirect risk
+        # today. The LLM controls ``shared_context`` (free-form dict in
+        # StartWorkflowArgs), so its contents cannot be trusted to carry
+        # identity fields.
+        shared_context["reply_context"] = {
             "platform": self.platform,
             "chat_id": self.chat_id,
             "user_id": self.user_id,
-        })
-        shared_context.setdefault("household_id", self.household_id)
+        }
+        shared_context["household_id"] = self.household_id
 
-        # Phase 16 (REQ-HID-3 / RESEARCH Pitfall 4): bracket form removes the silent
-        # "" mask. Line above injects self.household_id via setdefault, so the
-        # key is always present unless an explicit empty was passed in shared_context
-        # — that case falls through to queue_workflow's raise (plan 16-04).
-        household_id = shared_context["household_id"]
+        # Use the constructor value directly — avoid the dict round-trip so a
+        # future refactor that drops the assignment above doesn't silently
+        # re-introduce the LLM-controlled path.
+        household_id = self.household_id
         session = SessionLocal()
         try:
             queue = Queue(
