@@ -25,6 +25,8 @@ import os
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
+from robotina.queue.task_types import NonEmptyHouseholdId
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,10 +95,14 @@ class StartWorkflowTool(BaseTool):
     args_schema: type[BaseModel] = StartWorkflowArgs
 
     # Injected by run_task() at construction time
+    # Phase 16 (REQ-HID-3 / RESEARCH Pitfall 5): household_id has NO default —
+    # caller MUST pass a non-empty value. NonEmptyHouseholdId rejects '' and
+    # whitespace at pydantic validation. chat_id / user_id / platform defaults
+    # are intentionally LEFT as '' — out of scope for Phase 16.
     chat_id: str = ""
     user_id: str = ""
     platform: str = ""
-    household_id: str = ""
+    household_id: NonEmptyHouseholdId
 
     def _run(self, workflow_type: str, shared_context: dict) -> str:
         from redis import Redis
@@ -114,7 +120,11 @@ class StartWorkflowTool(BaseTool):
         })
         shared_context.setdefault("household_id", self.household_id)
 
-        household_id = shared_context.get("household_id", "")
+        # Phase 16 (REQ-HID-3 / RESEARCH Pitfall 4): bracket form removes the silent
+        # "" mask. Line above injects self.household_id via setdefault, so the
+        # key is always present unless an explicit empty was passed in shared_context
+        # — that case falls through to queue_workflow's raise (plan 16-04).
+        household_id = shared_context["household_id"]
         session = SessionLocal()
         try:
             queue = Queue(
