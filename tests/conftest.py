@@ -11,6 +11,17 @@ from robotina.db import SessionLocal
 from robotina.gateway.models import Conversation, StoredMessage
 
 
+@pytest.fixture(autouse=True)
+def _set_household_id(monkeypatch):
+    """Ensure every test sees HOUSEHOLD_ID set so per-message bracket-form reads
+    in gateway/handler.py (Phase 16) do not raise KeyError during collection or
+    unrelated test execution. Tests that need to verify behavior with the env var
+    unset/empty must explicitly call ``monkeypatch.delenv("HOUSEHOLD_ID", raising=False)``
+    inside the test body.
+    """
+    monkeypatch.setenv("HOUSEHOLD_ID", "test-household")
+
+
 @pytest.fixture
 def db_session():
     """Live Postgres session. Cleans up all gateway rows after each test."""
