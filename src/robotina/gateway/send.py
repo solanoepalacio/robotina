@@ -9,7 +9,6 @@ to ensure the HTTP client is properly initialized and closed per call.
 
 Env vars consumed:
   TELEGRAM_BOT_TOKEN  — required (KeyError on missing)
-  HOUSEHOLD_ID        — used for Conversation lookup; defaults ""
   DATABASE_URL        — default postgresql://robotina:robotina@localhost:5432/robotina
 """
 import logging
