@@ -405,13 +405,19 @@ Plans:
 
 ### Phase 16: Fix empty-string household_id propagation through gateway and workflow_run
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Stop empty-string `household_id` from silently propagating from a missing `HOUSEHOLD_ID` env var through `Conversation`, `IncomingMessageInput`, `WorkflowRun`, `StartWorkflowTool`, and `HouseholdManagerApiTool`. After this phase: (1) the gateway refuses to start without a non-empty `HOUSEHOLD_ID` (sys.exit(1) with named stderr), (2) task-input Pydantic models reject empty `household_id` at construction via a shared `NonEmptyHouseholdId` alias, (3) `HouseholdManagerApiTool`, `StartWorkflowTool`, and `queue_workflow` all raise on empty values, (4) `HOUSEHOLD_ID` is documented in `.env.example`, (5) the stale docstring reference in `gateway/send.py` is removed, and (6) PROJECT.md records the end-to-end validation contract.
+**Requirements**: REQ-HID-1, REQ-HID-2, REQ-HID-3, REQ-HID-4, REQ-HID-5, REQ-HID-6, REQ-HID-7, REQ-HID-8, REQ-HID-9 (phase-local; not in REQUIREMENTS.md)
 **Depends on:** Phase 15
-**Plans:** 0 plans
+**Plans:** 7 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 16 to break down)
+- [ ] 16-01-PLAN.md — Wave 0: autouse conftest fixture + 3 new test files (Pydantic, gateway boot, .env.example)
+- [ ] 16-02-PLAN.md — Pydantic NonEmptyHouseholdId alias applied to 7 task-input models
+- [ ] 16-03-PLAN.md — Tool constructor validation (HouseholdManagerApiTool, StartWorkflowTool) + remove `""` default + bracket-form shared_context read
+- [ ] 16-04-PLAN.md — queue_workflow guard: raise ValueError before any DB write on empty household_id
+- [ ] 16-05-PLAN.md — Gateway fail-fast: __init__.py::main sys.exit(1) guard + handler bracket-form read + docstring fix
+- [ ] 16-06-PLAN.md — Docs: .env.example HOUSEHOLD_ID block + send.py stale docstring removal + PROJECT.md Key Decision row
+- [ ] 16-07-PLAN.md — Wave 2: full suite green + invariant greps + flip VALIDATION.md to nyquist_compliant=true
 
 ### Phase 17: as a user I want to ask the agent to add a recipe based on a link I share
 
