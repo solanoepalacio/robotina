@@ -52,10 +52,18 @@ NonEmptyHouseholdId = Annotated[
     str,
     Field(
         min_length=1,
-        pattern=r"\S",
+        # Phase 16 WR-01 / IN-02: anchor both ends so leading/trailing whitespace
+        # is also rejected. The prior pattern (r"\S") only required ONE
+        # non-whitespace char anywhere, which let " hh-1 " through and caused
+        # the boot guard (which strips) to disagree with the handler (which
+        # does not strip) — silently persisting padded ids to the DB. The new
+        # pattern accepts either a single non-whitespace char OR a string
+        # whose first and last chars are non-whitespace.
+        pattern=r"^\S(.*\S)?$",
         description=(
-            "Household identifier. Must be a non-empty, non-whitespace string. "
-            "Empty values are rejected at model construction (Phase 16, REQ-HID-2)."
+            "Household identifier. Must be a non-empty string with no leading "
+            "or trailing whitespace. Empty/whitespace-only/padded values are "
+            "rejected at model construction (Phase 16, REQ-HID-2 + WR-01)."
         ),
     ),
 ]
