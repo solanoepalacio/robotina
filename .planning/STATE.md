@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 16 in progress — Wave 0 scaffold (16-01) complete
-stopped_at: Completed 16-01-PLAN.md (Wave 0 — 28 new RED-state test stubs + autouse conftest fixture)
-last_updated: "2026-05-15T18:44:33.499Z"
-last_activity: "2026-05-15 - Completed Phase 16-01 (Wave 0): autouse HOUSEHOLD_ID fixture in tests/conftest.py + 3 new test files (test_household_id_validation.py [21 tests], test_gateway_boot.py [4 tests], test_env_example.py [3 tests]). 19 failed / 9 passed = the contract Wave 1 plans 16-02/16-05/16-06 will satisfy. Commits fb6ab3c, 43c11d1."
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-05-15T18:50:03.736Z"
+last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
 progress:
   total_phases: 19
   completed_phases: 14
   total_plans: 70
-  completed_plans: 59
+  completed_plans: 62
   percent: 74
 ---
 
@@ -97,6 +97,7 @@ Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN, 16-01-SUMMARY
 | Phase 15 P02 | 181s | 2 tasks | 3 files |
 | Phase 15 P05 | 65s | 2 tasks | 3 files |
 | Phase 16-01 P01 | 2min | 2 tasks | 4 files |
+| Phase 16 P04 | 157 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -217,6 +218,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Plan 15-02: prefer canonical RecipeData symbol over RecipeResearchGatherOutput alias in AGENT_REGISTRY[recipe-research-gather].response_format_model
 - [Phase 15]: Plan 15-05: metadata V004 nulls `gathered_sources` on emit per D-04 — clean-payload contract for recipe-load. Owned fields: servings_qty, servings_unit, prep_time, cook_time, total_time, source_url. V003's never-null-always-estimate rule (default servings_qty=4, servings_unit="porciones") reversed: `null` now preferable to invented metadata; household-manager API accepts null.
 - [Phase ?]: Phase 16-01: Wave 0 RED-state stubs committed before production source. 19 failed / 9 passed IS the contract Wave 1 plans (16-02/16-05/16-06) will satisfy
+- [Phase ?]: 16-04: queue_workflow raises ValueError on empty/whitespace household_id BEFORE any DB write (REQ-HID-4 last-line-of-defense per RESEARCH Pattern 7)
 
 ### Pending Todos
 
@@ -254,7 +256,7 @@ None yet.
 
 Last activity: 2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)
 
-Last session: 2026-05-15T18:44:28.964Z
+Last session: 2026-05-15T18:49:44.204Z
 Stopped at: Completed 15-05-PLAN.md
 Resume file: 
 None
