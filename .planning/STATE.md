@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 16 in progress — Wave 2 tool-constructor validation complete (16-03)
-stopped_at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
-last_updated: "2026-05-15T19:06:59.751Z"
-last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
+status: Phase 16 complete — 7/7 plans, verification 11/11, code-review 4 warnings fixed, UAT deferred (operator-UX boot + DB no-migration checks)
+stopped_at: Completed 16-07-PLAN.md (final gate) + code-review fixes (WR-01..04)
+last_updated: "2026-05-15T20:30:00.000Z"
+last_activity: "2026-05-15 - Phase 16 complete: 4-layer household_id validation (Pydantic NonEmptyHouseholdId, tool constructors, queue_workflow guard, gateway sys.exit(1)); 8 dev commits + 4 code-review fixes + verification; 133/133 unit tests green; manual UAT deferred."
 progress:
   total_phases: 19
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 70
-  completed_plans: 65
-  percent: 79
+  completed_plans: 72
+  percent: 84
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 16 — fix empty-string household_id propagation. Wave 0 (16-01) complete; next up Wave 1 (16-02 Pydantic constraints, 16-03 tool validators, 16-04 queue_workflow guard, 16-05 gateway boot guard, 16-06 .env.example + docs sweep).
+**Current focus:** Phase 16 COMPLETE — 4-layer household_id validation in place. Next up Phase 17 (recipe via shared link) or backlog Phase 999.1 (custom AgentState schemas).
 
 ## Current Position
 
