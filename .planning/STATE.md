@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 16 in progress — Wave 1 partial (16-06 docs & cleanup complete)
-stopped_at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
-last_updated: "2026-05-15T18:53:47.195Z"
+status: Phase 16 in progress — Wave 2 tool-constructor validation complete (16-03)
+stopped_at: Completed 16-03-PLAN.md (Wave 2 tool constructor NonEmptyHouseholdId application)
+last_updated: "2026-05-15T18:58:07Z"
 last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
 progress:
   total_phases: 19
   completed_phases: 14
   total_plans: 70
-  completed_plans: 63
-  percent: 74
+  completed_plans: 65
+  percent: 76
 ---
 
 # Project State
@@ -100,6 +100,7 @@ Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN, 16-01-SUMMARY
 | Phase 16 P04 | 157 | 1 tasks | 2 files |
 | Phase 16 P06 | 6min | 3 tasks | 3 files |
 | Phase 16 P05 | 326 | 2 tasks | 2 files |
+| Phase 16 P03 | 158 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 16-04: queue_workflow raises ValueError on empty/whitespace household_id BEFORE any DB write (REQ-HID-4 last-line-of-defense per RESEARCH Pattern 7)
 - [Phase 16]: 16-06: HOUSEHOLD_ID block placed between Telegram and Tavily in .env.example with explicit `sys.exit(1)` failure-mode note; send.py stale docstring HOUSEHOLD_ID line removed (file never read the env var); PROJECT.md Key Decisions row recorded the four-layer contract (gateway sys.exit, NonEmptyHouseholdId on 7 models, tool constructors, queue_workflow).
 - [Phase ?]: Phase 16-05: HOUSEHOLD_ID dual-guard adopted — sys.exit(1) at gateway entrypoint (RESEARCH Pattern 2) + bracket-form os.environ['HOUSEHOLD_ID'] in handler.py (RESEARCH Pattern 4). Module-import RuntimeError rejected per Open Q1 (would break pytest collection).
+- [Phase 16]: Plan 16-03: NonEmptyHouseholdId (from 16-02) applied to HouseholdManagerApiTool.household_id and StartWorkflowTool.household_id — third defensive layer for REQ-HID-3. StartWorkflowTool's literal `""` default REMOVED (Pitfall 5) and `shared_context.get("household_id", "")` REPLACED with bracket form `shared_context["household_id"]` (Pitfall 4). chat_id/user_id/platform defaults intentionally LEFT as `""` — out of Phase 16 scope. Pydantic-native ValidationError preferred over bespoke ValueError (ValidationError is a ValueError subclass anyway).
 
 ### Pending Todos
 
