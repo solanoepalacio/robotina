@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 16 in progress — Wave 0 scaffold (16-01) complete
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-05-15T18:50:03.736Z"
-last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
+status: Phase 16 in progress — Wave 1 partial (16-06 docs & cleanup complete)
+stopped_at: Completed 16-06-PLAN.md
+last_updated: "2026-05-15T18:50:54Z"
+last_activity: "2026-05-15 - Completed Plan 16-06: .env.example HOUSEHOLD_ID block + send.py stale docstring cleanup + PROJECT.md Key Decision (REQ-HID-6, REQ-HID-7, REQ-HID-8)"
 progress:
   total_phases: 19
   completed_phases: 14
@@ -98,6 +98,7 @@ Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN, 16-01-SUMMARY
 | Phase 15 P05 | 65s | 2 tasks | 3 files |
 | Phase 16-01 P01 | 2min | 2 tasks | 4 files |
 | Phase 16 P04 | 157 | 1 tasks | 2 files |
+| Phase 16 P06 | 6min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -219,6 +220,7 @@ Recent decisions affecting current work:
 - [Phase 15]: Plan 15-05: metadata V004 nulls `gathered_sources` on emit per D-04 — clean-payload contract for recipe-load. Owned fields: servings_qty, servings_unit, prep_time, cook_time, total_time, source_url. V003's never-null-always-estimate rule (default servings_qty=4, servings_unit="porciones") reversed: `null` now preferable to invented metadata; household-manager API accepts null.
 - [Phase ?]: Phase 16-01: Wave 0 RED-state stubs committed before production source. 19 failed / 9 passed IS the contract Wave 1 plans (16-02/16-05/16-06) will satisfy
 - [Phase ?]: 16-04: queue_workflow raises ValueError on empty/whitespace household_id BEFORE any DB write (REQ-HID-4 last-line-of-defense per RESEARCH Pattern 7)
+- [Phase 16]: 16-06: HOUSEHOLD_ID block placed between Telegram and Tavily in .env.example with explicit `sys.exit(1)` failure-mode note; send.py stale docstring HOUSEHOLD_ID line removed (file never read the env var); PROJECT.md Key Decisions row recorded the four-layer contract (gateway sys.exit, NonEmptyHouseholdId on 7 models, tool constructors, queue_workflow).
 
 ### Pending Todos
 
