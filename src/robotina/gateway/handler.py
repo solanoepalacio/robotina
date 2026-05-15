@@ -8,7 +8,10 @@ Flow per message:
 
 Env vars consumed:
   TELEGRAM_BOT_TOKEN  — required (KeyError on missing)
-  HOUSEHOLD_ID        — required for Conversation; defaults ""
+  HOUSEHOLD_ID        — REQUIRED for Conversation; KeyError on missing (Phase 16, REQ-HID-5).
+                        The gateway entrypoint guard in __init__.py::main() validates
+                        HOUSEHOLD_ID at startup, so by the time this handler runs the
+                        env var is guaranteed non-empty.
   CONVERSATION_HISTORY_WINDOW — int, default 10
   REDIS_URL           — default redis://localhost:6379
   DATABASE_URL        — default postgresql://robotina:robotina@localhost:5432/robotina
@@ -40,7 +43,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     platform_message_id = str(msg.message_id)
     chat_id = str(msg.chat_id)
     user_id = str(update.effective_user.id)
-    household_id = os.environ.get("HOUSEHOLD_ID", "")
+    # Phase 16 — REQ-HID-5: bracket form removes the silent "" default. The
+    # gateway entrypoint guard (__init__.py::main) validates HOUSEHOLD_ID at
+    # startup, so in production this read never raises. In tests, the autouse
+    # conftest fixture (_set_household_id) injects "test-household".
+    household_id = os.environ["HOUSEHOLD_ID"]
     history_limit = int(os.environ.get("CONVERSATION_HISTORY_WINDOW", "10"))
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
