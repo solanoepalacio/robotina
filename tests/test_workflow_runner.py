@@ -789,3 +789,59 @@ def test_failure_reason_set_with_exception_format_and_single_line():
     assert step2.failure_reason is None, (
         "legacy caller (no exc=) must leave failure_reason untouched (NULL)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 — REQ-HID-4: queue_workflow rejects empty household_id BEFORE any
+# DB write
+# ---------------------------------------------------------------------------
+
+def test_queue_workflow_rejects_empty_household_id():
+    """queue_workflow with household_id='' raises ValueError and does NOT write to DB (REQ-HID-4)."""
+    from unittest.mock import MagicMock
+    import pytest
+
+    from robotina.queue.workflow_runner import queue_workflow
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+
+    with pytest.raises(ValueError) as exc_info:
+        queue_workflow(
+            workflow_type="add-recipe",
+            shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
+            household_id="",
+            queue=mock_queue,
+            session=mock_session,
+        )
+
+    assert "household_id" in str(exc_info.value)
+    # Critical: NO DB writes happened — the guard ran before session.add / session.flush
+    mock_session.add.assert_not_called()
+    mock_session.flush.assert_not_called()
+    mock_session.commit.assert_not_called()
+    mock_queue.enqueue.assert_not_called()
+
+
+def test_queue_workflow_rejects_whitespace_household_id():
+    """queue_workflow with household_id='   ' raises ValueError and does NOT write to DB."""
+    from unittest.mock import MagicMock
+    import pytest
+
+    from robotina.queue.workflow_runner import queue_workflow
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+
+    with pytest.raises(ValueError) as exc_info:
+        queue_workflow(
+            workflow_type="add-recipe",
+            shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
+            household_id="   ",
+            queue=mock_queue,
+            session=mock_session,
+        )
+
+    assert "household_id" in str(exc_info.value)
+    mock_session.add.assert_not_called()
+    mock_queue.enqueue.assert_not_called()

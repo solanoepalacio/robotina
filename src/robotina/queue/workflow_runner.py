@@ -128,6 +128,19 @@ def queue_workflow(
     Raises:
         KeyError: If workflow_type not in WORKFLOW_REGISTRY.
     """
+    # Phase 16 — REQ-HID-4 / RESEARCH Pattern 7: last-line-of-defense before any
+    # WorkflowRun row is written. Reaching this branch with an empty household_id
+    # means every upstream guard (gateway boot in __init__.py::main, Pydantic
+    # NonEmptyHouseholdId on task-input models, and tool-constructor validation
+    # on HouseholdManagerApiTool / StartWorkflowTool) was bypassed.
+    if not household_id or not household_id.strip():
+        raise ValueError(
+            "queue_workflow refuses empty household_id; this indicates "
+            "HOUSEHOLD_ID was not propagated from the gateway. Check "
+            "gateway/__init__.py boot guard, IncomingMessageInput.household_id "
+            "validation, and StartWorkflowTool.household_id field."
+        )
+
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.models import WorkflowRun, WorkflowRunStep, WorkflowStatus, WorkflowStepStatus
 
