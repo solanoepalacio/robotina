@@ -256,3 +256,41 @@ def test_args_schema_json_schema_forbids_extra():
     )
     schema = tool.args_schema.model_json_schema()
     assert schema.get("additionalProperties") is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 — REQ-HID-3: constructor rejects empty household_id; default removed
+# ---------------------------------------------------------------------------
+
+def test_constructor_rejects_empty_household_id():
+    """StartWorkflowTool(household_id='') must raise ValidationError (REQ-HID-3)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="")
+    assert "household_id" in str(exc_info.value)
+
+
+def test_constructor_requires_household_id_no_default():
+    """StartWorkflowTool() without household_id must fail — proves '' default was removed (Pitfall 5)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram")
+    assert "household_id" in str(exc_info.value)
+
+
+def test_constructor_accepts_non_empty_household_id():
+    """Regression guard: existing call site pattern still works."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+    assert tool.household_id == "h1"
