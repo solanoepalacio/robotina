@@ -25,6 +25,8 @@ import httpx
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from robotina.queue.task_types import NonEmptyHouseholdId
+
 logger = logging.getLogger(__name__)
 
 
@@ -215,7 +217,10 @@ class HouseholdManagerApiTool(BaseTool):
     # Injected at construction — agent never sees or reasons about household_id.
     # Phase 7 scope: stored for future endpoint-specific injection; NOT auto-appended
     # to every request. See module docstring for rationale.
-    household_id: str
+    # Phase 16 (REQ-HID-3): NonEmptyHouseholdId rejects empty/whitespace at construction
+    # via pydantic ValidationError — third defensive layer behind gateway boot guard
+    # (16-05) and task-input Pydantic models (16-02).
+    household_id: NonEmptyHouseholdId
 
     def _run(
         self,
