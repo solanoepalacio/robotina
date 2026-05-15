@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 15 complete — UAT passed, threat-secure, Nyquist-compliant
-stopped_at: Completed 15-06-PLAN.md (and post-execution hardening)
-last_updated: "2026-05-15T17:55:00.000Z"
-last_activity: "2026-05-15 - Completed Phase 15: typed CreateRecipeBody + model_validator close empty-body POST loop in recipe-load; UAT 5/5 (e3660d6); SECURITY 14/14 closed (3fff765); VALIDATION nyquist_compliant (c4525a9). Ready for Phase 16."
+status: Phase 16 in progress — Wave 0 scaffold (16-01) complete
+stopped_at: Completed 16-01-PLAN.md (Wave 0 — 28 new RED-state test stubs + autouse conftest fixture)
+last_updated: "2026-05-15T18:44:33.499Z"
+last_activity: "2026-05-15 - Completed Phase 16-01 (Wave 0): autouse HOUSEHOLD_ID fixture in tests/conftest.py + 3 new test files (test_household_id_validation.py [21 tests], test_gateway_boot.py [4 tests], test_env_example.py [3 tests]). 19 failed / 9 passed = the contract Wave 1 plans 16-02/16-05/16-06 will satisfy. Commits fb6ab3c, 43c11d1."
 progress:
   total_phases: 19
   completed_phases: 14
-  total_plans: 63
-  completed_plans: 63
+  total_plans: 70
+  completed_plans: 59
   percent: 74
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 15 complete — next up Phase 16 (fix empty-string household_id propagation)
+**Current focus:** Phase 16 — fix empty-string household_id propagation. Wave 0 (16-01) complete; next up Wave 1 (16-02 Pydantic constraints, 16-03 tool validators, 16-04 queue_workflow guard, 16-05 gateway boot guard, 16-06 .env.example + docs sweep).
 
 ## Current Position
 
-Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — COMPLETE
-Plans: 6 of 6 (all executed and verified)
-Artifacts: 6 SUMMARY + UAT (5/5 pass) + SECURITY (14/14 closed) + VALIDATION (nyquist_compliant)
+Phase: 16 (fix-empty-string-household-id-propagation-through-gateway-an) — IN PROGRESS
+Plans: 1 of 7 (16-01 Wave 0 scaffold complete; 16-02..16-06 are Wave 1, 16-07 is Wave 2)
+Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN, 16-01-SUMMARY
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Artifacts: 6 SUMMARY + UAT (5/5 pass) + SECURITY (14/14 closed) + VALIDATION (ny
 | Phase 13-queue-visibility-dashboard PP02 | 6min | 2 tasks | 21 files |
 | Phase 15 P02 | 181s | 2 tasks | 3 files |
 | Phase 15 P05 | 65s | 2 tasks | 3 files |
+| Phase 16-01 P01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 13-02: D-01 (USER-LOCKED) enforced by tests/dashboard/test_independence.py — grep gate + inward-only import audit run as normal pytest assertions; cannot be silently bypassed
 - [Phase ?]: Plan 15-02: prefer canonical RecipeData symbol over RecipeResearchGatherOutput alias in AGENT_REGISTRY[recipe-research-gather].response_format_model
 - [Phase 15]: Plan 15-05: metadata V004 nulls `gathered_sources` on emit per D-04 — clean-payload contract for recipe-load. Owned fields: servings_qty, servings_unit, prep_time, cook_time, total_time, source_url. V003's never-null-always-estimate rule (default servings_qty=4, servings_unit="porciones") reversed: `null` now preferable to invented metadata; household-manager API accepts null.
+- [Phase ?]: Phase 16-01: Wave 0 RED-state stubs committed before production source. 19 failed / 9 passed IS the contract Wave 1 plans (16-02/16-05/16-06) will satisfy
 
 ### Pending Todos
 
@@ -252,7 +254,7 @@ None yet.
 
 Last activity: 2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)
 
-Last session: 2026-05-14T19:27:07.000Z
+Last session: 2026-05-15T18:44:28.964Z
 Stopped at: Completed 15-05-PLAN.md
 Resume file: 
 None

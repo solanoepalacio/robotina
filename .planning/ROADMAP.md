@@ -408,10 +408,10 @@ Plans:
 **Goal:** Stop empty-string `household_id` from silently propagating from a missing `HOUSEHOLD_ID` env var through `Conversation`, `IncomingMessageInput`, `WorkflowRun`, `StartWorkflowTool`, and `HouseholdManagerApiTool`. After this phase: (1) the gateway refuses to start without a non-empty `HOUSEHOLD_ID` (sys.exit(1) with named stderr), (2) task-input Pydantic models reject empty `household_id` at construction via a shared `NonEmptyHouseholdId` alias, (3) `HouseholdManagerApiTool`, `StartWorkflowTool`, and `queue_workflow` all raise on empty values, (4) `HOUSEHOLD_ID` is documented in `.env.example`, (5) the stale docstring reference in `gateway/send.py` is removed, and (6) PROJECT.md records the end-to-end validation contract.
 **Requirements**: REQ-HID-1, REQ-HID-2, REQ-HID-3, REQ-HID-4, REQ-HID-5, REQ-HID-6, REQ-HID-7, REQ-HID-8, REQ-HID-9 (phase-local; not in REQUIREMENTS.md)
 **Depends on:** Phase 15
-**Plans:** 7 plans
+**Plans:** 1/7 plans executed
 
 Plans:
-- [ ] 16-01-PLAN.md — Wave 0: autouse conftest fixture + 3 new test files (Pydantic, gateway boot, .env.example)
+- [x] 16-01-PLAN.md — Wave 0: autouse conftest fixture + 3 new test files (Pydantic, gateway boot, .env.example)
 - [ ] 16-02-PLAN.md — Wave 1: Pydantic NonEmptyHouseholdId alias applied to 7 task-input models
 - [ ] 16-03-PLAN.md — Wave 2: Tool constructor validation (HouseholdManagerApiTool, StartWorkflowTool) + remove `""` default + bracket-form shared_context read (imports NonEmptyHouseholdId from 16-02)
 - [ ] 16-04-PLAN.md — Wave 1: queue_workflow guard: raise ValueError before any DB write on empty household_id
