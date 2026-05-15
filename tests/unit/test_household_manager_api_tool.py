@@ -297,3 +297,237 @@ def test_extra_field_in_agent_loop_yields_tool_error_message(monkeypatch):
     # "response: Extra inputs are not permitted".
     assert "response" in content_lower
     assert "extra" in content_lower or "not permitted" in content_lower
+
+
+# ---------------------------------------------------------------------------
+# V005 hardening: typed CreateRecipeBody + model_validator for POST /api/recipes
+#
+# Closes the empty-body POST retry loop: prior to V005, body was a free-form
+# dict so {} and null both passed schema validation, the backend rejected each
+# with a 400, and the agent looped forever resending the same empty body.
+# ---------------------------------------------------------------------------
+
+
+def test_post_recipes_with_null_body_is_rejected_by_validator():
+    """V005: POST /api/recipes with body=None raises ValidationError with a
+    message naming the endpoint, so a future maintainer who weakens the
+    validator sees this test fail."""
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiArgs
+
+    with pytest.raises(ValidationError) as exc_info:
+        HouseholdManagerApiArgs(method="POST", path="/api/recipes", body=None)
+
+    assert "POST /api/recipes requires a non-null body" in str(exc_info.value)
+
+
+def test_post_recipes_with_null_body_yields_tool_error_message_in_agent_loop(
+    monkeypatch,
+):
+    """V005 end-to-end: the model_validator's rejection of body=None for
+    POST /api/recipes surfaces through langgraph as ToolMessage(status='error'),
+    not an unhandled exception."""
+    monkeypatch.setenv("HOUSEHOLD_MANAGER_API_KEY", "token")
+
+    from langchain_core.language_models.fake_chat_models import (
+        FakeMessagesListChatModel,
+    )
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+    from langchain.agents import create_agent
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+
+    class CountingModel(FakeMessagesListChatModel):
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+    bad_tool_call = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "household-manager-api",
+                "args": {
+                    "method": "POST",
+                    "path": "/api/recipes",
+                    "body": None,
+                    "query": None,
+                },
+                "id": "tc-empty-post",
+                "type": "tool_call",
+            }
+        ],
+    )
+    final_reply = AIMessage(content="ok, will retry with full body", tool_calls=[])
+    model = CountingModel(responses=[bad_tool_call, final_reply])
+    tool = HouseholdManagerApiTool(household_id="hh-1")
+
+    agent = create_agent(model=model, tools=[tool])
+    result = agent.invoke({"messages": [HumanMessage(content="save recipe")]})
+
+    tool_messages = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert len(tool_messages) == 1
+    tm = tool_messages[0]
+    # Load-bearing assertion: the validator's rejection becomes a recoverable
+    # ToolMessage(status='error'), not an unhandled exception that would
+    # cancel the workflow step.
+    assert tm.status == "error"
+    # The error message references the failing tool call so the agent can
+    # see what it tried (kwargs are echoed by langgraph's default handler).
+    content_str = str(tm.content)
+    assert "household-manager-api" in content_str
+    assert "/api/recipes" in content_str
+
+
+def test_post_recipes_with_empty_body_flags_all_required_keys():
+    """V005: POST /api/recipes with body={} raises ValidationError listing
+    every required key on CreateRecipeBody as missing — so a maintainer who
+    relaxes a field to optional sees this test fail."""
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiArgs
+
+    with pytest.raises(ValidationError) as exc_info:
+        HouseholdManagerApiArgs(method="POST", path="/api/recipes", body={})
+
+    errors = exc_info.value.errors()
+    missing_fields = {
+        err["loc"][-1]
+        for err in errors
+        if err["type"] == "missing"
+    }
+
+    required_keys = {
+        "name",
+        "description",
+        "servingsQty",
+        "servingsUnit",
+        "prepTime",
+        "cookTime",
+        "totalTime",
+        "sourceUrl",
+        "ingredients",
+        "steps",
+    }
+    assert required_keys.issubset(missing_fields), (
+        f"expected all required keys flagged missing; got {missing_fields}, "
+        f"missing from error report: {required_keys - missing_fields}"
+    )
+
+
+def _make_full_recipe_body_dict() -> dict:
+    return {
+        "name": "Pasta al Pomodoro",
+        "description": "Classic tomato pasta.",
+        "servingsQty": 4,
+        "servingsUnit": "porciones",
+        "prepTime": 10,
+        "cookTime": 15,
+        "totalTime": 25,
+        "sourceUrl": "https://example.com/pasta",
+        "ingredients": [
+            {
+                "foodId": "food-uuid-1",
+                "unitId": "unit-uuid-1",
+                "quantity": 400.0,
+                "note": None,
+            }
+        ],
+        "steps": [
+            {"body": "Boil water and cook pasta.", "title": None},
+        ],
+    }
+
+
+def test_post_recipes_with_full_body_dict_dumps_json_safe_payload(monkeypatch):
+    """V005: a full body passed as a dict is coerced through CreateRecipeBody
+    and httpx receives a plain dict (not a Pydantic instance) with every key
+    present."""
+    monkeypatch.setenv("HOUSEHOLD_MANAGER_API_KEY", "test-token")
+    monkeypatch.setenv("HOUSEHOLD_MANAGER_BASE_URL", "http://localhost:3001")
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+
+    tool = HouseholdManagerApiTool(household_id="hh-1")
+
+    mock_response = MagicMock()
+    mock_response.status_code = 201
+    mock_response.is_success = True
+    mock_response.json.return_value = {"id": "new-recipe-1"}
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.request = AsyncMock(return_value=mock_response)
+
+    body_dict = _make_full_recipe_body_dict()
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        # Pass through args_schema: dict gets coerced to CreateRecipeBody.
+        result = tool.invoke(
+            {"method": "POST", "path": "/api/recipes", "body": body_dict}
+        )
+
+    assert result == {"id": "new-recipe-1"}
+
+    sent_json = mock_client.request.call_args.kwargs["json"]
+    assert isinstance(sent_json, dict), (
+        f"httpx must receive a plain dict, got {type(sent_json).__name__}"
+    )
+    # Every required key present in the dumped payload.
+    for key in (
+        "name",
+        "description",
+        "servingsQty",
+        "servingsUnit",
+        "prepTime",
+        "cookTime",
+        "totalTime",
+        "sourceUrl",
+        "ingredients",
+        "steps",
+    ):
+        assert key in sent_json, f"required key {key!r} missing from httpx payload"
+    assert sent_json["name"] == "Pasta al Pomodoro"
+    assert sent_json["ingredients"][0]["foodId"] == "food-uuid-1"
+    assert sent_json["steps"][0]["body"] == "Boil water and cook pasta."
+
+
+def test_post_recipes_with_full_body_model_instance_dumps_json_safe_payload(
+    monkeypatch,
+):
+    """V005: when _run() is called directly with a CreateRecipeBody instance
+    (e.g. test/internal call paths bypassing args_schema), the tool still
+    model_dumps it before httpx — httpx must receive a dict, never a model."""
+    monkeypatch.setenv("HOUSEHOLD_MANAGER_API_KEY", "test-token")
+    monkeypatch.setenv("HOUSEHOLD_MANAGER_BASE_URL", "http://localhost:3001")
+
+    from robotina.agent.tools.household_manager_api import (
+        CreateRecipeBody,
+        HouseholdManagerApiTool,
+    )
+
+    tool = HouseholdManagerApiTool(household_id="hh-1")
+    body_model = CreateRecipeBody(**_make_full_recipe_body_dict())
+
+    mock_response = MagicMock()
+    mock_response.status_code = 201
+    mock_response.is_success = True
+    mock_response.json.return_value = {"id": "new-recipe-2"}
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.request = AsyncMock(return_value=mock_response)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = tool._run("POST", "/api/recipes", body=body_model)
+
+    assert result == {"id": "new-recipe-2"}
+
+    sent_json = mock_client.request.call_args.kwargs["json"]
+    assert isinstance(sent_json, dict), (
+        f"httpx must receive a plain dict, got {type(sent_json).__name__}"
+    )
+    assert sent_json["name"] == "Pasta al Pomodoro"
+    assert sent_json["ingredients"][0]["foodId"] == "food-uuid-1"
