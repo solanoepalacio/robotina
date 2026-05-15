@@ -30,9 +30,35 @@ Phase 15 — accumulating-artifact contract:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 — non-empty household_id constraint (REQ-HID-2)
+# ---------------------------------------------------------------------------
+# Centralized constraint applied to every task-input model that carries a
+# household_id. ``min_length=1`` rejects the empty string; ``pattern=r"\S"``
+# rejects strings that are non-empty but contain only whitespace. The two
+# together close both branches of the silent-empty-default bug fixed in
+# Phase 16 (see .planning/phases/16-*/16-RESEARCH.md Pattern 5).
+#
+# Future ambient-context refactor (backlog Phase 999.1) may lift household_id
+# out of per-task models entirely; until then this alias is the single source
+# of truth for the constraint.
+
+NonEmptyHouseholdId = Annotated[
+    str,
+    Field(
+        min_length=1,
+        pattern=r"\S",
+        description=(
+            "Household identifier. Must be a non-empty, non-whitespace string. "
+            "Empty values are rejected at model construction (Phase 16, REQ-HID-2)."
+        ),
+    ),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +137,7 @@ class IncomingMessageInput(BaseModel):
     received_at: datetime         # when the gateway received the message
     chat_id: str                  # platform chat/thread identifier
     user_id: str                  # platform user identifier
-    household_id: str             # populated by the gateway from env var
+    household_id: NonEmptyHouseholdId  # populated by the gateway from env var
     text: str                     # raw message text
     history: list[Message]        # last X messages, ordered oldest to newest
 
@@ -132,7 +158,7 @@ class IncomingMessageOutput(BaseModel):
 
 class RecipeResearchInput(BaseModel):
     query: str            # e.g. "spaghetti carbonara"
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         return self.query
@@ -154,7 +180,7 @@ class RecipeResearchOutput(BaseModel):
 class RecipeResearchGatherInput(BaseModel):
     query: str
     reply_context: ReplyContext
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         return self.query
@@ -163,7 +189,7 @@ class RecipeResearchGatherInput(BaseModel):
 class RecipeResearchInstructionsInput(BaseModel):
     recipe: RecipeData
     reply_context: ReplyContext
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         import json
@@ -178,7 +204,7 @@ class RecipeResearchInstructionsInput(BaseModel):
 class RecipeResearchIngredientsInput(BaseModel):
     recipe: RecipeData
     reply_context: ReplyContext
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         import json
@@ -193,7 +219,7 @@ class RecipeResearchIngredientsInput(BaseModel):
 class RecipeResearchMetadataInput(BaseModel):
     recipe: RecipeData
     reply_context: ReplyContext
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         import json
@@ -220,7 +246,7 @@ RecipeResearchMetadataOutput = RecipeData
 class RecipeLoadInput(BaseModel):
     recipe: RecipeData    # resolved from prior step's artifact by the task runner
     reply_context: ReplyContext
-    household_id: str
+    household_id: NonEmptyHouseholdId
 
     def to_user_message(self) -> str:
         import json
