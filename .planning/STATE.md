@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 15 in progress (Plans 15-01..15-05 complete)
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-05-14T19:27:07.000Z"
-last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
+status: Phase 15 complete — UAT passed, threat-secure, Nyquist-compliant
+stopped_at: Completed 15-06-PLAN.md (and post-execution hardening)
+last_updated: "2026-05-15T17:55:00.000Z"
+last_activity: "2026-05-15 - Completed Phase 15: typed CreateRecipeBody + model_validator close empty-body POST loop in recipe-load; UAT 5/5 (e3660d6); SECURITY 14/14 closed (3fff765); VALIDATION nyquist_compliant (c4525a9). Ready for Phase 16."
 progress:
-  total_phases: 18
-  completed_phases: 13
+  total_phases: 19
+  completed_phases: 14
   total_plans: 63
-  completed_plans: 56
-  percent: 89
+  completed_plans: 63
+  percent: 74
 ---
 
 # Project State
@@ -21,12 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 14 complete — next up Phase 15 (recipe artifact accumulation)
+**Current focus:** Phase 15 complete — next up Phase 16 (fix empty-string household_id propagation)
 
 ## Current Position
 
-Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — IN PROGRESS
-Plans: 5 of (TBD; expected 6 — foundation + 5 prompt bumps)
+Phase: 15 (recipe-artifact-accumulation-and-food-unit-validation) — COMPLETE
+Plans: 6 of 6 (all executed and verified)
+Artifacts: 6 SUMMARY + UAT (5/5 pass) + SECURITY (14/14 closed) + VALIDATION (nyquist_compliant)
 
 ## Performance Metrics
 
@@ -109,6 +110,7 @@ Plans: 5 of (TBD; expected 6 — foundation + 5 prompt bumps)
 - Phase 11 code complete (manual checkpoint pending): response_format adopted on 5 named agents; canelones-class parse failures structurally eliminated for those agents — pending 3-query end-to-end verification (Plan 11-04 Task 4.2)
 - Phase 15 added: Recipe artifact accumulation and food/unit validation
 - Phase 16 added: Fix empty-string household_id propagation through gateway and workflow_run
+- Phase 17 added: as a user I want to ask the agent to add a recipe based on a link I share
 
 ### Decisions
 

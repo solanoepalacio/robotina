@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 12: Middleware-Based Agent Instrumentation** - Migrate per-agent OTel/LangWatch instrumentation from `langchain_core.callbacks` to `create_agent` middleware (`@before_model`, `@after_model`, `@wrap_model_call`) (completed 2026-05-14)
 - [x] **Phase 13: Queue Visibility Dashboard** - Server-rendered FastAPI + Jinja2 + HTMX dashboard at `src/robotina/dashboard/` for debugging failed workflows post-hoc; persistence of `step_input`/`failure_reason`; HTMX polling halts on terminal status; module is fully independent of other robotina.* modules (grep + AST enforced) (completed 2026-05-14)
 - [x] **Phase 14: Prompt Cleanup and Structural Standardization** - All 7 active agent prompts share a single skeleton (Role / Inputs / Tools / Process / Rules / Output), deduplicated language rules, and schema-deferring Output sections — zero behavioral change (completed 2026-05-14)
-- [ ] **Phase 15: Recipe Artifact Accumulation and Food/Unit Validation** - Refactor recipe-research pipeline so each step accumulates fields onto a single growing RecipeData artifact; food/unit validation moves into the ingredients step via two new tools (validate-foods / validate-units) that combine normalized direct match with batched LLM-based semantic match; recipe-load shrinks to happy-path POST + targeted error recovery
+- [x] **Phase 15: Recipe Artifact Accumulation and Food/Unit Validation** - Refactor recipe-research pipeline so each step accumulates fields onto a single growing RecipeData artifact; food/unit validation moves into the ingredients step via two new tools (validate-foods / validate-units) that combine normalized direct match with batched LLM-based semantic match; recipe-load shrinks to happy-path POST + targeted error recovery (completed 2026-05-15)
 
 ## Phase Details
 
@@ -393,15 +393,15 @@ Plans:
 
 **Requirements**: RRECIPE-04, RRECIPE-07, RLOAD-03, RLOAD-04, RLOAD-07
 **Depends on:** Phase 14
-**Plans:** 2/6 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
 - [x] 15-01-PLAN.md — Shared types + catalog-match helper + validation tools + validate-catalog registry + overrides + .env.example + matcher prompt + workflow rewiring
 - [x] 15-02-PLAN.md — recipe-research-gather V005 prompt bump (emit name + gathered_sources)
-- [ ] 15-03-PLAN.md — recipe-research-instructions V004 prompt bump (read gathered_sources, populate steps + description)
-- [ ] 15-04-PLAN.md — recipe-research-ingredients V004 prompt bump (use validate-foods / validate-units, surface missing_ingredients)
-- [ ] 15-05-PLAN.md — recipe-research-metadata V004 prompt bump (populate servings/times/source_url, clear gathered_sources)
-- [ ] 15-06-PLAN.md — recipe-load V005 prompt bump (happy-path POST + recovery via validation tools) + end-to-end smoke
+- [x] 15-03-PLAN.md — recipe-research-instructions V004 prompt bump (read gathered_sources, populate steps + description)
+- [x] 15-04-PLAN.md — recipe-research-ingredients V004 prompt bump (use validate-foods / validate-units, surface missing_ingredients)
+- [x] 15-05-PLAN.md — recipe-research-metadata V004 prompt bump (populate servings/times/source_url, clear gathered_sources)
+- [x] 15-06-PLAN.md — recipe-load V005 prompt bump + typed CreateRecipeBody schema + model_validator (closes empty-body-loop) + end-to-end smoke
 
 ### Phase 16: Fix empty-string household_id propagation through gateway and workflow_run
 
@@ -412,3 +412,13 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 16 to break down)
+
+### Phase 17: as a user I want to ask the agent to add a recipe based on a link I share
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 16
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 17 to break down)
