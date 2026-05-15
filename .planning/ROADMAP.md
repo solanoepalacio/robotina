@@ -412,12 +412,12 @@ Plans:
 
 Plans:
 - [ ] 16-01-PLAN.md — Wave 0: autouse conftest fixture + 3 new test files (Pydantic, gateway boot, .env.example)
-- [ ] 16-02-PLAN.md — Pydantic NonEmptyHouseholdId alias applied to 7 task-input models
-- [ ] 16-03-PLAN.md — Tool constructor validation (HouseholdManagerApiTool, StartWorkflowTool) + remove `""` default + bracket-form shared_context read
-- [ ] 16-04-PLAN.md — queue_workflow guard: raise ValueError before any DB write on empty household_id
-- [ ] 16-05-PLAN.md — Gateway fail-fast: __init__.py::main sys.exit(1) guard + handler bracket-form read + docstring fix
-- [ ] 16-06-PLAN.md — Docs: .env.example HOUSEHOLD_ID block + send.py stale docstring removal + PROJECT.md Key Decision row
-- [ ] 16-07-PLAN.md — Wave 2: full suite green + invariant greps + flip VALIDATION.md to nyquist_compliant=true
+- [ ] 16-02-PLAN.md — Wave 1: Pydantic NonEmptyHouseholdId alias applied to 7 task-input models
+- [ ] 16-03-PLAN.md — Wave 2: Tool constructor validation (HouseholdManagerApiTool, StartWorkflowTool) + remove `""` default + bracket-form shared_context read (imports NonEmptyHouseholdId from 16-02)
+- [ ] 16-04-PLAN.md — Wave 1: queue_workflow guard: raise ValueError before any DB write on empty household_id
+- [ ] 16-05-PLAN.md — Wave 1: Gateway fail-fast: __init__.py::main sys.exit(1) guard + handler bracket-form read + docstring fix
+- [ ] 16-06-PLAN.md — Wave 1: Docs: .env.example HOUSEHOLD_ID block + send.py stale docstring removal + PROJECT.md Key Decision row
+- [ ] 16-07-PLAN.md — Wave 3: full suite green + invariant greps + flip VALIDATION.md to nyquist_compliant=true
 
 ### Phase 17: as a user I want to ask the agent to add a recipe based on a link I share
 
