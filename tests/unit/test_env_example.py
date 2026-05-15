@@ -22,16 +22,28 @@ def test_household_id_documented():
 
 
 def test_household_id_marked_required():
-    """The line directly above HOUSEHOLD_ID= must call it required (so a fresh-checkout
-    operator sees the warning without reading source)."""
+    """The comment block above HOUSEHOLD_ID= must call it required (so a fresh-checkout
+    operator sees the warning without reading source).
+
+    Window widened from 5 to 12 lines in Phase 16 WR-04: the empty-default
+    rationale needs more prose, which pushes "REQUIRED" further from the
+    assignment line. The intent — the contiguous comment block immediately
+    above the var must say "required" — remains the same.
+    """
     text = ENV_EXAMPLE.read_text()
-    # Find the HOUSEHOLD_ID= line index and look up ~5 lines for "required"
     lines = text.splitlines()
     target_idx = next(
         (i for i, ln in enumerate(lines) if ln.startswith("HOUSEHOLD_ID=")),
         None,
     )
     assert target_idx is not None, "HOUSEHOLD_ID= line not found"
-    preamble = "\n".join(lines[max(0, target_idx - 5):target_idx])
+    # Walk upward from HOUSEHOLD_ID= through the contiguous comment block
+    # (lines starting with '#'), stopping at the first non-comment line.
+    # This naturally bounds the search to the block that documents this var
+    # rather than fixed-line window that bleeds into unrelated config above.
+    start = target_idx
+    while start > 0 and lines[start - 1].lstrip().startswith("#"):
+        start -= 1
+    preamble = "\n".join(lines[start:target_idx])
     assert re.search(r"required", preamble, re.IGNORECASE), \
         f"comment block above HOUSEHOLD_ID= must contain 'required'; got: {preamble!r}"
