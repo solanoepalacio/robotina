@@ -23,6 +23,8 @@ from typing import Any
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from robotina.queue.task_types import NonEmptyHouseholdId
+
 logger = logging.getLogger(__name__)
 
 # WR-02: cap stored failure_reason length. The D-16 format string
@@ -104,7 +106,7 @@ def _extract_task_output(result: dict, *, expects_structured: bool = False) -> d
 def queue_workflow(
     workflow_type: str,
     shared_context: dict,
-    household_id: str,
+    household_id: NonEmptyHouseholdId,
     queue,
     session: Session,
 ) -> str:
