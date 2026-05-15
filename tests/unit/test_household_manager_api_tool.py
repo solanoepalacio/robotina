@@ -531,3 +531,39 @@ def test_post_recipes_with_full_body_model_instance_dumps_json_safe_payload(
     )
     assert sent_json["name"] == "Pasta al Pomodoro"
     assert sent_json["ingredients"][0]["foodId"] == "food-uuid-1"
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 — REQ-HID-3: constructor rejects empty / whitespace household_id
+# ---------------------------------------------------------------------------
+
+def test_constructor_rejects_empty_household_id():
+    """HouseholdManagerApiTool(household_id='') must raise ValidationError (REQ-HID-3)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+
+    with pytest.raises(ValidationError) as exc_info:
+        HouseholdManagerApiTool(household_id="")
+    assert "household_id" in str(exc_info.value)
+
+
+def test_constructor_rejects_whitespace_household_id():
+    """HouseholdManagerApiTool(household_id='   ') must raise ValidationError (REQ-HID-3)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+
+    with pytest.raises(ValidationError) as exc_info:
+        HouseholdManagerApiTool(household_id="   ")
+    assert "household_id" in str(exc_info.value)
+
+
+def test_constructor_accepts_non_empty_household_id():
+    """Regression guard: non-empty household_id still constructs successfully."""
+    from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
+
+    tool = HouseholdManagerApiTool(household_id="hh-1")
+    assert tool.household_id == "hh-1"
