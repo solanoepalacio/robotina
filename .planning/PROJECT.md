@@ -63,6 +63,7 @@ Families can delegate household tasks to Robotina in natural language and trust 
 | Two separate RQ workers: scheduler-worker (`--with-scheduler`) and task-runner | Keeps scheduling concerns decoupled from agent execution | — Pending |
 | Skills use lazy loading (index pre-loaded, sub-files on demand) | Avoids context bloat for tasks that only need part of a skill | — Pending |
 | `create_agent` from `langchain.agents` is used for all agents | LangGraph deprecated `create_react_agent` (V1.0; removal in V2.0). The new factory is required to unlock `response_format` (Phase 11) and middleware (Phase 12). Behavior parity verified empirically during Phase 10. | — Active |
+| `household_id` is required and validated end-to-end (Phase 16) | A missing `HOUSEHOLD_ID` env var silently propagated as `""` through Conversation, IncomingMessageInput, WorkflowRun, and the household-manager-api tool, surfacing only as confusing 4xx responses from the backend. Phase 16 added defensive validation at four layers: gateway entrypoint (`sys.exit(1)` on missing/empty/whitespace), Pydantic task-input models (`NonEmptyHouseholdId` alias on 7 models), tool constructors (`HouseholdManagerApiTool`, `StartWorkflowTool` reject empty), and `queue_workflow` (raises ValueError before any DB write). | — Active |
 
 ## Evolution
 
