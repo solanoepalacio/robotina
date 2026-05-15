@@ -408,7 +408,7 @@ Plans:
 **Goal:** Stop empty-string `household_id` from silently propagating from a missing `HOUSEHOLD_ID` env var through `Conversation`, `IncomingMessageInput`, `WorkflowRun`, `StartWorkflowTool`, and `HouseholdManagerApiTool`. After this phase: (1) the gateway refuses to start without a non-empty `HOUSEHOLD_ID` (sys.exit(1) with named stderr), (2) task-input Pydantic models reject empty `household_id` at construction via a shared `NonEmptyHouseholdId` alias, (3) `HouseholdManagerApiTool`, `StartWorkflowTool`, and `queue_workflow` all raise on empty values, (4) `HOUSEHOLD_ID` is documented in `.env.example`, (5) the stale docstring reference in `gateway/send.py` is removed, and (6) PROJECT.md records the end-to-end validation contract.
 **Requirements**: REQ-HID-1, REQ-HID-2, REQ-HID-3, REQ-HID-4, REQ-HID-5, REQ-HID-6, REQ-HID-7, REQ-HID-8, REQ-HID-9 (phase-local; not in REQUIREMENTS.md)
 **Depends on:** Phase 15
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans complete
 
 Plans:
 - [x] 16-01-PLAN.md — Wave 0: autouse conftest fixture + 3 new test files (Pydantic, gateway boot, .env.example)
@@ -417,7 +417,7 @@ Plans:
 - [x] 16-04-PLAN.md — Wave 1: queue_workflow guard: raise ValueError before any DB write on empty household_id
 - [x] 16-05-PLAN.md — Wave 1: Gateway fail-fast: __init__.py::main sys.exit(1) guard + handler bracket-form read + docstring fix
 - [x] 16-06-PLAN.md — Wave 1: Docs: .env.example HOUSEHOLD_ID block + send.py stale docstring removal + PROJECT.md Key Decision row
-- [ ] 16-07-PLAN.md — Wave 3: full suite green + invariant greps + flip VALIDATION.md to nyquist_compliant=true
+- [x] 16-07-PLAN.md — Wave 3: full suite green + invariant greps + flip VALIDATION.md to nyquist_compliant=true
 
 ### Phase 17: as a user I want to ask the agent to add a recipe based on a link I share
 

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 16 in progress — Wave 2 tool-constructor validation complete (16-03)
-stopped_at: Completed 16-03-PLAN.md (Wave 2 tool constructor NonEmptyHouseholdId application)
-last_updated: "2026-05-15T18:58:07Z"
+stopped_at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
+last_updated: "2026-05-15T19:06:59.751Z"
 last_activity: "2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)"
 progress:
   total_phases: 19
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 70
   completed_plans: 65
-  percent: 76
+  percent: 79
 ---
 
 # Project State
@@ -262,7 +262,7 @@ None yet.
 
 Last activity: 2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)
 
-Last session: 2026-05-15T18:53:47.187Z
+Last session: 2026-05-15T19:06:59.744Z
 Stopped at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
 Resume file: 
 None
