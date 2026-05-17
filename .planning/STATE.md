@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 16 complete — 7/7 plans, verification 11/11, code-review 4 warnings fixed, UAT deferred (operator-UX boot + DB no-migration checks)
-stopped_at: Completed 16-07-PLAN.md (final gate) + code-review fixes (WR-01..04)
-last_updated: "2026-05-15T20:30:00.000Z"
-last_activity: "2026-05-15 - Phase 16 complete: 4-layer household_id validation (Pydantic NonEmptyHouseholdId, tool constructors, queue_workflow guard, gateway sys.exit(1)); 8 dev commits + 4 code-review fixes + verification; 133/133 unit tests green; manual UAT deferred."
+status: Phase 16 complete — 7/7 plans, verification 11/11 + manual UAT (2/2), code-review 4 warnings fixed
+stopped_at: Completed Phase 16 manual UAT (operator-UX boot guard + DB no-migration negative test)
+last_updated: "2026-05-16T00:00:00.000Z"
+last_activity: "2026-05-16 - Phase 16 UAT executed: gateway sys.exit(1) verified for unset/empty/whitespace HOUSEHOLD_ID (exit code 1, named stderr); psql confirms 20 pre-existing empty-household_id workflow_runs rows preserved (no migration written); queue_workflow guard verified to raise ValueError before any DB write. VERIFICATION.md flipped to status=passed."
 progress:
   total_phases: 19
   completed_phases: 16
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 16 COMPLETE — 4-layer household_id validation in place. Next up Phase 17 (recipe via shared link) or backlog Phase 999.1 (custom AgentState schemas).
+**Current focus:** Phase 16 COMPLETE (incl. manual UAT) — 4-layer household_id validation verified end-to-end. Next up Phase 17 (recipe via shared link) or backlog Phase 999.1 (custom AgentState schemas).
 
 ## Current Position
 
-Phase: 16 (fix-empty-string-household-id-propagation-through-gateway-an) — IN PROGRESS
-Plans: 1 of 7 (16-01 Wave 0 scaffold complete; 16-02..16-06 are Wave 1, 16-07 is Wave 2)
-Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN, 16-01-SUMMARY
+Phase: 16 (fix-empty-string-household-id-propagation-through-gateway-an) — COMPLETE (incl. UAT)
+Plans: 7 of 7; verification passed (11/11 must-haves + 2/2 manual UAT items)
+Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN(s), 16-SUMMARY(s), 16-REVIEW, 16-VERIFICATION (status=passed)
 
 ## Performance Metrics
 

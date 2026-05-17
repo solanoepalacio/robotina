@@ -1,7 +1,8 @@
 ---
 phase: 16
-status: human_needed
+status: passed
 verified_at: 2026-05-15
+uat_completed_at: 2026-05-16
 must_haves_total: 11
 must_haves_passed: 11
 ---
@@ -74,28 +75,27 @@ The full data flow `HOUSEHOLD_ID env → boot guard → handler bracket read →
 
 ## human_verification
 
-Per `16-VALIDATION.md` "Manual-Only Verifications", these require a real terminal / DB session and are out of scope for automated verification:
+Per `16-VALIDATION.md` "Manual-Only Verifications", these required a real terminal / DB session and were completed manually on 2026-05-16:
 
-1. **Misconfigured deploy fails loudly with the expected error (REQ-HID-5 operator UX).**
-   - Steps: `unset HOUSEHOLD_ID` (or set to `""`); `uv run agent` (or gateway entrypoint).
-   - Expected: stderr message names `HOUSEHOLD_ID` clearly; process exits with non-zero status (`sys.exit(1)`); no Telegram polling started.
-   - Why human: verifies operator UX / error-message readability in a real terminal — not assertable from inside the test process.
+1. **Misconfigured deploy fails loudly with the expected error (REQ-HID-5 operator UX).** ✅ PASS
+   - Tested three variants via `uv run gateway`: `unset HOUSEHOLD_ID`, `HOUSEHOLD_ID=""`, `HOUSEHOLD_ID="   "`.
+   - All three exit with code `1`. stderr message names `HOUSEHOLD_ID`, points to `.env.example`, and process exits before `ApplicationBuilder` is called (no Telegram polling started).
+   - Verified on 2026-05-16.
 
-2. **Existing DB rows with `household_id=""` remain untouched (no migration written).**
-   - Steps: `psql -c "SELECT count(*) FROM workflow_runs WHERE household_id=''"` before and after deploy.
-   - Expected: count unchanged (Phase 16 chose not to write a migration; only future writes are blocked).
-   - Why human: negative test requiring access to the deployed database.
+2. **Existing DB rows with `household_id=""` remain untouched (no migration written).** ✅ PASS
+   - `migrations/versions/` ends at `0005_dashboard_columns.py` — no Phase 16 migration was added.
+   - `psql ... SELECT count(*) FROM workflow_runs WHERE household_id=''` → `20` (out of 25 total). Pre-Phase-16 rows preserved.
+   - Negative test: `queue_workflow(workflow_type="add-recipe", shared_context={}, household_id="", queue=None, session=None)` raised `ValueError` before any DB write; post-attempt count remained `20` (no new empty row created).
+   - Verified on 2026-05-16.
 
 ---
 
 ## Verification Complete
 
-**Status: human_needed**
+**Status: passed**
 
-All 11 must-haves are green. The phase goal — stopping empty-string `household_id` from silently propagating through the gateway, task-input models, tool constructors, and workflow runner — is observably achieved in the codebase via the four-layer defence (boot guard, Pydantic alias, tool constructor validation, queue_workflow guard). 133 unit tests pass; targeted behavioral spot-checks confirm runtime rejection at every layer.
-
-The status is `human_needed` rather than `passed` because `VALIDATION.md` explicitly defers two items to manual UAT: (a) the operator-UX check that `sys.exit(1)` produces a readable stderr message when `HOUSEHOLD_ID` is unset, and (b) the negative-test confirmation that no migration was written against existing `household_id=""` rows. Both items are operator-environment concerns that cannot be asserted from inside the test process.
+All 11 must-haves are green and both manual UAT items have been executed. The phase goal — stopping empty-string `household_id` from silently propagating through the gateway, task-input models, tool constructors, and workflow runner — is observably achieved in the codebase via the four-layer defence (boot guard, Pydantic alias, tool constructor validation, queue_workflow guard). 133 unit tests pass; behavioral spot-checks and manual UAT confirm runtime rejection at every layer with readable operator UX.
 
 ## VERIFICATION COMPLETE
 
-**Final Status: human_needed**
+**Final Status: passed**
