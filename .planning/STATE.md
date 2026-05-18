@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
-status: roadmap_complete
-stopped_at: Roadmap planning complete (Phases 17–24); ready to plan Phase 17
-last_updated: "2026-05-18T22:00:00.000Z"
-last_activity: 2026-05-18 — Roadmap for v1.1 created (8 phases, 46 requirements mapped, Phase 17 next)
+status: completed
+stopped_at: Phase 17 context gathered
+last_updated: "2026-05-18T23:39:21.368Z"
+last_activity: 2026-05-18 — Roadmap for v1.1 published (Phases 17–24; 46/46 requirements mapped)
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -273,10 +272,10 @@ None yet.
 
 Last activity: 2026-05-18
 
-Last session: 2026-05-18T22:00:00.000Z
-Stopped at: v1.1 roadmap published (Phases 17–24); Phase 17 (Conversation FK closure) is next
+Last session: 2026-05-18T23:39:21.365Z
+Stopped at: Phase 17 context gathered
 Resume file: 
-.planning/ROADMAP.md (Phase 17 detail)
+.planning/phases/17-conversation-fk-closure/17-CONTEXT.md
 
 ## Operator Next Steps
 
