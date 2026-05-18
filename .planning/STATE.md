@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 16 complete — 7/7 plans, verification 11/11 + manual UAT (2/2), code-review 4 warnings fixed
-stopped_at: Completed Phase 16 manual UAT (operator-UX boot guard + DB no-migration negative test)
-last_updated: "2026-05-16T00:00:00.000Z"
-last_activity: "2026-05-16 - Phase 16 UAT executed: gateway sys.exit(1) verified for unset/empty/whitespace HOUSEHOLD_ID (exit code 1, named stderr); psql confirms 20 pre-existing empty-household_id workflow_runs rows preserved (no migration written); queue_workflow guard verified to raise ValueError before any DB write. VERIFICATION.md flipped to status=passed."
+stopped_at: Removed unscoped Phase 17 from roadmap pending milestone wrap-up
+last_updated: "2026-05-18T18:04:47.536Z"
+last_activity: "2026-05-18 - Removed unscoped Phase 17 (recipe via shared link) from roadmap; will be reintroduced in a new milestone alongside related features."
 progress:
-  total_phases: 19
+  total_phases: 18
   completed_phases: 16
   total_plans: 70
   completed_plans: 72
-  percent: 84
+  percent: 89
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 16 COMPLETE (incl. manual UAT) — 4-layer household_id validation verified end-to-end. Next up Phase 17 (recipe via shared link) or backlog Phase 999.1 (custom AgentState schemas).
+**Current focus:** Phase 16 COMPLETE (incl. manual UAT) — 4-layer household_id validation verified end-to-end. Wrapping up milestone v1.0 next; the shared-link recipe feature plus related ideas will land in a new milestone.
 
 ## Current Position
 
