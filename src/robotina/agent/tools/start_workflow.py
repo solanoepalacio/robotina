@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Literal
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,21 +34,34 @@ logger = logging.getLogger(__name__)
 class StartWorkflowArgs(BaseModel):
     """Strict argument schema for StartWorkflowTool.
 
-    ``extra='forbid'`` makes any unknown LLM-emitted field raise ``ValidationError``
-    at ``tool.invoke()`` time, which the langgraph ``ToolNode`` converts into a
-    ``ToolMessage(status='error')`` the agent sees on its next turn. See
-    ``HouseholdManagerApiArgs`` docstring for the full rationale.
+    Two structural guardrails enforced at args-validation time (before
+    _run is called), so misuse surfaces as a ToolMessage(status='error')
+    the engine terminates on (return_direct=True), not as a downstream
+    KeyError or registry miss:
+
+    1. workflow_type is a Literal — only 'add-recipe' validates. A
+       hallucinated name fails here, not at WORKFLOW_REGISTRY lookup.
+    2. recipe_query is a required top-level string. The old
+       shared_context dict surface — which let the LLM (a) omit
+       recipe_query entirely and (b) attempt to shadow the trusted
+       household_id / reply_context via WR-02 — is gone.
+
+    ``extra='forbid'`` keeps any unknown LLM-emitted field at the top
+    level as a ValidationError (e.g. an LLM cannot now inject
+    household_id at the top level either).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    workflow_type: str = Field(
-        description="Workflow identifier, e.g. 'add-recipe'.",
-    )
-    shared_context: dict = Field(
+    workflow_type: Literal["add-recipe"] = Field(
         description=(
-            "Task-specific fields the workflow needs (e.g. recipe_query). "
-            "reply_context and household_id are injected automatically."
+            "Workflow identifier. Currently only 'add-recipe' is supported."
+        ),
+    )
+    recipe_query: str = Field(
+        description=(
+            "User's recipe request in natural language (e.g. 'lentil soup', "
+            "'carbonara'). Forwarded to the add-recipe workflow."
         ),
     )
 
@@ -60,14 +74,21 @@ class StartWorkflowTool(BaseTool):
     workflow_run_id string.
 
     Recipient context (chat_id, user_id, platform, household_id) is injected at
-    construction time by run_task() and auto-merged into shared_context as
-    ``reply_context`` — the LLM never needs to know these values.
+    construction time by run_task() and merged into the internally-built
+    shared_context dict as ``reply_context`` and ``household_id`` — the LLM
+    never supplies these values and has no schema surface to attempt to.
 
     Args (via _run):
-        workflow_type: Workflow identifier (e.g. "add-recipe"). Must exist in WORKFLOW_REGISTRY.
-        shared_context: Dict containing task-specific fields the workflow needs
-                        (e.g. recipe_query). reply_context and household_id are
-                        injected automatically — the agent does not need to provide them.
+        workflow_type: Workflow identifier. Constrained to the Literal
+                       ``"add-recipe"`` at args-validation time.
+        recipe_query: User's recipe request in natural language. Required
+                      top-level string; the old ``shared_context`` dict
+                      surface is gone.
+
+        The shared_context dict that downstream ``workflow_runner.queue_workflow``
+        consumes is built internally from ``recipe_query`` plus the
+        constructor-injected identity fields (chat_id/user_id/platform/
+        household_id). The agent never sees or supplies it.
 
     Returns:
         Confirmation string with the workflow_run_id (or error string on
@@ -79,14 +100,18 @@ class StartWorkflowTool(BaseTool):
 
     name: str = "start-workflow"
     description: str = (
-        "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues the first step.\n"
+        "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues "
+        "the first step.\n"
         "Args:\n"
-        "  workflow_type (str): Workflow name, e.g. 'add-recipe'.\n"
-        "  shared_context (dict): Task-specific fields (e.g. recipe_query). "
-        "reply_context and household_id are injected automatically.\n"
-        "Arguments are passed as JSON. Use JSON literals: null (not None or none), "
-        "true/false (not True/False). Strings must use double quotes. "
-        "Example: {\"recipe_query\": \"lentil soup\"}, not {'recipe_query': 'lentil soup'}."
+        "  workflow_type (str): Workflow name. Only 'add-recipe' is supported.\n"
+        "  recipe_query (str): User's recipe request in natural language "
+        "(e.g. 'lentil soup').\n"
+        "reply_context and household_id are injected automatically by the "
+        "runtime — do not pass them.\n"
+        "Arguments are passed as JSON. Use JSON literals: null (not None or "
+        "none), true/false (not True/False). Strings must use double quotes. "
+        "Example: {\"workflow_type\": \"add-recipe\", \"recipe_query\": "
+        "\"lentil soup\"}."
     )
     return_direct: bool = True
 
@@ -104,34 +129,31 @@ class StartWorkflowTool(BaseTool):
     platform: str = ""
     household_id: NonEmptyHouseholdId
 
-    def _run(self, workflow_type: str, shared_context: dict) -> str:
+    def _run(self, workflow_type: str, recipe_query: str) -> str:
         from redis import Redis
         from rq import Queue
 
         from robotina.db import SessionLocal
         from robotina.queue import workflow_runner
 
-        # Auto-inject reply_context and household_id from constructor fields
-        # so the LLM never needs to know about chat_id/user_id/platform.
-        #
-        # WR-02: use explicit assignment (NOT setdefault) so the constructor
-        # identity is authoritative. setdefault would let an LLM-emitted
-        # ``shared_context={"household_id": "wrong-house", "reply_context": {...}}``
-        # shadow the trusted constructor values — a tenant-isolation defect
-        # once multi-household support is added, and a chat_id redirect risk
-        # today. The LLM controls ``shared_context`` (free-form dict in
-        # StartWorkflowArgs), so its contents cannot be trusted to carry
-        # identity fields.
-        shared_context["reply_context"] = {
-            "platform": self.platform,
-            "chat_id": self.chat_id,
-            "user_id": self.user_id,
+        # Build shared_context internally from the LLM-supplied recipe_query
+        # plus the constructor-injected identity fields. The LLM no longer
+        # supplies a free-form dict, so the WR-02 shadowing attack surface
+        # (LLM-supplied household_id / reply_context) is eliminated
+        # structurally — there is nothing for the LLM to overwrite.
+        shared_context: dict = {
+            "recipe_query": recipe_query,
+            "reply_context": {
+                "platform": self.platform,
+                "chat_id": self.chat_id,
+                "user_id": self.user_id,
+            },
+            "household_id": self.household_id,
         }
-        shared_context["household_id"] = self.household_id
 
-        # Use the constructor value directly — avoid the dict round-trip so a
-        # future refactor that drops the assignment above doesn't silently
-        # re-introduce the LLM-controlled path.
+        # Use the constructor value directly — avoid the dict round-trip so
+        # a future refactor that reorders the build above doesn't silently
+        # re-introduce an LLM-controlled path.
         household_id = self.household_id
         session = SessionLocal()
         try:
@@ -164,5 +186,5 @@ class StartWorkflowTool(BaseTool):
         finally:
             session.close()
 
-    async def _arun(self, workflow_type: str, shared_context: dict) -> str:
-        return self._run(workflow_type, shared_context)
+    async def _arun(self, workflow_type: str, recipe_query: str) -> str:
+        return self._run(workflow_type, recipe_query)

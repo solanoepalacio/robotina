@@ -41,7 +41,7 @@ def test_start_workflow_tool_returns_workflow_run_id_on_success():
     ):
         result = tool._run(
             workflow_type="add-recipe",
-            shared_context={"recipe_query": "carbonara"},
+            recipe_query="carbonara",
         )
 
     assert isinstance(result, str)
@@ -69,7 +69,7 @@ def test_start_workflow_tool_error_path_returns_string():
             side_effect=ValueError("unknown workflow_type"),
         ),
     ):
-        result = tool._run(workflow_type="nonexistent", shared_context={})
+        result = tool._run(workflow_type="nonexistent", recipe_query="anything")
 
     assert isinstance(result, str)
     assert "failed" in result.lower() or "unknown" in result.lower()
@@ -100,7 +100,7 @@ def test_start_workflow_tool_auto_injects_reply_context():
     ):
         tool._run(
             workflow_type="add-recipe",
-            shared_context={"recipe_query": "pasta"},
+            recipe_query="pasta",
         )
 
     shared = captured["shared_context"]
@@ -145,7 +145,7 @@ def test_start_workflow_tool_short_circuits_create_agent():
         content="",
         tool_calls=[{
             "name": "start-workflow",
-            "args": {"workflow_type": "add-recipe", "shared_context": {"recipe_query": "carbonara"}},
+            "args": {"workflow_type": "add-recipe", "recipe_query": "carbonara"},
             "id": "tc-sw",
             "type": "tool_call",
         }],
@@ -178,6 +178,7 @@ def test_start_workflow_tool_description_no_prompt_level_stop_hack():
     )
     assert "do not call" not in tool.description.lower()
     assert "task is done" not in tool.description.lower()
+    assert "shared_context" not in tool.description.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +205,7 @@ def test_args_schema_forbids_unknown_field():
 
     bad_args = {
         "workflow_type": "add-recipe",
-        "shared_context": {"recipe_query": "carbonara"},
+        "recipe_query": "carbonara",
         "response": "200",  # hallucinated extra field
     }
 
@@ -215,7 +216,7 @@ def test_args_schema_forbids_unknown_field():
 
 
 def test_args_schema_allows_required_only():
-    """A minimal valid call (workflow_type + shared_context) still works
+    """A minimal valid call (workflow_type + recipe_query) still works
     under the strict schema — extra='forbid' must not break the happy path."""
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
@@ -239,7 +240,7 @@ def test_args_schema_allows_required_only():
         result = tool.invoke(
             {
                 "workflow_type": "add-recipe",
-                "shared_context": {"recipe_query": "carbonara"},
+                "recipe_query": "carbonara",
             }
         )
 
@@ -294,3 +295,59 @@ def test_constructor_accepts_non_empty_household_id():
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
     )
     assert tool.household_id == "h1"
+
+
+# ---------------------------------------------------------------------------
+# Flat-schema guardrails: top-level identity-field rejection and Literal narrowing
+# ---------------------------------------------------------------------------
+
+
+def test_args_schema_rejects_top_level_household_id():
+    """The LLM cannot smuggle identity fields via the flat schema either —
+    extra='forbid' rejects top-level household_id / reply_context. The old
+    WR-02 attack surface (LLM supplying these inside shared_context) is
+    structurally eliminated; this test guards the replacement surface."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+
+    for hostile_field, hostile_value in [
+        ("household_id", "attacker-house"),
+        ("reply_context", {"platform": "telegram", "chat_id": "evil", "user_id": "evil"}),
+    ]:
+        bad_args = {
+            "workflow_type": "add-recipe",
+            "recipe_query": "carbonara",
+            hostile_field: hostile_value,
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            tool.invoke(bad_args)
+        assert hostile_field in str(exc_info.value)
+
+
+def test_args_schema_rejects_unknown_workflow_type():
+    """workflow_type is Literal['add-recipe']; any other value must fail at
+    args validation, not at WORKFLOW_REGISTRY lookup. This catches LLM
+    hallucinations like 'remove-recipe' or 'shopping-list' before they reach
+    the queue."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+    )
+
+    bad_args = {
+        "workflow_type": "remove-recipe",  # not in the Literal
+        "recipe_query": "carbonara",
+    }
+    with pytest.raises(ValidationError) as exc_info:
+        tool.invoke(bad_args)
+    assert "workflow_type" in str(exc_info.value)
