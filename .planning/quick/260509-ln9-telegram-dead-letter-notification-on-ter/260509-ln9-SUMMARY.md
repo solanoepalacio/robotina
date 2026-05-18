@@ -2,20 +2,35 @@
 phase: quick-260509-ln9
 plan: 01
 subsystem: queue/workflow_runner
-tags: [dead-letter, telegram, workflow, error-handling, notifications]
+tags:
+
+  - dead-letter
+  - telegram
+  - workflow
+  - error-handling
+  - notifications
+
 requires: []
 provides: [dead-letter-notification-hook]
-affects: [src/robotina/queue/workflow_runner.py, src/robotina/queue/jobs.py]
+affects:
+
+  - src/robotina/queue/workflow_runner.py
+  - src/robotina/queue/jobs.py
+
 key-files:
   modified:
+
     - src/robotina/queue/workflow_runner.py
     - src/robotina/queue/jobs.py
     - tests/test_workflow_runner.py
+
 decisions:
-  - "Dead-letter hook is inline in on_step_failed (no separate module) — avoids premature abstraction per project convention."
-  - "queue parameter defaults to None on on_step_failed so existing unit tests that don't pass a queue keep passing unchanged."
-  - "reply_context validation requires non-empty platform/chat_id/user_id (truthy check, not just key presence) — empty strings count as missing."
-  - "Errors from the dead-letter block are logged via logger.exception and swallowed — workflow is already FAILED, never cascade."
+
+  - Dead-letter hook is inline in on_step_failed (no separate module) — avoids premature abstraction per project convention.
+  - queue parameter defaults to None on on_step_failed so existing unit tests that don't pass a queue keep passing unchanged.
+  - reply_context validation requires non-empty platform/chat_id/user_id (truthy check, not just key presence) — empty strings count as missing.
+  - Errors from the dead-letter block are logged via logger.exception and swallowed — workflow is already FAILED, never cascade.
+
 metrics:
   tasks_completed: 1
   files_modified: 3
@@ -23,6 +38,7 @@ metrics:
   tests_total: 15
   tests_passed: 15
   completed: 2026-05-09
+status: complete
 ---
 
 # Quick Task 260509-ln9: Telegram Dead-Letter Notification on Terminal Failure — Summary
@@ -57,6 +73,7 @@ $ uv run pytest tests/test_workflow_runner.py -x -v
 All 15 tests pass — 13 pre-existing (FAILED-marking, PENDING-cancellation, WorkflowRun-FAILED, ToolMessage extraction, etc.) plus the 2 new ones. No regressions.
 
 Plan-level grep checks all PASS:
+
 - `grep -n "on_step_failed" src/robotina/queue/jobs.py` → both callsites pass three args.
 - `grep -n "Disculpá" src/robotina/queue/workflow_runner.py` → Argentine `Disculpá` present at line 413.
 - `grep -n "at_front=True" src/robotina/queue/workflow_runner.py` → present at line 427 (project standing rule honored).

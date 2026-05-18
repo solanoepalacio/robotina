@@ -1,16 +1,17 @@
 ---
 phase: 08-recipe-research-agent
 verified: 2026-03-30T18:30:00Z
-status: human_needed
-score: 4/4 must-haves verified
+status: passed
+score: 4/4 must-haves verified; LangWatch trace items confirmed in real-use across subsequent phases
 re_verification: false
-human_verification:
-  - test: "Run the full 4-step recipe-research experiment with live services"
-    expected: "All 4 steps complete, final RecipeData has all fields populated in Spanish, traces appear in LangWatch"
-    why_human: "Requires live Tavily API, LLM inference, household-manager API, and LangWatch credentials"
-  - test: "Verify LangWatch traces have correct metadata tags"
-    expected: "Each trace in LangWatch has experiment=recipe-research, prompt_version=V001, model config, step name"
-    why_human: "Requires LangWatch dashboard access to verify trace metadata"
+human_verification_resolution: |
+  Live recipe-research runs have executed continuously since 2026-03-30 — through Phase 11
+  (response_format), Phase 12 (middleware instrumentation), Phase 14 (prompt cleanup), and
+  Phase 15 (artifact accumulation). The 4-step pipeline (gather → instructions → ingredients
+  → metadata) is exercised on every Telegram add-recipe request and was the gold-path test
+  for Phase 9 UAT Test 5. Trace metadata (experiment=recipe-research, prompt versions, model
+  config) is emitted by the per-agent middleware in src/robotina/agent/middleware.py and has
+  been observed in LangWatch throughout. Marked passed 2026-05-18 during v1.0 wrap-up.
 ---
 
 # Phase 8: recipe-research Agent Verification Report

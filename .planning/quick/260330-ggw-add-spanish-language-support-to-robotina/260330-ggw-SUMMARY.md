@@ -2,46 +2,53 @@
 phase: quick
 plan: 260330-ggw
 subsystem: agents
-tags: [i18n, prompts, spanish, langchain]
+tags:
 
-# Dependency graph
+  - i18n
+  - prompts
+  - spanish
+  - langchain
+
 requires:
-  - phase: 06-send-notification-agent
-    provides: send-notification prompt V001 and experiment script
-  - phase: 07-handle-incoming-message-agent
-    provides: robotina prompt V001 and household-manager shared skill
+
+  - "phase: 06-send-notification-agent"
+  - "phase: 07-handle-incoming-message-agent"
+
 provides:
+
   - Spanish language directives in all user-facing agent prompts
   - Spanish test cases for send-notification experiment
-affects: [experiments, prompt-versions]
 
-# Tech tracking
+affects: [experiments, prompt-versions]
 tech-stack:
   added: []
   patterns:
+
     - "Prompt language directive: instructions in English, output directive for Spanish at top of prompt"
-    - "API data language note in shared skill — agents use API values as-is without translating"
+    - API data language note in shared skill — agents use API values as-is without translating
 
 key-files:
   created: []
   modified:
+
     - src/robotina/agent/prompts/robotina/V001.md
     - src/robotina/agent/prompts/send-notification/V001.md
     - src/robotina/agent/skills/household-manager/shared.md
     - experiments/send_notification.py
 
 key-decisions:
-  - "Spanish directive placed as first line (blockquote) before title in prompt files — ensures LLM sees language constraint before any other instruction"
-  - "Internal instructions remain in English — only user-facing output changes language"
+
+  - Spanish directive placed as first line (blockquote) before title in prompt files — ensures LLM sees language constraint before any other instruction
+  - Internal instructions remain in English — only user-facing output changes language
 
 patterns-established:
+
   - "Language directive pattern: blockquote at top of prompt file overrides output language without modifying instruction language"
 
 requirements-completed: []
-
-# Metrics
 duration: 1min
 completed: 2026-03-30
+status: complete
 ---
 
 # Quick 260330-ggw: Add Spanish Language Support Summary
@@ -57,6 +64,7 @@ completed: 2026-03-30
 - **Files modified:** 4
 
 ## Accomplishments
+
 - Robotina main agent prompt now requires all user-facing responses in Spanish
 - Send-notification agent prompt preserves Spanish content and does not translate to English
 - Shared skill documents that household-manager API data is stored in Spanish
@@ -70,12 +78,14 @@ Each task was committed atomically:
 2. **Task 2: Update experiment test cases to Spanish** - `128efe8` (feat)
 
 ## Files Created/Modified
+
 - `src/robotina/agent/prompts/robotina/V001.md` - Added Spanish response directive as first line
 - `src/robotina/agent/prompts/send-notification/V001.md` - Added Spanish content preservation directive as first line
 - `src/robotina/agent/skills/household-manager/shared.md` - Added "Data language" section documenting API data is in Spanish
 - `experiments/send_notification.py` - Replaced 4 English test cases with Spanish equivalents
 
 ## Decisions Made
+
 - Spanish directive placed as blockquote at the very top of prompt files (before the title) so the LLM encounters the language constraint first
 - Internal prompt instructions remain in English -- only user-facing output language changes
 
@@ -84,12 +94,15 @@ Each task was committed atomically:
 None - plan executed exactly as written.
 
 ## Issues Encountered
+
 None.
 
 ## User Setup Required
+
 None - no external service configuration required.
 
 ## Next Phase Readiness
+
 - Spanish language support is active for all agents
 - Re-run `uv run experiments.send_notification` to verify Spanish formatting with the LLM
 

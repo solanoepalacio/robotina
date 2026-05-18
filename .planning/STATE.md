@@ -1,33 +1,34 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: Phase 16 complete — 7/7 plans, verification 11/11 + manual UAT (2/2), code-review 4 warnings fixed
-stopped_at: Removed unscoped Phase 17 from roadmap pending milestone wrap-up
-last_updated: "2026-05-18T18:04:47.536Z"
-last_activity: "2026-05-18 - Removed unscoped Phase 17 (recipe via shared link) from roadmap; will be reintroduced in a new milestone alongside related features."
+milestone_name: v1.0 MVP
+status: Milestone v1.0 SHIPPED — awaiting /gsd:new-milestone for v1.1
+stopped_at: Milestone v1.0 archived (tagged v1.0); next milestone TBD
+last_updated: "2026-05-18T18:30:00.000Z"
+last_activity: 2026-05-18 — Milestone v1.0 archived, ROADMAP reorganized, RETROSPECTIVE created, tagged v1.0
 progress:
   total_phases: 18
-  completed_phases: 16
+  completed_phases: 18
   total_plans: 70
-  completed_plans: 72
-  percent: 89
+  completed_plans: 70
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-05-18 after v1.0 MVP shipped)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 16 COMPLETE (incl. manual UAT) — 4-layer household_id validation verified end-to-end. Wrapping up milestone v1.0 next; the shared-link recipe feature plus related ideas will land in a new milestone.
+**Current focus:** Milestone v1.0 SHIPPED 2026-05-18 — end-to-end add-recipe gold path live in Spanish via Telegram. Next: `/gsd:new-milestone` to scope v1.1 (shared-link recipe ingestion + scheduler track).
 
 ## Current Position
 
-Phase: 16 (fix-empty-string-household-id-propagation-through-gateway-an) — COMPLETE (incl. UAT)
-Plans: 7 of 7; verification passed (11/11 must-haves + 2/2 manual UAT items)
-Artifacts: 16-CONTEXT, 16-RESEARCH, 16-VALIDATION, 16-PLAN(s), 16-SUMMARY(s), 16-REVIEW, 16-VERIFICATION (status=passed)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-18 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -261,9 +262,13 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-05-18 - Completed quick task 260518-ksv: tighten StartWorkflowTool schema (flat recipe_query + workflow_type Literal)
+Last activity: 2026-05-18
 
 Last session: 2026-05-15T19:06:59.744Z
 Stopped at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
 Resume file: 
 None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

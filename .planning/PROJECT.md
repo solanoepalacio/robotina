@@ -13,20 +13,29 @@ Families can delegate household tasks to Robotina in natural language and trust 
 ### Validated
 
 - ✓ household-manager skill (index + sub-files) — existing
+- ✓ Developer tooling: Docker Compose (Postgres + Redis), uv project setup, uv run shortcuts — v1.0 (Phase 1)
+- ✓ Queue: Redis + RQ task queue with sequential worker (concurrency = 1), all task input/output Pydantic models — v1.0 (Phase 2)
+- ✓ Workflow infrastructure: `WorkflowRun` / `WorkflowRunStep` Postgres models — v1.0 (Phase 2)
+- ✓ Gateway: Telegram bot receives messages, persists conversations, enqueues `handle-incoming-message` tasks — v1.0 (Phase 3)
+- ✓ Agent infrastructure: LLM module + adapters (Ollama, Anthropic, OpenAI), `agents.py` scaffold, skill loading, prompt versioning, LangWatch + OTel instrumentation — v1.0 (Phase 4)
+- ✓ Workflow registry + task-runner advancement hook + `start-workflow` tool — v1.0 (Phase 5)
+- ✓ Notification agent (`send-notification`): format-telegram-message skill, prompt, tool — v1.0 (Phase 6; retired as LLM agent in Phase 07.1, now deterministic Python path)
+- ✓ Robotina agent (`handle-incoming-message`): household-manager skill, prompt, tools (household-manager-api, queue, start-workflow) — v1.0 (Phase 7)
+- ✓ Deterministic agent termination via `return_direct=True` on terminal tools — v1.0 (Phase 07.1)
+- ✓ Recipe Research agent (`recipe-research`): 4-step pipeline (gather/instructions/ingredients/metadata), Tavily web-search, Spanish prompts — v1.0 (Phase 8)
+- ✓ Recipe Loader agent (`recipe-load`): household-manager-api tool, name resolution, end-to-end add-recipe Telegram → backend recipe — v1.0 (Phase 9)
+- ✓ LangChain 1.x agent API migration: `create_react_agent` → `langchain.agents.create_agent` across 3 LLMBackend adapters — v1.0 (Phase 10)
+- ✓ Structured agent output via `response_format=PydanticModel` on 5 named agents; canelones-class parse failures structurally eliminated — v1.0 (Phase 11)
+- ✓ Middleware-based agent instrumentation (`@before_model`/`@after_model`/`@wrap_model_call`); legacy callbacks removed — v1.0 (Phase 12)
+- ✓ Queue visibility dashboard: independent FastAPI + Jinja2 + HTMX module with persisted `step_input` and `failure_reason` — v1.0 (Phase 13)
+- ✓ Prompt cleanup: single Role/Inputs/Tools/Process/Rules/Output skeleton across 7 active prompts — v1.0 (Phase 14)
+- ✓ Recipe artifact accumulation: single growing `RecipeData` through pipeline + food/unit semantic validation via `validate-foods` / `validate-units` tools — v1.0 (Phase 15)
+- ✓ 4-layer `household_id` validation: gateway fail-fast + Pydantic `NonEmptyHouseholdId` + tool-constructor guards + `queue_workflow` pre-DB check — v1.0 (Phase 16)
 
 ### Active
 
-- [x] Gateway: Telegram bot receives messages, persists conversations, enqueues `handle-incoming-message` tasks — Validated in Phase 3: gateway
-- [x] Queue: Redis + RQ task queue with sequential worker (concurrency = 1), all task input/output Pydantic models — Validated in Phase 2: Database Models and Queue Layer
-- [x] Workflow infrastructure: `WorkflowRun` / `WorkflowRunStep` Postgres models — Validated in Phase 2: Database Models and Queue Layer (registry + task-runner hook pending Phase 5)
-- [x] Workflow registry + task-runner advancement hook + `start-workflow` tool — Validated in Phase 5: task-runner-and-workflow-engine
-- [x] Agent infrastructure: LLM module + adapters (Ollama, Anthropic, OpenAI), `agents.py` scaffold, skill loading, prompt versioning, LangWatch + OTel instrumentation — Validated in Phase 4: llm-module-and-agent-infrastructure
-- [x] Notification agent (`send-notification`): format-telegram-message skill, prompt, tool, experiment — Validated in Phase 6: send-notification-agent
-- [x] Robotina agent (`handle-incoming-message`): household-manager skill (auth update), prompt, tools (household-manager-api, queue, start-workflow) — Validated in Phase 7: handle-incoming-message-agent
-- [x] Recipe Research agent (`recipe-research`): skill, prompt, web-search tool, experiment — Validated in Phase 8: recipe-research-agent
-- [x] Recipe Loader agent (`recipe-load`): skill reuse (household-manager), prompt, household-manager-api tool, experiment — Validated in Phase 9: recipe-load-agent-and-end-to-end-integration
-- [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API
-- [x] Developer tooling: Docker Compose (Postgres + Redis), uv project setup, uv run shortcuts — Validated in Phase 1: Developer Tooling and Infrastructure
+- [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API (carried into next milestone)
+- [ ] Shared-link recipe ingestion: ingest a recipe from a URL the user shares in Telegram (next milestone — `recipe-scrapers` dependency already declared)
 
 ### Out of Scope
 
@@ -40,10 +49,11 @@ Families can delegate household tasks to Robotina in natural language and trust 
 
 - Robotina is one of three components: client app, household-manager backend (source of truth), and Robotina. This repo covers only Robotina.
 - The household-manager skill (`agent/skills/household-manager/`) is already implemented and covers recipes CRUD, meal plan, and shared API conventions. Minor update needed: remove auth instructions (auth is handled by the `household-manager-api` tool, not the agent).
-- Agents are implemented with LangChain using a `LLMBackend` Protocol abstraction, making it easy to swap providers per task type.
+- Agents are implemented with LangChain using a `LLMBackend` Protocol abstraction, making it easy to swap providers per task type. As of v1.0 all agents run on `langchain.agents.create_agent` (LangChain 1.x); 5 named agents bind `response_format=PydanticModel` for schema-constrained output.
 - Skills are markdown directories with an `index.md` and sub-files. Index content is pre-loaded into agent context; sub-files are loaded on demand via `read-skill` tool.
-- Prompts are markdown files, versioned (V001.md, V002.md...), and can be swapped at runtime via `AGENT_OVERRIDES_FILEPATH` without a redeploy.
-- LangWatch + OpenTelemetry instrumentation is required on all agents. Each task type (except `handle-incoming-message`) needs a standalone experiment script.
+- Prompts are markdown files, versioned (V001.md, V002.md...), and can be swapped at runtime via `AGENT_OVERRIDES_FILEPATH` without a redeploy. As of v1.0 all 7 active prompts share a common Role/Inputs/Tools/Process/Rules/Output skeleton (Phase 14).
+- LangWatch + OpenTelemetry instrumentation is required on all agents — wired via `create_agent` middleware as of Phase 12. Each task type (except `handle-incoming-message`) has a standalone experiment script in `experiments/`.
+- v1.0 codebase: 3,990 LOC `src/` Python (32 files), 5,742 LOC tests (38 files), 135 unit tests green at milestone close.
 
 ## Constraints
 
@@ -57,11 +67,11 @@ Families can delegate household tasks to Robotina in natural language and trust 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Centralized task-runner orchestrates workflows (not agents chaining themselves) | Separates concerns — agents know only their task, not the sequence they belong to | — Pending |
-| `reply_context` lives in `WorkflowRun.shared_context`, never in intermediate task inputs | Prevents coupling intermediate agents to UI concerns | — Pending |
-| `RecipeData` uses human-readable food/unit names (not IDs) | Recipe-research agent has no access to household-manager IDs; recipe-load resolves them | — Pending |
-| Two separate RQ workers: scheduler-worker (`--with-scheduler`) and task-runner | Keeps scheduling concerns decoupled from agent execution | — Pending |
-| Skills use lazy loading (index pre-loaded, sub-files on demand) | Avoids context bloat for tasks that only need part of a skill | — Pending |
+| Centralized task-runner orchestrates workflows (not agents chaining themselves) | Separates concerns — agents know only their task, not the sequence they belong to | ✓ Good — validated through Phases 5–16; agents stayed sequence-agnostic and the workflow registry remained the single source of truth |
+| `reply_context` lives in `WorkflowRun.shared_context`, never in intermediate task inputs | Prevents coupling intermediate agents to UI concerns | ✓ Good — held across all 7 add-recipe steps; revisit alongside Phase 999.1 (custom `AgentState` schemas) if promoted |
+| `RecipeData` uses human-readable food/unit names (not IDs) | Recipe-research agent has no access to household-manager IDs; recipe-load resolves them | ✓ Good — Phase 15 doubled down on this by moving food/unit semantic-match into the ingredients step (still name-based); recipe-load remains the single resolution point |
+| Two separate RQ workers: scheduler-worker (`--with-scheduler`) and task-runner | Keeps scheduling concerns decoupled from agent execution | — Pending — scheduler track deferred to next milestone; task-runner alone shipped v1.0 |
+| Skills use lazy loading (index pre-loaded, sub-files on demand) | Avoids context bloat for tasks that only need part of a skill | ✓ Good — `SkillSet`/`ReadSkillTool` pattern stable since Phase 4 |
 | `create_agent` from `langchain.agents` is used for all agents | LangGraph deprecated `create_react_agent` (V1.0; removal in V2.0). The new factory is required to unlock `response_format` (Phase 11) and middleware (Phase 12). Behavior parity verified empirically during Phase 10. | — Active |
 | `household_id` is required and validated end-to-end (Phase 16) | A missing `HOUSEHOLD_ID` env var silently propagated as `""` through Conversation, IncomingMessageInput, WorkflowRun, and the household-manager-api tool, surfacing only as confusing 4xx responses from the backend. Phase 16 added defensive validation at four layers: gateway entrypoint (`sys.exit(1)` on missing/empty/whitespace), Pydantic task-input models (`NonEmptyHouseholdId` alias on 7 models), tool constructors (`HouseholdManagerApiTool`, `StartWorkflowTool` reject empty), and `queue_workflow` (raises ValueError before any DB write). | — Active |
 
@@ -83,4 +93,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after Phase 9 completion (recipe-load-agent-and-end-to-end-integration) — all v1.0 milestone phases complete*
+*Last updated: 2026-05-18 after v1.0 MVP milestone ship — 18 phases, 70 plans, end-to-end add-recipe gold path live in Spanish via Telegram*

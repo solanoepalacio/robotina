@@ -2,24 +2,38 @@
 phase: quick
 plan: 260509-m4f
 subsystem: agent/skills
-tags: [skills, prompts, i18n, recipe-research, household-manager, null-handling]
+tags:
+
+  - skills
+  - prompts
+  - i18n
+  - recipe-research
+  - household-manager
+  - null-handling
+
 dependency_graph:
   requires: []
   provides:
-    - "Uniform JSON null-handling rule across recipe-research and household-manager skill bundles"
-    - "English-only instruction prose in every skill .md file"
+
+    - Uniform JSON null-handling rule across recipe-research and household-manager skill bundles
+    - English-only instruction prose in every skill .md file
   affects:
-    - "recipe-research-gather agent (prior contradictory null guidance fixed)"
-    - "recipe-research-{ingredients,instructions,metadata} agents (null guidance now consistent)"
-    - "household-manager request-producing flows (canonical null rule attached)"
+
+    - recipe-research-gather agent (prior contradictory null guidance fixed)
+    - recipe-research-{ingredients,instructions,metadata} agents (null guidance now consistent)
+    - household-manager request-producing flows (canonical null rule attached)
+
 tech_stack:
   added: []
   patterns:
-    - "Single canonical null-handling paragraph reused across all skill files that document agent-produced JSON"
-    - "English instructions / Spanish example values split (instructions in English, mimicked outputs in Argentine Spanish)"
+
+    - Single canonical null-handling paragraph reused across all skill files that document agent-produced JSON
+    - English instructions / Spanish example values split (instructions in English, mimicked outputs in Argentine Spanish)
+
 key_files:
   created: []
   modified:
+
     - src/robotina/agent/skills/recipe-research/gather.md
     - src/robotina/agent/skills/recipe-research/ingredients.md
     - src/robotina/agent/skills/recipe-research/instructions.md
@@ -29,16 +43,20 @@ key_files:
     - src/robotina/agent/skills/household-manager/recipes_create.md
     - src/robotina/agent/skills/household-manager/recipes_edit.md
     - src/robotina/agent/skills/household-manager/meal_plan.md
+
 decisions:
-  - "Use a single canonical null-handling paragraph in every production-side skill file (full-paragraph repetition rather than cross-references) so a small model with sliced context always sees the rule."
-  - "Keep household-manager/{recipes_get,recipes_image,recipes_search,index}.md untouched — they document responses the agent reads, not request bodies it produces, so the canonical rule does not apply."
-  - "Restore main-repo skill files when initial Edit/Write calls accidentally targeted them via absolute paths constructed from a drifted cwd; redo all edits inside the worktree to land them on the per-agent branch."
+
+  - Use a single canonical null-handling paragraph in every production-side skill file (full-paragraph repetition rather than cross-references) so a small model with sliced context always sees the rule.
+  - Keep household-manager/{recipes_get,recipes_image,recipes_search,index}.md untouched — they document responses the agent reads, not request bodies it produces, so the canonical rule does not apply.
+  - Restore main-repo skill files when initial Edit/Write calls accidentally targeted them via absolute paths constructed from a drifted cwd; redo all edits inside the worktree to land them on the per-agent branch.
+
 metrics:
   duration_seconds: 497
-  duration_human: "~8 min"
+  duration_human: ~8 min
   completed: 2026-05-09
   files_modified: 9
   tasks_completed: 3
+status: complete
 ---
 
 # Quick Task 260509-m4f: Translate skill files to English and unify null-handling guidance Summary

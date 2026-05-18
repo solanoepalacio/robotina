@@ -1,28 +1,41 @@
 ---
 phase: quick-260327-j4k
-plan: "01"
+plan: 01
 subsystem: experiments
-tags: [langwatch, experiment, observability, send-notification]
+tags:
+
+  - langwatch
+  - experiment
+  - observability
+  - send-notification
+
 dependency_graph:
   requires: []
   provides: [send-notification experiment with LangWatch Experiment API]
   affects: [experiments/send_notification.py]
 tech_stack:
   added: []
-  patterns: [langwatch.Experiment context manager, experiment.log for per-case evaluation, OTel force_flush on exit]
+  patterns:
+
+    - langwatch.Experiment context manager
+    - experiment.log for per-case evaluation
+    - OTel force_flush on exit
+
 key_files:
   created: []
-  modified:
-    - experiments/send_notification.py
+  modified: [experiments/send_notification.py]
 decisions:
-  - "langwatch.Experiment used as outermost context instead of per-case langwatch.trace() to group all traces under one experiment run"
-  - "experiment.log() called from main() (the caller) after extracting outcome, not inside run_experiment_case(), so the function stays a pure agent invoker"
-  - "force_flush() placed in finally block at main() exit to guarantee OTel traces are sent before process terminates"
+
+  - langwatch.Experiment used as outermost context instead of per-case langwatch.trace() to group all traces under one experiment run
+  - experiment.log() called from main() (the caller) after extracting outcome, not inside run_experiment_case(), so the function stays a pure agent invoker
+  - force_flush() placed in finally block at main() exit to guarantee OTel traces are sent before process terminates
+
 metrics:
-  duration: "2min"
-  completed: "2026-03-27"
+  duration: 2min
+  completed: 2026-03-27
   tasks: 1
   files: 1
+status: complete
 ---
 
 # Quick Task 260327-j4k: Fix send-notification experiment to use LangWatch Experiment API

@@ -1,8 +1,12 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "telegram-bot-not-polling"
 created: 2026-03-27T00:00:00Z
-updated: 2026-03-27T00:01:00Z
+updated: 2026-05-18T00:00:00Z
+resolution: |
+  Fix landed: src/robotina/gateway/__init__.py main() now calls load_dotenv() before
+  reading os.environ["TELEGRAM_BOT_TOKEN"] (see lines 29-31, 48). Confirmed working in
+  production through Phases 7-16. Closing on 2026-05-18 during v1.0 milestone wrap-up.
 ---
 
 ## Current Focus

@@ -2,44 +2,54 @@
 phase: 260518-ksv-tighten-startworkflowtool-schema-flatten
 plan: 01
 subsystem: agent.tools
-tags: [agent, tools, pydantic, schema-tightening, security]
+tags:
+
+  - agent
+  - tools
+  - pydantic
+  - schema-tightening
+  - security
+
 dependency_graph:
   requires:
+
     - robotina.queue.task_types.NonEmptyHouseholdId
     - robotina.queue.workflow_runner.queue_workflow
     - WORKFLOW_REGISTRY (unchanged contract — "add-recipe" entry consumes
-      shared_context["recipe_query"], shared_context["reply_context"],
-      shared_context["household_id"])
   provides:
-    - StartWorkflowArgs with flat {workflow_type: Literal["add-recipe"], recipe_query: str}
+
+    - "StartWorkflowArgs with flat {workflow_type: Literal["add-recipe"], recipe_query: str}"
     - StartWorkflowTool._run(workflow_type, recipe_query) builds shared_context internally
   affects:
+
     - Phase 07 handle-incoming-message agent (LLM-facing tool schema surface)
+
 tech_stack:
   added: []
   patterns:
-    - "Literal narrowing on Pydantic args_schema → JSON-schema const (Pydantic v2
-      emits `const: \"add-recipe\"` for a single-value Literal); LangChain
-      `create_agent` tool-call path serializes this to the model."
-    - "Structural defense over runtime defense: WR-02 identity-shadowing is
-      eliminated by removing the dict surface, not by overwriting it inside _run."
+
+    - Literal narrowing on Pydantic args_schema → JSON-schema const (Pydantic v2
+    - "Structural defense over runtime defense: WR-02 identity-shadowing is"
+
 key_files:
   created: []
   modified:
+
     - src/robotina/agent/tools/start_workflow.py
     - tests/unit/test_start_workflow_tool.py
+
 decisions:
+
   - StartWorkflowArgs flattened — top-level recipe_query replaces shared_context dict surface
   - workflow_type constrained to Literal["add-recipe"]; hallucinations fail at args validation
   - shared_context dict constructed internally in _run; LLM has no schema surface to inject identity fields
   - No min_length=1 on recipe_query — out of scope; prior shared_context didn't validate it either
+
 metrics:
   duration: ~5min
-  completed: "2026-05-18"
-requirements_completed:
-  - QUICK-SW-01
-  - QUICK-SW-02
-  - QUICK-SW-03
+  completed: 2026-05-18
+requirements_completed: [QUICK-SW-01, QUICK-SW-02, QUICK-SW-03]
+status: complete
 ---
 
 # Quick Task 260518-ksv: Tighten StartWorkflowTool Schema (Flatten + Literal) Summary
@@ -84,11 +94,14 @@ requirements_completed:
 - `uv run pytest tests/unit/test_start_workflow_tool.py -v` → **14 passed in 0.31s** (12 prior + 2 new).
 - `grep -nE "shared_context\s*[:=]" src/robotina/agent/tools/start_workflow.py` →
   only two matches, both inside `_run`: the internal dict construction (`shared_context: dict = {...}`) and the `workflow_runner.queue_workflow(shared_context=shared_context, ...)` call. The args schema and method signatures have **none**.
+
 - `grep -n "shared_context" tests/unit/test_start_workflow_tool.py` → only the docstring/comment references, the captured-dict downstream-contract assertions (`captured["shared_context"]`, `shared = ...`), the new description guardrail (`assert "shared_context" not in tool.description.lower()`), and a docstring reference in the new top-level-rejection test. No test passes `shared_context=` as a kwarg or dict key to the tool.
 - Smoke (Literal valid):
   `StartWorkflowArgs(workflow_type='add-recipe', recipe_query='x')` → OK.
+
 - Smoke (Literal invalid):
   `StartWorkflowArgs(workflow_type='remove-recipe', recipe_query='x')` → `ValidationError` raised.
+
 - `model_json_schema()` carries `additionalProperties: false`, `recipe_query` is a top-level required string, and `workflow_type` carries `const: "add-recipe"` (Pydantic v2's emission for a single-value `Literal`, equivalently acceptable to the plan's `enum: ["add-recipe"]`).
 
 ## Must-Haves — Truths

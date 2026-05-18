@@ -2,35 +2,46 @@
 phase: quick-260509-lcd
 plan: 01
 subsystem: llm-adapters
-tags: [ollama, retry, resilience, langchain]
+tags:
+
+  - ollama
+  - retry
+  - resilience
+  - langchain
+
 requires: []
 provides:
-  - "_RetryingChatOllama subclass of ChatOllama"
-  - "_is_transient_ollama_error retry predicate"
-  - "_compute_backoff backoff function"
-  - "OllamaBackend wired to use _RetryingChatOllama"
-affects:
-  - "src/robotina/llm/__init__.py"
+
+  - _RetryingChatOllama subclass of ChatOllama
+  - _is_transient_ollama_error retry predicate
+  - _compute_backoff backoff function
+  - OllamaBackend wired to use _RetryingChatOllama
+
+affects: [src/robotina/llm/__init__.py]
 tech_stack:
   added: []
   patterns:
-    - "Subclass + override on ChatOllama._generate / _agenerate to add bounded retry while preserving BaseChatModel identity (required by langgraph.prebuilt.create_react_agent)"
+
+    - Subclass + override on ChatOllama._generate / _agenerate to add bounded retry while preserving BaseChatModel identity (required by langgraph.prebuilt.create_react_agent)
     - "Status-code-aware retry: 5xx + transient httpx errors retry; 4xx and unknown (-1) propagate immediately"
+
 key_files:
   created: []
-  modified:
-    - "src/robotina/llm/__init__.py"
+  modified: [src/robotina/llm/__init__.py]
 decisions:
-  - "Subclass ChatOllama instead of using Runnable.with_retry() — with_retry filters by exception type only (would also retry 4xx) and produces a RunnableRetry wrapper that langgraph's create_react_agent does not accept"
-  - "Promote langchain_ollama import to module scope — required because _RetryingChatOllama subclasses ChatOllama at class-definition time"
-  - "Hard-code retry constants (3 attempts, 0.5s base, x2 backoff, ±25% jitter) — no env vars per BRIEF"
-  - "Status-code -1 ResponseError treated as non-retryable (fail fast on unknown) rather than retryable"
+
+  - Subclass ChatOllama instead of using Runnable.with_retry() — with_retry filters by exception type only (would also retry 4xx) and produces a RunnableRetry wrapper that langgraph's create_react_agent does not accept
+  - Promote langchain_ollama import to module scope — required because _RetryingChatOllama subclasses ChatOllama at class-definition time
+  - Hard-code retry constants (3 attempts, 0.5s base, x2 backoff, ±25% jitter) — no env vars per BRIEF
+  - Status-code -1 ResponseError treated as non-retryable (fail fast on unknown) rather than retryable
+
 metrics:
-  completed: "2026-05-09"
-  duration: "~2 minutes"
+  completed: 2026-05-09
+  duration: ~2 minutes
   tasks: 2
   files_modified: 1
 commit: f801814
+status: complete
 ---
 
 # Quick Task 260509-lcd: Add bounded transient retry to OllamaBackend Summary
@@ -53,6 +64,7 @@ _OLLAMA_RETRY_TRANSIENT_HTTPX = (httpx.ConnectError, httpx.ReadTimeout, httpx.Co
 ### `_is_transient_ollama_error(exc) -> bool`
 
 Returns True iff:
+
 - `isinstance(exc, OllamaResponseError)` AND `exc.status_code in {500, 502, 503, 504}`, OR
 - `isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout))`.
 
@@ -61,12 +73,14 @@ Returns False for 4xx `ResponseError`, `ResponseError` with `status_code == -1`,
 ### `_compute_backoff(attempt_index) -> float`
 
 `delay = 0.5 * (2.0 ** attempt_index)`, then multiplied by `1 + uniform(-0.25, 0.25)`, clamped to ≥ 0. So:
+
 - `attempt_index=0` → ~0.5s ±25% (lies in [0.375, 0.625]s)
 - `attempt_index=1` → ~1.0s ±25% (lies in [0.75, 1.25]s)
 
 ### `_RetryingChatOllama(ChatOllama)`
 
 Two overrides only — `_generate` (sync) and `_agenerate` (async). Both:
+
 1. Wrap a `for attempt in range(3):` loop around the parent call.
 2. Pass `messages`, `stop`, `run_manager`, and `**kwargs` straight through to `super()` (no rebinding).
 3. On `_is_transient_ollama_error(exc) is True` AND attempts remaining: log a WARN and sleep (`time.sleep` for sync, `await asyncio.sleep` for async). Sleep duration comes from `_compute_backoff(attempt)`.
@@ -91,6 +105,7 @@ OK
 ```
 
 All assertions passed:
+
 - `_RetryingChatOllama` is a subclass of `ChatOllama` and an instance of `BaseChatModel`.
 - `_OLLAMA_RETRY_MAX_ATTEMPTS == 3` and `_OLLAMA_RETRY_5XX_STATUSES == frozenset({500, 502, 503, 504})`.
 - Retry predicate: True on `ResponseError(500)`, `httpx.ConnectError`, `httpx.ReadTimeout`. False on `ResponseError(401)`, `ResponseError(-1)`, `ValueError`.
@@ -120,6 +135,7 @@ So the retry layer does not interfere with normal `invoke()` operation against a
 ### End-to-end verification (plan `<verification>` checks 1-6)
 
 All six checks pass:
+
 1. `_RetryingChatOllama` subclass of `ChatOllama` AND `isinstance(model, BaseChatModel)` ✓
 2. Retry predicate correct on all canonical inputs (500/401/-1/ConnectError/ReadTimeout/ConnectTimeout/ValueError) ✓
 3. Backoff math: `_compute_backoff(0) ∈ [0.375, 0.625]` and `_compute_backoff(1) ∈ [0.75, 1.25]` across 20 samples ✓

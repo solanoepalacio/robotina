@@ -4,23 +4,21 @@ plan: 01
 subsystem: docs
 tags: [docs, spec, terminology-fix]
 requires: []
-provides:
-  - "Spec doc with consistent SQLAlchemy terminology"
-affects:
-  - plans/01-kickoff/spec.md
+provides: [Spec doc with consistent SQLAlchemy terminology]
+affects: [plans/01-kickoff/spec.md]
 tech-stack:
   added: []
   patterns: []
 key-files:
   created: []
-  modified:
-    - plans/01-kickoff/spec.md
+  modified: [plans/01-kickoff/spec.md]
 decisions: []
 metrics:
   duration: 1min
   completed: 2026-04-30
   tasks_completed: 1
   files_modified: 1
+status: complete
 ---
 
 # Quick Task 260430-meh: Fix spec.md Line 112 Prisma -> SQLAlchemy Models Summary
@@ -38,8 +36,10 @@ One-line documentation fix: replaced "Prisma models" with "SQLAlchemy models" on
 Single-line edit on `plans/01-kickoff/spec.md`:
 
 ```diff
+
 -    - `WorkflowRun` / `WorkflowRunStep` Prisma models (Postgres)
 +    - `WorkflowRun` / `WorkflowRunStep` SQLAlchemy models (Postgres)
+
 ```
 
 `git diff --stat` confirms: `1 file changed, 1 insertion(+), 1 deletion(-)`.
