@@ -1,13 +1,15 @@
 ---
 phase: 06-send-notification-agent
 verified: 2026-03-27T00:00:00Z
-status: human_needed
-score: 7/7 must-haves verified (automated); 1 item requires human confirmation
+status: passed
+score: 7/7 must-haves verified (automated); LangWatch trace item superseded by Phase 07.1 architecture change
 re_verification: false
-human_verification:
-  - test: "Run `uv run experiments.send_notification` with SEND_NOTIFICATION_API_TOKEN, LANGWATCH_API_KEY, and LANGWATCH_ENDPOINT set"
-    expected: "All 4 cases complete without error; summary shows tool_called=True for each case; 4 traces appear in LangWatch with prompt_version=V001 and experiment=send-notification metadata"
-    why_human: "Requires a live LLM endpoint (Ollama/API), LangWatch credentials, and visual trace inspection — cannot verify programmatically"
+human_verification_resolution: |
+  Phase 07.1 retired `send-notification` as an LLM agent — delivery now runs as a deterministic Python path inside `run_task()`
+  (see `src/robotina/agent/agents.py:71-74`, `src/robotina/queue/jobs.py`). The `experiments/send_notification.py` script was
+  removed alongside that change. The OBS-03 trace requirement (Spanish-formatted Telegram notifications at the end of `add-recipe`)
+  is covered in real-use end-to-end via Phase 09 UAT Test 5 (full add-recipe workflow) and Phase 16 UAT (manual real-user runs).
+  Marked passed 2026-05-18 during milestone v1.0 wrap-up.
 ---
 
 # Phase 6: send-notification Agent Verification Report
