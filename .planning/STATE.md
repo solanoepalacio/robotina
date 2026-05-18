@@ -257,10 +257,11 @@ None yet.
 | 260512-pyd | Make optional RecipeData fields truly optional with `= None` defaults (RecipeStep.title, RecipeIngredient optional fields, RecipeData optional fields) — fixes pydantic ValidationError when LLM omits null-valued fields | 2026-05-12 | 19b3b9d | (fast — no directory) |
 | 260513-lcc | Align CLAUDE.md langchain-core row to `>=1.2` (was `>=0.3`) — internal consistency cleanup flagged by Phase 10 VERIFICATION.md | 2026-05-13 | f52533a | (fast — no directory) |
 | 260514-ix8 | Remove redundant Output section from 5 recipe research prompts — schema enforced by `response_format_model` in agents.py, prompt-level section was developer-facing | 2026-05-14 | 0bd4062 | [260514-ix8-remove-redundant-output-section-from-5-r](./quick/260514-ix8-remove-redundant-output-section-from-5-r/) |
+| 260518-ksv | Tighten StartWorkflowTool schema: flatten `shared_context: dict` into top-level `recipe_query: str` and constrain `workflow_type` to `Literal["add-recipe"]` — stronger LLM-facing schema so terminal-tool validation failures (no retry under `return_direct=True`) are far less likely | 2026-05-18 | c792229 | [260518-ksv-tighten-startworkflowtool-schema-flatten](./quick/260518-ksv-tighten-startworkflowtool-schema-flatten/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-14 - Completed Plan 15-05: recipe-research-metadata V004 (accumulating artifact + clean-payload emit per D-04)
+Last activity: 2026-05-18 - Completed quick task 260518-ksv: tighten StartWorkflowTool schema (flat recipe_query + workflow_type Literal)
 
 Last session: 2026-05-15T19:06:59.744Z
 Stopped at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
