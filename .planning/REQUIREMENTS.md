@@ -122,62 +122,72 @@ Each LLM task type has a standalone experiment in `experiments/` (OBS-03 require
 
 ## Traceability
 
-Filled in by `gsd-roadmapper` after roadmap creation.
+Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ARCH-01 | TBD | Pending |
-| ARCH-02 | TBD | Pending |
-| ARCH-03 | TBD | Pending |
-| ARCH-04 | TBD | Pending |
-| ARCH-05 | TBD | Pending |
-| WAKE-01 | TBD | Pending |
-| WAKE-02 | TBD | Pending |
-| WAKE-03 | TBD | Pending |
-| WAKE-04 | TBD | Pending |
-| WAKE-05 | TBD | Pending |
-| TOOLS-01 | TBD | Pending |
-| TOOLS-02 | TBD | Pending |
-| TOOLS-03 | TBD | Pending |
-| TOOLS-04 | TBD | Pending |
-| TOOLS-05 | TBD | Pending |
-| BATCH-01 | TBD | Pending |
-| BATCH-02 | TBD | Pending |
-| BATCH-03 | TBD | Pending |
-| BATCH-04 | TBD | Pending |
-| BATCH-05 | TBD | Pending |
-| URL-01 | TBD | Pending |
-| URL-02 | TBD | Pending |
-| URL-03 | TBD | Pending |
-| URL-04 | TBD | Pending |
-| URL-05 | TBD | Pending |
-| URL-06 | TBD | Pending |
-| IMG-01 | TBD | Pending |
-| IMG-02 | TBD | Pending |
-| IMG-03 | TBD | Pending |
-| IMG-04 | TBD | Pending |
-| IMG-05 | TBD | Pending |
-| IMG-06 | TBD | Pending |
-| EVAL-01 | TBD | Pending |
-| EVAL-02 | TBD | Pending |
-| EVAL-03 | TBD | Pending |
-| DASH-10 | TBD | Pending |
-| DASH-11 | TBD | Pending |
-| DASH-12 | TBD | Pending |
-| DASH-13 | TBD | Pending |
-| DASH-14 | TBD | Pending |
-| EXP-01 | TBD | Pending |
-| EXP-02 | TBD | Pending |
-| EXP-03 | TBD | Pending |
-| EXP-04 | TBD | Pending |
-| EXP-05 | TBD | Pending |
-| EXP-06 | TBD | Pending |
+| ARCH-01 | Phase 17 | Pending |
+| ARCH-02 | Phase 18 | Pending |
+| ARCH-03 | Phase 18 | Pending |
+| ARCH-04 | Phase 18 | Pending |
+| ARCH-05 | Phase 17 | Pending |
+| WAKE-01 | Phase 20 | Pending |
+| WAKE-02 | Phase 20 | Pending |
+| WAKE-03 | Phase 20 | Pending |
+| WAKE-04 | Phase 20 | Pending |
+| WAKE-05 | Phase 20 | Pending |
+| TOOLS-01 | Phase 21 | Pending |
+| TOOLS-02 | Phase 21 | Pending |
+| TOOLS-03 | Phase 21 | Pending |
+| TOOLS-04 | Phase 21 | Pending |
+| TOOLS-05 | Phase 21 | Pending |
+| BATCH-01 | Phase 22 | Pending |
+| BATCH-02 | Phase 22 | Pending |
+| BATCH-03 | Phase 22 | Pending |
+| BATCH-04 | Phase 22 | Pending |
+| BATCH-05 | Phase 22 | Pending |
+| URL-01 | Phase 23 | Pending |
+| URL-02 | Phase 23 | Pending |
+| URL-03 | Phase 23 | Pending |
+| URL-04 | Phase 23 | Pending |
+| URL-05 | Phase 23 | Pending |
+| URL-06 | Phase 23 | Pending |
+| IMG-01 | Phase 24 | Pending |
+| IMG-02 | Phase 24 | Pending |
+| IMG-03 | Phase 24 | Pending |
+| IMG-04 | Phase 24 | Pending |
+| IMG-05 | Phase 24 | Pending |
+| IMG-06 | Phase 24 | Pending |
+| EVAL-01 | Phase 19 | Pending |
+| EVAL-02 | Phase 19 | Pending |
+| EVAL-03 | Phase 19 | Pending |
+| DASH-10 | Phase 20 | Pending |
+| DASH-11 | Phase 21 | Pending |
+| DASH-12 | Phase 20 | Pending |
+| DASH-13 | Phase 18 | Pending |
+| DASH-14 | Phase 18 | Pending |
+| EXP-01 | Phase 24 | Pending |
+| EXP-02 | Phase 23 | Pending |
+| EXP-03 | Phase 24 | Pending |
+| EXP-04 | Phase 24 | Pending |
+| EXP-05 | Phase 21 | Pending |
+| EXP-06 | Phase 24 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 46 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 46 ⚠️ (will resolve via roadmapper)
+- Mapped to phases: 46 (Phases 17–24)
+- Unmapped: 0 ✓
+
+**Per-phase counts:**
+- Phase 17: 2 (ARCH-01, ARCH-05)
+- Phase 18: 5 (ARCH-02, ARCH-03, ARCH-04, DASH-13, DASH-14)
+- Phase 19: 3 (EVAL-01, EVAL-02, EVAL-03)
+- Phase 20: 7 (WAKE-01..05, DASH-10, DASH-12)
+- Phase 21: 7 (TOOLS-01..05, DASH-11, EXP-05)
+- Phase 22: 5 (BATCH-01..05)
+- Phase 23: 7 (URL-01..06, EXP-02)
+- Phase 24: 10 (IMG-01..06, EXP-01, EXP-03, EXP-04, EXP-06)
 
 ---
 *Requirements defined: 2026-05-18*
-*Last updated: 2026-05-18 — milestone v1.1 initial requirements*
+*Last updated: 2026-05-18 — milestone v1.1 roadmap mapped (Phases 17–24)*

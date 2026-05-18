@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1–16 + decimal 07.1 (shipped 2026-05-18)
-- 📋 **v1.1 (next)** — Recipe input modalities (shared link + related), Scheduler track (planned)
+- 🚧 **v1.1 Workflows Abstraction Refinement** — Phases 17–24 (planning complete 2026-05-18)
 
 See `.planning/MILESTONES.md` for shipped-milestone details.
 See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at close.
@@ -33,34 +33,142 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 
 </details>
 
-### 📋 v1.1 (Planned)
+### 🚧 v1.1 Workflows Abstraction Refinement (Phases 17–24)
 
-Next-milestone phases will be defined via `/gsd:new-milestone`. Known intent:
+- [ ] **Phase 17: Conversation FK closure** — Three-step Alembic adds `WorkflowRun.conversation_id` (nullable → backfill → NOT NULL) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable.
+- [ ] **Phase 18: RobotinaInvocation entity** — New `robotina_invocations` table + `InvocationTrigger` enum + idempotency `UniqueConstraint`; gateway inserts invocation on user_message; `WorkflowRun.triggered_by_invocation_id` FK populated by `StartWorkflowTool`; dashboard surfaces the new FK on detail view.
+- [ ] **Phase 19: LLM multi-call smoke test** — Standalone load-bearing experiment in `experiments/robotina/` verifying that target backends emit N `start-workflow` tool calls per turn; committed pass-rate evidence gates downstream phases.
+- [ ] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell.
+- [ ] **Phase 21: Tool-surface flip + remove acknowledge/notify** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides.
+- [ ] **Phase 22: Multi-recipe per message** — Robotina prompt V006 teaches multi-recipe extraction + consolidated post-batch reply + soft cap at 5; eval set committed; partial-failure reporting verified end-to-end.
+- [ ] **Phase 23: URL ingestion** — `safe_fetch` helper (six SSRF defenses, lands FIRST commit); `gather-from-url` task type with `recipe-scrapers` + LLM fallback; `add-recipe-from-url` workflow variant; Robotina URL detection + routing; experiment script; 20-URL eval ≥85% field-level success.
+- [ ] **Phase 24: Recipe images** — `recipe-image` task type with Tavily image search + source-page fallback; new per-step non-fatal-failure runner capability; `safe_fetch` reused for image URL validation; `image_url` persisted via household-manager API; `AddRecipeOutcome.image_present` flag; experiment script.
 
-- Shared-link recipe ingestion ("agregá esta receta: <url>") + related recipe-input modalities
-- Scheduler track (carried over from v1.0): scheduled-tasks queue + worker, RQ cron / `enqueue_at`, scheduler tool, Scheduler HTTP API
+## Phase Details
+
+### Phase 17: Conversation FK closure
+**Goal**: Every WorkflowRun is linked to its originating Conversation via FK; existing rows are safely backfilled.
+**Depends on**: v1.0 baseline (Phase 16)
+**Requirements**: ARCH-01, ARCH-05
+**Success Criteria** (what must be TRUE):
+  1. A new WorkflowRun written via `StartWorkflowTool` has `conversation_id` set and matches the Conversation the originating message belonged to.
+  2. The three-step Alembic sequence (add nullable → backfill → enforce NOT NULL) runs on a staging DB clone without orphan rows (post-migration `COUNT(*) WHERE conversation_id IS NULL` returns 0).
+  3. Existing code paths that previously read `shared_context.reply_context.chat_id` continue to function (deprecation window) — single-recipe happy path unaffected.
+  4. `WorkflowRun.outcome` JSON column exists (nullable, unused this phase) ready for Phase 20.
+**Plans**: TBD
+
+### Phase 18: RobotinaInvocation entity
+**Goal**: Every Robotina LLM turn is recorded as a persisted row, and every new WorkflowRun points back to the invocation that dispatched it.
+**Depends on**: Phase 17
+**Requirements**: ARCH-02, ARCH-03, ARCH-04, DASH-13, DASH-14
+**Success Criteria** (what must be TRUE):
+  1. A user-message in Telegram inserts a `RobotinaInvocation(trigger=user_message)` row with `trigger_ref_id` set to the StoredMessage id; the agent job is enqueued with `meta['invocation_id']`.
+  2. Every WorkflowRun created during that turn carries `triggered_by_invocation_id` matching the invocation row.
+  3. The `RobotinaInvocation` schema includes the `AddRecipeOutcome`-shaped `outcome` JSON contract on `WorkflowRun` (Pydantic model defined; not yet written).
+  4. Dashboard's WorkflowRun detail view surfaces `triggered_by_invocation_id`; module-isolation grep gate still passes (RobotinaInvocation imported from `queue.models` only).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 19: LLM multi-call smoke test
+**Goal**: Empirical evidence — committed to the repo — that the production LLM backends emit N `start-workflow` tool calls per turn before any tool-surface code change lands.
+**Depends on**: Phase 18 (so the test can stamp `invocation_id`)
+**Requirements**: EVAL-01, EVAL-02, EVAL-03
+**Success Criteria** (what must be TRUE):
+  1. `uv run experiments.robotina.multi_recipe_eval` runs end-to-end on three backends (Ollama `gpt-oss:20b`, Anthropic, OpenAI) and outputs per-backend pass-rate.
+  2. A 30–50-utterance Spanish multi-recipe eval set is committed to the repo with ground-truth recipe counts/names.
+  3. A per-backend evidence summary is committed BEFORE Phase 21 lands; if reliability is unacceptable on production backends, this phase's outcome triggers a schema pivot to list-form `start-workflow(actions=[...])` before Phase 21 starts.
+**Plans**: TBD
+
+### Phase 20: Wake rule + outcome plumbing
+**Goal**: When all workflows linked to one invocation reach terminal status, exactly one wake invocation is enqueued — with structured outcomes the next Robotina turn can consume.
+**Depends on**: Phase 19 (load-bearing smoke-test must have passed)
+**Requirements**: WAKE-01, WAKE-02, WAKE-03, WAKE-04, WAKE-05, DASH-10, DASH-12
+**Success Criteria** (what must be TRUE):
+  1. A single add-recipe workflow that completes triggers exactly one new `RobotinaInvocation(trigger=workflow_completion)` row whose `trigger_ref_id` is the prior invocation's id.
+  2. The wake check is idempotent: manual requeue from RQ failed registry on a terminal workflow does NOT enqueue a second wake invocation (verified by `wake_dispatched_at` UPDATE-RETURNING semantics).
+  3. A `kill -9` of the worker between the wake-enqueue's commit and RQ enqueue is recovered on startup — the reconciler re-enqueues the pre-assigned `job_id`.
+  4. Each terminal workflow has a non-null `WorkflowRun.outcome` (`AddRecipeOutcome` JSON, < 300 bytes) written by the deterministic `finalize-outcome` step; the dashboard renders a compact outcome summary.
+  5. The wake agent receives a `WakeInvocationInput` with the previous invocation id and list of `WorkflowOutcome` summaries.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 21: Tool-surface flip + remove acknowledge/notify
+**Goal**: Robotina speaks via explicit `respond()`/`terminate()` tools and dispatches N workflows per turn; the legacy `acknowledge-add-recipe` agent and `notify` workflow step are gone.
+**Depends on**: Phase 20
+**Requirements**: TOOLS-01, TOOLS-02, TOOLS-03, TOOLS-04, TOOLS-05, DASH-11, EXP-05
+**Success Criteria** (what must be TRUE):
+  1. Single-recipe happy path: "agregá lentejas" → Robotina `respond()`s pre-batch → workflow drains → wake invocation `respond()`s post-batch with recipe link → `terminate()`s. No final-AI-message-content leakage to the user.
+  2. `StartWorkflowTool` accepts N calls per turn with `{workflow_type, input}` schema; `return_direct=False`; `invocation_id` is constructor-injected (not mutable state).
+  3. `grep -r "acknowledge-add-recipe" src/ tests/ overrides/ experiments/` returns zero hits; AGENT_REGISTRY ↔ `overrides/*.json` CI guard fails the build if they drift.
+  4. `notify` workflow step is removed from the add-recipe definition; dashboard task-type label map updated (Spanish labels for new types, removed labels for retired ones); no template regression.
+  5. `experiments/acknowledge_add_recipe.py` and its `[project.scripts]` entry are removed; documentation updated.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 22: Multi-recipe per message (Topic 1)
+**Goal**: A single user message naming up to 5 recipes results in N parallel add-recipe workflows and one consolidated final reply summarizing each outcome.
+**Depends on**: Phase 21
+**Requirements**: BATCH-01, BATCH-02, BATCH-03, BATCH-04, BATCH-05
+**Success Criteria** (what must be TRUE):
+  1. "agregá canelones, pollo al horno y arroz pilaf" produces 3 `RobotinaInvocation`-linked WorkflowRuns and a single pre-batch `respond()` acknowledging all three.
+  2. After all 3 workflows reach terminal status, the wake-invocation reply summarizes each (success: name+slug; failure: brief reason) in user-input order, in one Telegram message.
+  3. A partial-failure batch ("2 listos, canelones falló: …") reports cleanly — no silent drops, no all-or-nothing.
+  4. A request with > 5 recipes is handled per the prompt's soft cap (asks the user to split, or proceeds with first 5 and notes the cap).
+**Plans**: TBD
+
+### Phase 23: URL ingestion (Topic 2)
+**Goal**: A user can paste a recipe URL and have Robotina save that exact recipe, with SSRF/abuse defenses around every URL fetch.
+**Depends on**: Phase 22
+**Requirements**: URL-01, URL-02, URL-03, URL-04, URL-05, URL-06, EXP-02
+**Success Criteria** (what must be TRUE):
+  1. `safe_fetch` (the FIRST commit in this phase) rejects all SSRF/abuse vectors in a dedicated test suite: non-HTTPS scheme, RFC1918/loopback/link-local IPs, redirect-chain to internal IP, content-length > 5 MB, content-type/magic-byte mismatch.
+  2. "agregá esta receta: https://example/x" routes through `add-recipe-from-url` workflow; `gather-from-url` extracts structured RecipeData via `recipe-scrapers` (`wild_mode=True`) with per-field try/except; downstream steps (instructions/ingredients/metadata/recipe-image/recipe-load) are unchanged.
+  3. When `recipe-scrapers` returns insufficient data, the LLM fallback agent re-extracts from raw HTML using the same `RecipeData` schema.
+  4. A 20-URL Spanish-recipe-blog eval set runs and achieves ≥85% field-level success at v1.1 ship; results documented.
+  5. `uv run experiments.gather_from_url` exercises the pipeline end-to-end with LangWatch traces tagged to the experiment.
+**Plans**: TBD
+
+### Phase 24: Recipe images (Topic 3)
+**Goal**: Saved recipes have an associated image when one can be acquired; image acquisition failure never blocks recipe save.
+**Depends on**: Phase 23 (`safe_fetch` reused)
+**Requirements**: IMG-01, IMG-02, IMG-03, IMG-04, IMG-05, IMG-06, EXP-01, EXP-03, EXP-04, EXP-06
+**Success Criteria** (what must be TRUE):
+  1. The add-recipe pipeline (both query and URL variants) inserts a `recipe-image` step between metadata and `recipe-load` that produces an `image_url` (or empty/sentinel on miss).
+  2. The image fallback ladder works: source-page image (recipe-scrapers `.image()`) on URL-sourced inputs → Tavily image search (`include_images=True`) otherwise → mark missing.
+  3. The new per-step non-fatal-failure runner capability is declared on `recipe-image`: failure writes a structured "unavailable" artifact and advances the workflow; the recipe still saves; `WorkflowRun.outcome.image_present=False` records the gap.
+  4. The image URL is validated via `safe_fetch` before persist (re-uses Phase 23's SSRF defenses); persisted to the household-manager API per the storage strategy decided at planning time.
+  5. `uv run experiments.recipe_image` exercises Tavily image search + source-page fallback with LangWatch traces; `experiments.robotina_wake` exercises wake-context Robotina iteration; existing experiment scripts (recipe_research, recipe_load) still run unchanged thanks to default source discriminators; `pyproject.toml` and CLAUDE.md experiment list reflect the new entry points.
+**Plans**: TBD
 
 ## Progress
 
-| Phase                                            | Milestone | Plans | Status   | Completed  |
-| ------------------------------------------------ | --------- | ----- | -------- | ---------- |
-| 1. Developer Tooling and Infrastructure          | v1.0      | 3/3   | Complete | 2026-03-25 |
-| 2. Database Models and Queue Layer               | v1.0      | 3/3   | Complete | 2026-03-25 |
-| 3. Gateway                                       | v1.0      | 3/3   | Complete | 2026-03-26 |
-| 4. LLM Module and Agent Infrastructure           | v1.0      | 6/6   | Complete | 2026-03-27 |
-| 5. Task Runner and Workflow Engine               | v1.0      | 5/5   | Complete | 2026-03-27 |
-| 6. send-notification Agent                       | v1.0      | 4/4   | Complete | 2026-03-27 |
-| 7. handle-incoming-message Agent                 | v1.0      | 4/4   | Complete | 2026-03-27 |
-| 07.1. Deterministic Agent Termination (INSERTED) | v1.0      | 3/3   | Complete | 2026-03-30 |
-| 8. recipe-research Agent                         | v1.0      | 4/4   | Complete | 2026-03-30 |
-| 9. recipe-load Agent and End-to-End Integration  | v1.0      | 2/2   | Complete | 2026-05-12 |
-| 10. LangChain 1.x Agent API Migration            | v1.0      | 3/3   | Complete | 2026-05-13 |
-| 11. Structured Agent Output via response_format  | v1.0      | 4/4   | Complete | 2026-05-13 |
-| 12. Middleware-Based Agent Instrumentation       | v1.0      | 2/2   | Complete | 2026-05-14 |
-| 13. Queue Visibility Dashboard                   | v1.0      | 3/3   | Complete | 2026-05-14 |
-| 14. Prompt Cleanup and Structural Standardization| v1.0      | 8/8   | Complete | 2026-05-14 |
-| 15. Recipe Artifact Accumulation                 | v1.0      | 6/6   | Complete | 2026-05-15 |
-| 16. household_id propagation fix                 | v1.0      | 7/7   | Complete | 2026-05-15 |
+| Phase                                                | Milestone | Plans | Status      | Completed  |
+| ---------------------------------------------------- | --------- | ----- | ----------- | ---------- |
+| 1. Developer Tooling and Infrastructure              | v1.0      | 3/3   | Complete    | 2026-03-25 |
+| 2. Database Models and Queue Layer                   | v1.0      | 3/3   | Complete    | 2026-03-25 |
+| 3. Gateway                                           | v1.0      | 3/3   | Complete    | 2026-03-26 |
+| 4. LLM Module and Agent Infrastructure               | v1.0      | 6/6   | Complete    | 2026-03-27 |
+| 5. Task Runner and Workflow Engine                   | v1.0      | 5/5   | Complete    | 2026-03-27 |
+| 6. send-notification Agent                           | v1.0      | 4/4   | Complete    | 2026-03-27 |
+| 7. handle-incoming-message Agent                     | v1.0      | 4/4   | Complete    | 2026-03-27 |
+| 07.1. Deterministic Agent Termination (INSERTED)     | v1.0      | 3/3   | Complete    | 2026-03-30 |
+| 8. recipe-research Agent                             | v1.0      | 4/4   | Complete    | 2026-03-30 |
+| 9. recipe-load Agent and End-to-End Integration      | v1.0      | 2/2   | Complete    | 2026-05-12 |
+| 10. LangChain 1.x Agent API Migration                | v1.0      | 3/3   | Complete    | 2026-05-13 |
+| 11. Structured Agent Output via response_format      | v1.0      | 4/4   | Complete    | 2026-05-13 |
+| 12. Middleware-Based Agent Instrumentation           | v1.0      | 2/2   | Complete    | 2026-05-14 |
+| 13. Queue Visibility Dashboard                       | v1.0      | 3/3   | Complete    | 2026-05-14 |
+| 14. Prompt Cleanup and Structural Standardization    | v1.0      | 8/8   | Complete    | 2026-05-14 |
+| 15. Recipe Artifact Accumulation                     | v1.0      | 6/6   | Complete    | 2026-05-15 |
+| 16. household_id propagation fix                     | v1.0      | 7/7   | Complete    | 2026-05-15 |
+| 17. Conversation FK closure                          | v1.1      | 0/0   | Not started | —          |
+| 18. RobotinaInvocation entity                        | v1.1      | 0/0   | Not started | —          |
+| 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
+| 20. Wake rule + outcome plumbing                     | v1.1      | 0/0   | Not started | —          |
+| 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
+| 22. Multi-recipe per message                         | v1.1      | 0/0   | Not started | —          |
+| 23. URL ingestion                                    | v1.1      | 0/0   | Not started | —          |
+| 24. Recipe images                                    | v1.1      | 0/0   | Not started | —          |
 
 ## Backlog
 
@@ -70,7 +178,7 @@ Unsequenced ideas that aren't ready for active planning. Promote with `/gsd-revi
 
 **Goal:** Lift `reply_context: ReplyContext` and `household_id: str` from per-task `*Input` Pydantic models into a typed `AgentState` schema passed to `create_agent(state_schema=...)`. Tools access these via `InjectedState` rather than runtime kwargs. The job dispatcher in `run_task()` (`src/robotina/queue/jobs.py`) maps `WorkflowRun.shared_context` -> agent state at invocation time.
 
-**Why this is a backlog item, not an active phase:** This refactor changes the contract between the workflow runner / job dispatcher and the agent -- a meaningful structural shift. Real ergonomic value (removes the "thread `household_id` through every `*Input` model and every tool signature" plumbing) but no current production pain forces it. Adding new ambient fields today is annoying-but-rare, not blocking.
+**Why this is a backlog item, not an active phase:** This refactor changes the contract between the workflow runner / job dispatcher and the agent -- a meaningful structural shift. Real ergonomic value (removes the "thread `household_id` through every `*Input` model and every tool signature" plumbing) but no current production pain forces it. Adding new ambient fields today is annoying-but-rare, not blocking. v1.1's FK closure (Phase 17) reduces but does not eliminate the threading pressure.
 
 **Requirements:** TBD
 
@@ -89,4 +197,3 @@ Unsequenced ideas that aren't ready for active planning. Promote with `/gsd-revi
 
 Plans:
 - [ ] TBD (promote with /gsd-review-backlog when ready)
-

@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
-status: planning
-stopped_at: Milestone v1.1 started — defining requirements
-last_updated: "2026-05-18T19:00:00.000Z"
-last_activity: 2026-05-18 — Milestone v1.1 started (workflows abstraction refinement)
+status: roadmap_complete
+stopped_at: Roadmap planning complete (Phases 17–24); ready to plan Phase 17
+last_updated: "2026-05-18T22:00:00.000Z"
+last_activity: 2026-05-18 — Roadmap for v1.1 created (8 phases, 46 requirements mapped, Phase 17 next)
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 17 — Conversation FK closure (not started; first phase of v1.1)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-18 — Milestone v1.1 started
+Status: Roadmap complete; awaiting `/gsd:plan-phase 17`
+Last activity: 2026-05-18 — Roadmap for v1.1 published (Phases 17–24; 46/46 requirements mapped)
 
 ## Performance Metrics
 
@@ -117,6 +117,15 @@ Last activity: 2026-05-18 — Milestone v1.1 started
 - Phase 15 added: Recipe artifact accumulation and food/unit validation
 - Phase 16 added: Fix empty-string household_id propagation through gateway and workflow_run
 - Phase 17 added: as a user I want to ask the agent to add a recipe based on a link I share
+- v1.1 roadmap published 2026-05-18: Phases 17–24 (8 phases, 46 requirements). Numbering continues from v1.0 close (Phase 16). Decimal 07.1 + backlog 999.1 preserved.
+- Phase 17 (Conversation FK closure): foundation — three-step Alembic for `WorkflowRun.conversation_id`. ARCH-01, ARCH-05.
+- Phase 18 (RobotinaInvocation entity): additive entity + FK + dashboard surfacing. ARCH-02/03/04, DASH-13, DASH-14.
+- Phase 19 (LLM multi-call smoke test): LOAD-BEARING standalone experiment; gates Phases 20–24. EVAL-01/02/03.
+- Phase 20 (Wake rule + outcome plumbing): new control loop + `AddRecipeOutcome` + reconciler. WAKE-01..05, DASH-10, DASH-12.
+- Phase 21 (Tool-surface flip): respond/terminate/multi-call start-workflow; deletes acknowledge-add-recipe + notify step. TOOLS-01..05, DASH-11, EXP-05.
+- Phase 22 (Multi-recipe per message): prompt-only after Phase 21. BATCH-01..05.
+- Phase 23 (URL ingestion): safe_fetch FIRST commit; recipe-scrapers + LLM fallback. URL-01..06, EXP-02.
+- Phase 24 (Recipe images): non-fatal-step runner capability; Tavily image search. IMG-01..06, EXP-01/03/04/06.
 
 ### Decisions
 
@@ -264,11 +273,13 @@ None yet.
 
 Last activity: 2026-05-18
 
-Last session: 2026-05-15T19:06:59.744Z
-Stopped at: Completed 16-05-PLAN.md (Wave 1 gateway dual-guard)
+Last session: 2026-05-18T22:00:00.000Z
+Stopped at: v1.1 roadmap published (Phases 17–24); Phase 17 (Conversation FK closure) is next
 Resume file: 
-None
+.planning/ROADMAP.md (Phase 17 detail)
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 17 with `/gsd:plan-phase 17`
+- Phase 17 is the three-step Alembic for `WorkflowRun.conversation_id` — staging soak before prod
+- Note: Phase 19 (LLM multi-call smoke test) is load-bearing; its evidence gates Phases 20–24
