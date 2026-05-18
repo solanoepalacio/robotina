@@ -1,193 +1,401 @@
-# Pitfalls Research
+# Pitfalls Research — Milestone v1.1 Workflows Abstraction Refinement
 
-**Domain:** Python LangChain agent with RQ task queue, multi-step workflow orchestration, Postgres state, Telegram gateway, LangWatch observability
-**Researched:** 2026-03-25
-**Confidence:** HIGH (spec-driven analysis) / MEDIUM (library-specific behaviors from domain knowledge)
+**Domain:** Python/LangChain agent + RQ workflow runner refactor + 3 new features (multi-recipe, URL ingestion, images)
+**Researched:** 2026-05-18
+**Confidence:** HIGH on architecture/refactor pitfalls (read the codebase directly); MEDIUM on LangChain 1.x `create_agent` post–`return_direct=False` behavior (verified via LangChain forum/docs but exact ToolNode parallelism semantics need a smoke test in Phase 02 before locking the prompt); MEDIUM-LOW on third-party library specifics (`recipe-scrapers` wild-mode failure surface, image-search provider quirks).
+
+## Orientation
+
+This milestone is a **substantive refactor of a working system**, not a greenfield build. The existing system has carefully-earned guarantees that the new design must preserve:
+
+- **Transactional advancement** (D-07): job_id pre-assigned BEFORE commit, so a worker crash between commit and enqueue is recoverable. Any new "enqueue next Robotina invocation" path must follow the same rule.
+- **AOF `appendfsync always` + `result_ttl=-1` / `failure_ttl=-1`**: no tasks lost on crash. The wake-rule enqueue must inherit these.
+- **Concurrency=1 sequential worker**: removes most contention but does NOT remove the failed-registry / manual-retry path that this research must protect.
+- **D-16 SPEC-locked `failure_reason` format**: `f"{type(exc).__name__}: {exc}"`. Any new fields on WorkflowRun must avoid silently leaking sensitive content (see WR-02 cap at 500 chars in `workflow_runner.py`).
+- **Phase 11 structured output guarantee**: every artifact-producing agent has `response_format=PydanticModel`. The new `gather-from-url` and `recipe-image` steps must inherit this.
+- **Phase 16 four-layer `household_id` validation**: gateway, Pydantic, tool constructor, `queue_workflow`. New entry points (RobotinaInvocation, `respond()` tool) need the same defense in depth.
+
+Every pitfall below ties to one or more of these.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: RQ Job Arguments Must Be Pickle-Serializable — Pydantic Models Are Not Automatically Safe
+### Pitfall 1: Wake-rule double-fire on the failed-registry / manual-retry path
 
 **What goes wrong:**
-RQ serializes job arguments using Python's `pickle` by default. Pydantic v2 models are generally picklable, but the serialization breaks silently when arguments contain: lambda functions, database session objects, open file handles, or objects that hold references to unpicklable attributes. The spec passes `build_input` as a `Callable` on `WorkflowStepDef` — if this callable is a lambda defined in a module-level dict, it serializes fine. But if any tool or agent object is accidentally included in job args, the worker will fail with a `PicklingError` that only surfaces at enqueue time, not at definition time.
+The rule is "when all workflows linked to a `RobotinaInvocation` reach terminal status, enqueue the next Robotina invocation." Under concurrency=1, two workflows cannot finish at the same instant — but a workflow can transition to `FAILED` *and later* be manually requeued from RQ's `FailedJobRegistry` (the project's intentional retry path). The wake-check fires on the original failure transition (all-terminal = true, invocation N+1 enqueued). The manual retry then runs the step, eventually moves the workflow back to terminal, and re-fires the wake check → **invocation N+1 is enqueued a second time**. Robotina runs twice on stale outcome context, may double-respond to the user, may double-dispatch chained workflows.
+
+A subtler variant: the same step can be retried directly (a developer requeues `run_task` without changing the WorkflowRun status). The completion hook fires `on_step_complete` again on a workflow that's already DONE, and if the all-terminal check is naive (`SELECT … WHERE NOT terminal`), it'll re-fire the wake.
 
 **Why it happens:**
-Developers enqueue tasks passing rich objects (SQLAlchemy model instances, entire config objects) instead of plain serializable inputs. The gateway code fetches a `Conversation` ORM object and then passes it directly into job args instead of serializing it to a Pydantic model first.
+The mental model "concurrency=1 means no races" hides the fact that "terminal status" is not the same as "first time we observed all-terminal." Idempotency is not the worker's job — it's the wake-rule's.
 
 **How to avoid:**
-- Job function signatures must accept only Pydantic model instances or plain Python primitives (`str`, `int`, `dict`, `list`).
-- Never pass SQLAlchemy ORM instances, database sessions, or connection objects as RQ job args.
-- Serialize to `.model_dump()` at the call site and deserialize with `Model.model_validate()` inside the job function.
-- Use RQ's `serializer` parameter to switch to JSON if strict safety is required — this makes serialization failures explicit and immediate instead of hidden.
-- Write a test that enqueues every task type and verifies the job reaches `queued` status without errors.
+- Add a column on `RobotinaInvocation`: `wake_dispatched_at TIMESTAMPTZ NULL`. Wake logic is `UPDATE RobotinaInvocation SET wake_dispatched_at = NOW() WHERE id = :id AND wake_dispatched_at IS NULL RETURNING id` — wrapped in the same SQLAlchemy session/transaction that observes all-terminal. If the UPDATE affects 0 rows, the wake already fired; skip the enqueue. This is a Postgres-row-level guard, not an in-memory check — it survives worker crashes and double completions.
+- Pre-assign the next invocation's `job_id` BEFORE commit (mirror D-07): write `RobotinaInvocation` row with `job_id` set, commit, then enqueue. If enqueue fails after commit, a startup reconciler can find rows with `wake_dispatched_at IS NOT NULL` but no matching RQ job and either re-enqueue or alert.
+- Make `on_step_complete` and `on_step_failed` both call the same `_check_and_dispatch_wake(invocation_id, session)` helper. Currently `on_step_complete` only marks RUN done; `on_step_failed` only marks RUN failed. Both terminal transitions need the wake check, and the helper has to be ONE function so the guard is one place.
 
 **Warning signs:**
-- `PicklingError` or `AttributeError: Can't pickle` in RQ worker logs at job enqueue time.
-- Jobs enter `failed` state immediately without ever reaching `started`.
-- Unit tests pass but integration tests (with a real Redis) fail.
+- Dashboard shows two RobotinaInvocations with the same `triggered_by_completion_of` and back-to-back timestamps.
+- User receives two replies for one batch.
+- Manual retry of a failed workflow produces a "ghost" Robotina turn that responds to outcomes it has already seen.
 
-**Phase to address:** Queue infrastructure phase (before any agent work begins). All task input/output Pydantic models must be tested for round-trip serialization before the first agent is wired up.
+**Phase to address:** RobotinaInvocation + wake-rule phase (early). The guard must land in the same PR as the wake-rule itself, not as a follow-up.
 
 ---
 
-### Pitfall 2: Workflow Advancement Race Between Task Completion and Next-Step Enqueueing
+### Pitfall 2: Wake check runs against stale read inside a serializable race
 
 **What goes wrong:**
-The task runner must: (1) write `WorkflowRunStep.artifact`, (2) mark the step `DONE`, (3) build the next step's input, (4) enqueue the next RQ job, and (5) write the new `task_job_id` to `WorkflowRunStep` — all atomically. If the process crashes between steps 4 and 5, the next job is running in RQ but the `WorkflowRunStep` has no `task_job_id`, so when that job completes the task runner cannot link it back to its workflow step. Subsequent advancement fails silently.
+Even within one process under concurrency=1, the SQL "are all sibling workflows terminal?" check can return the wrong answer if executed against a session view that hasn't observed the current step's own status write. The sequence:
+
+1. `on_step_complete` writes `WorkflowRun.status = DONE` and `session.flush()`.
+2. Wake check `SELECT COUNT(*) FROM workflow_run WHERE triggered_by_invocation_id = :id AND status NOT IN ('done', 'failed')` — must see the row we just flushed as DONE.
+
+With SQLAlchemy 2.x default session behavior and the same session, this works. But if the wake check is factored into a separate function that opens its own `SessionLocal()` (a tempting symmetry with `StartWorkflowTool._run`), the new session can run before the outer transaction commits, miss the DONE row, count it as non-terminal, and skip the wake. Now the chain is stuck — no further Robotina invocation will ever fire because the next terminal transition isn't going to happen.
 
 **Why it happens:**
-The natural implementation writes to Postgres and enqueues to Redis as two separate operations with no transaction boundary around them. Developers assume they are "close enough" in time to be safe.
+The current codebase has a strong pattern of "open your own session" (StartWorkflowTool does it). Reusing that pattern for the wake check looks like consistency but is wrong here — the wake-check MUST be inside the same transaction that performed the terminal transition.
 
 **How to avoid:**
-- Enqueue the next RQ job *before* committing the Postgres transaction. Use RQ's `job_id` parameter to pre-assign a deterministic or UUIDbased job ID. Write that ID to `WorkflowRunStep.task_job_id` in the same Postgres commit. If the commit fails, the enqueued job is orphaned in Redis but the workflow row is consistent and can be re-advanced.
-- Alternatively: use a database-side outbox pattern — write the "enqueue next step" intent to a Postgres table row, commit, then have a separate thread poll the outbox and enqueue. For concurrency=1 sequential processing, the simpler approach (pre-assign job ID, commit atomically) is sufficient.
-- Never commit `DONE` state to a step without also having already written `task_job_id` to the next step.
+- Wake check is a function that takes the **existing session** as an argument (mirror `queue_workflow(..., session)` in `workflow_runner.py`). Caller is the completion hook, which already has a session.
+- Commit ONCE at the end of `on_step_complete` / `on_step_failed`, AFTER both the status write and the wake check + invocation enqueue.
+- Write a regression test that uses `freezegun` or in-test mocks to verify the wake check observes the just-written status.
 
 **Warning signs:**
-- Workflow runs stuck in `RUNNING` with the last step `DONE` but no subsequent step enqueued.
-- `WorkflowRunStep.task_job_id` is `NULL` for a step that has an RQ job in the queue.
-- Workflows only fail during testing when a debugger or slow I/O is introduced between Postgres and Redis operations.
+- A chain hangs: Robotina dispatches 1 workflow, workflow completes successfully, but no further invocation fires.
+- Logs show "Workflow complete" but no "Wake dispatched" line for that invocation.
 
-**Phase to address:** Workflow infrastructure phase. Transactional advancement logic must be implemented and integration-tested before any workflow-dependent agent is built.
+**Phase to address:** Same phase as Pitfall 1 (RobotinaInvocation + wake-rule).
 
 ---
 
-### Pitfall 3: LangChain Tool Exceptions Swallowed by the Agent Loop
+### Pitfall 3: Migration backfill of `WorkflowRun.conversation_id` is non-trivial — `shared_context.reply_context.chat_id` is per-platform
 
 **What goes wrong:**
-When a LangChain tool raises an exception, the default behavior of `create_react_agent` (LangGraph) is to catch the exception and return its string representation as a tool observation. This means: a `401 Unauthorized` from the household-manager API becomes an agent observation saying "Error: 401 Unauthorized", and the agent proceeds to retry or hallucinate a workaround. For hard errors (auth failure, network down) the agent should abort — instead it spins in a retry loop burning LLM tokens, potentially exhausting max_iterations and leaving the job in a non-recoverable state without a clear error.
+The migration plan says: "Backfill `conversation_id` for existing rows from `shared_context.reply_context.chat_id` + platform." That sounds clean, but:
+
+1. `shared_context` is a JSON column — Alembic generates SQL, and JSON path extraction differs between dev/staging/prod Postgres versions and is verbose in raw SQL (`shared_context->'reply_context'->>'chat_id'`).
+2. `Conversation` is keyed on `(platform, chat_id)`. If two `chat_id` values collide across platforms (unlikely but possible — Telegram chat_ids are large ints; the next platform might recycle smaller IDs), naive backfill creates orphan FKs.
+3. The current codebase still has live `acknowledge-add-recipe` workflows that may be **in-flight** during deploy. Backfilling them mid-run will silently move them to a Conversation row that may not be the one the workflow originally targeted (because `Conversation.id` may have been recreated since).
+4. Some pre-Phase-16 historical rows may have `household_id = ""` or `reply_context = {}` — backfill must handle these (skip with logging, not crash the migration).
 
 **Why it happens:**
-Developers write tools that raise `Exception` and assume this will stop the agent. LangGraph's tool executor intercepts exceptions unless the tool is configured with `handle_tool_error=False` or the exception is re-raised as a specific interrupt type.
+JSON-glue migrations look superficially like "just an UPDATE" but the data shape is heterogeneous over time. Phases 1–16 evolved `shared_context` schema implicitly; older rows may not match what the migration assumes.
 
 **How to avoid:**
-- For the `household-manager-api` tool, a `401` or `403` response must raise an exception that bypasses the agent loop, not return a string error. Use LangChain's `ToolException` with `handle_tool_error=False` on the tool definition, or raise a Python exception that propagates past the agent executor entirely. The spec explicitly states: "A `401` or `403` response is unrecoverable and must raise a hard error."
-- Define two exception categories: **recoverable** (e.g. rate limit, transient HTTP 500) which return a string observation to let the agent retry, and **unrecoverable** (auth failure, missing resource, schema mismatch) which raise and abort the job.
-- Set a `max_iterations` cap on the agent (e.g. 10) to prevent infinite retry loops even for recoverable errors.
-- Log all tool exceptions at `ERROR` level before deciding to surface or swallow them.
+- Make the new FK columns NULLABLE on first migration. Backfill in a **separate data migration** (Alembic op or a one-off script), not in the schema migration. Schema-only migration runs in seconds; data migration can be replayed.
+- Block deploy if `WORKFLOWS_IN_FLIGHT > 0`: a pre-deploy check that counts WorkflowRuns where `status IN ('pending', 'running')`. Wait for drain or fail loud.
+- For unresolvable rows (no `reply_context` in `shared_context`, or platform+chat_id doesn't match any Conversation), insert a synthetic Conversation row OR leave `conversation_id NULL` and add a code path that tolerates NULL for historical-only reads.
+- Test the migration against a snapshot of the staging DB before running on production. The `docker-compose.yml` Postgres makes this cheap.
 
 **Warning signs:**
-- Agent logs show repeated identical tool calls with the same parameters.
-- LangWatch traces show many tool calls for a single job that should have completed in 2-3.
-- Jobs finish with `success` status but the actual household operation was never performed.
+- Migration takes more than a few seconds (likely a JSON scan or missing index).
+- Post-migration query for `SELECT COUNT(*) FROM workflow_run WHERE conversation_id IS NULL AND status = 'done'` returns > 0 (orphans).
+- New code path that reads `WorkflowRun.conversation_id` crashes on a NULL it didn't expect.
 
-**Phase to address:** Agent infrastructure phase. Tool error handling policy must be established in the base tool wrappers before any domain tool (`household-manager-api`, `web-search`) is implemented.
+**Phase to address:** Schema migration phase (first phase of the refactor — must precede new code that depends on FKs).
 
 ---
 
-### Pitfall 4: LangWatch Trace Context Lost Across RQ Job Boundaries
+### Pitfall 4: `return_direct=True` removal lets LLM text leak into the assistant message
 
 **What goes wrong:**
-LangWatch uses OpenTelemetry to propagate trace context. When an agent runs inside an RQ worker, the OTel span context is NOT automatically propagated from the enqueuing process to the worker process. Each RQ job starts a new OTel context, creating orphaned traces that are not linked to the originating request. The Telegram message → handle-incoming-message → recipe-research → recipe-load → send-notification chain appears as five disconnected traces in LangWatch rather than one correlated session.
+Currently `StartWorkflowTool.return_direct=True` makes the graph terminate the instant the tool runs — no further model call, no AI text rendered. With `return_direct` removed and N parallel `start-workflow` tool calls allowed, the LangChain 1.x `create_agent` ReAct loop continues until the model emits an AI message with NO tool calls — that final AI message's `content` becomes the "user-facing" output by default ([LangChain agents docs](https://docs.langchain.com/oss/python/langchain/agents)).
+
+Robotina is now responsible for messaging via the **explicit `respond()` tool**. But:
+- The LLM may emit a final text turn AFTER the `respond()` calls ("OK, I started 3 workflows") that the user never sees because we're not piping the final AI content anywhere — and we **shouldn't**, because we have explicit `respond()`. But if we ARE consuming `result["messages"][-1].content`, that text now leaks.
+- Conversely, if Robotina mis-uses `terminate()` and never calls `respond()`, the user gets silence after a multi-recipe request because no agent message reached the gateway.
 
 **Why it happens:**
-OTel trace propagation relies on context managers that live in process memory. Cross-process boundaries (Telegram gateway → RQ worker → next RQ worker) require explicit serialization of the trace context (W3C `traceparent` header format) and injection into the job payload. Developers instrument each agent individually but miss the propagation linkage.
+The Phase 11 `_extract_task_output` path in `workflow_runner.py` already strictly rejects free-text final messages — but Robotina is the one agent without `response_format` bound (it's conversational, not artifact-producing). The current `handle-incoming-message` task type is the legacy free-text path that Phase 11 grandfathered (`expects_structured=False`). Once Robotina emits text post-tool-calls, that path silently consumes it.
 
 **How to avoid:**
-- Serialize the current OTel trace context (`W3C traceparent`) into every task's input model or as a job metadata field when enqueuing. At job start, extract and restore the parent trace context before creating the child span.
-- For experiment runs: start a fresh trace root span at the experiment entry point and instrument from there — no propagation needed.
-- Store `workflow_run_id` as a trace attribute on every span within a workflow. Even without parent-child linkage, all spans with the same `workflow_run_id` can be correlated in LangWatch.
-- Use LangWatch's native session/thread ID feature to group traces by `workflow_run_id` or `conversation_id`.
+- Robotina's agent loop must NOT have its final AI message content forwarded to the user. Make `respond()` the **only** user-visible channel. The agent's final AI message (if any) is treated as internal scratchpad — log it for debugging, do not deliver it.
+- Add an explicit `terminate()` tool (in the milestone description). Make it `return_direct=True` — that's the engine-enforced termination point. After `terminate()`, the loop ends; any text the model wrote in the same AI message as the `terminate()` call is ignored.
+- Update the Robotina prompt's Output rule to: "All user-facing messages MUST go through `respond()`. After your last tool call, call `terminate()`. Do not write user-facing text in your final assistant message."
+- Smoke test: invoke the agent with a prompt that tends to produce trailing text ("explain what you're doing"). Verify trailing text never reaches the user.
 
 **Warning signs:**
-- LangWatch shows traces for individual agents but no higher-level view of a full workflow run.
-- Trace durations look short (missing the full agent reasoning chain) because the parent span context was never propagated.
-- Experiment script traces appear in the wrong LangWatch project collection.
+- User receives a message they didn't expect, content matches Robotina's "thinking" tone.
+- Telegram message appears AFTER the "all workflows done" reply.
+- `respond()` tool call count != number of messages delivered to Telegram.
 
-**Phase to address:** Agent infrastructure and observability phase. Trace propagation strategy must be decided before the first multi-agent workflow is wired up. Retroactively adding it requires changes to all task input models.
+**Phase to address:** `respond()` + `terminate()` tools + Robotina prompt rewrite phase.
 
 ---
 
-### Pitfall 5: Telegram Bot Receives Duplicate Webhooks Under Load or Reconnect
+### Pitfall 5: `create_agent` does not let us disable parallel tool calls — multi `start-workflow` ordering is provider-dependent
 
 **What goes wrong:**
-Telegram's webhook delivery does not guarantee exactly-once delivery. On reconnect, network timeout, or if the gateway returns a non-200 response, Telegram will retry the webhook. The gateway will persist the message and enqueue a `handle-incoming-message` task twice. The agent will process the same user message twice, potentially creating duplicate recipes or sending duplicate replies.
+Multi-recipe means Robotina is expected to emit N `start-workflow` tool calls per turn. LangChain's `create_agent` runs tools through `ToolNode`, which executes all tool calls in a single AI message either in parallel (where the model emitted parallel) or sequentially. **`create_agent` does NOT expose `parallel_tool_calls=False`** — there's an open issue ([langchain-ai/langchain#34010](https://github.com/langchain-ai/langchain/issues/34010)) and the workaround is to hand-build the agent with LangGraph, which would cost us the middleware (Phase 12) and `response_format` (Phase 11) wins.
+
+Implications for us:
+- If the provider emits parallel tool calls (OpenAI does by default; Anthropic does; Ollama varies), all N `start-workflow` invocations run concurrently from `ToolNode`'s perspective. Each opens its own `SessionLocal()` (see `StartWorkflowTool._run`) — so we get N concurrent Postgres transactions, N concurrent `queue.enqueue` calls.
+- The new RobotinaInvocation row needs all N WorkflowRuns to point to it. If `respond()` creates the invocation lazily or if the linkage is "current invocation in a context var," concurrency inside the same Python process across tool calls can race.
+- Ordering is not guaranteed. The workflows may not enqueue in user-uttered order. For Topic 1 (multi-recipe), this is acceptable; for any future "ordered batch" use case it's not.
 
 **Why it happens:**
-Developers implement the webhook handler without idempotency checks, relying on Telegram's best-effort deduplication. The `StoredMessage.platform_message_id` unique constraint exists in the spec, but it is only used when inserting the message — not checked before enqueueing the task.
+The shift from `return_direct=True` (one call, terminate) to "N calls, no termination" exposes `ToolNode`'s parallel execution semantics that the previous architecture hid.
 
 **How to avoid:**
-- Use `platform_message_id` as an idempotency key at the enqueue step, not just for storage. Before calling `queue.enqueue(handle-incoming-message)`, check whether a job with this `message_id` was already enqueued or completed (via RQ job ID stored against `platform_message_id`, or by checking `StoredMessage.created_at` vs just-inserted).
-- In the gateway webhook handler: use a database `INSERT ... ON CONFLICT DO NOTHING` with `RETURNING` — if no row is returned, the message was already processed; skip enqueue and return 200 to Telegram immediately.
-- Never return a non-200 response to Telegram unless the request is fundamentally malformed. Return 200 even on internal errors; let the task queue handle retries asynchronously. A non-200 will trigger Telegram to re-deliver.
+- **Make `StartWorkflowTool._run` idempotent and self-contained**: each call opens its own session, creates exactly one WorkflowRun, commits. Concurrent calls within the same turn are independent transactions on independent rows. This is already roughly what the code does — keep it that way and DO NOT add a "current invocation" mutable in the tool.
+- The `RobotinaInvocation.id` MUST be passed into the tool at construction time (via the same path that injects `chat_id` / `household_id` today). Then it's a constructor field, not mutable shared state. The tool writes `workflow_run.triggered_by_invocation_id = self.invocation_id` — concurrent calls all use the same constant.
+- If strict ordering of WorkflowRun rows ever matters (it doesn't for V1), wrap the N enqueues in a sequential loop by binding the provider parameter at the provider-adapter level (e.g. ChatOpenAI accepts `parallel_tool_calls=False` in `bind_tools`). This is a per-adapter customization, not a `create_agent` change.
+- Smoke test specifically the Ollama backend (used in development per CLAUDE.md): small local models are notably worse at emitting multiple coherent tool calls. Acceptance criterion: the dev backend can reliably do 3 recipes.
 
 **Warning signs:**
-- Duplicate `StoredMessage` insert attempts raising `UniqueViolation` in Postgres logs.
-- Two `handle-incoming-message` jobs in RQ with the same `message_id` in their input.
-- Users receiving duplicate replies to a single message.
+- N user-uttered recipes → fewer than N WorkflowRuns created.
+- WorkflowRuns created with `triggered_by_invocation_id` pointing to wrong invocation (off-by-one if there's mutable shared state).
+- Intermittent test failures when running multi-recipe scenarios — classic race smell.
 
-**Phase to address:** Gateway infrastructure phase. Idempotency must be built into the initial webhook handler design — it cannot be bolted on after the fact without risk of race conditions.
+**Phase to address:** `StartWorkflowTool` schema + injection refactor phase.
 
 ---
 
-### Pitfall 6: Alembic Autogenerate Misses SQLAlchemy Enum Type Changes
+### Pitfall 6: SSRF and resource-exhaustion via user-supplied URL — `recipe-scrapers` doesn't fetch, *we* do
 
 **What goes wrong:**
-When a `WorkflowStatus` or `WorkflowStepStatus` Python enum is modified (a new value added, a value renamed), `alembic revision --autogenerate` does NOT reliably detect the change to the underlying Postgres `ENUM` type. Alembic compares Python enum members with the Postgres type definition only in specific configurations. Without explicit Alembic `op.execute("ALTER TYPE ... ADD VALUE ...")` calls, the migration is silently incomplete. The application starts, but any row written with the new enum value will cause a `LookupError: <value> is not among the valid values` in SQLAlchemy.
+`recipe-scrapers` is **HTML-parser only** ([recipe-scrapers docs](https://docs.recipe-scrapers.com/)). The fetch is our code. A user pastes:
+- `http://169.254.169.254/latest/meta-data/...` — AWS instance metadata (if Robotina ever runs on EC2/ECS). Returns IAM creds.
+- `http://localhost:6379/...` — direct Redis access. Could exfiltrate other users' tasks or run commands.
+- `http://postgres:5432/...` — Compose-internal DB. Less exploitable but still wrong.
+- `http://[::1]/admin` — IPv6 loopback bypass.
+- `https://example.com/recipe` that 302s to `http://169.254.169.254/...` — redirect-chain SSRF.
+- A 5 GB HTML file — content-length bomb if we don't cap.
+- `application/octet-stream` declaring itself HTML in the body — content-type spoofing.
+- `gzip` bomb (Content-Encoding: gzip with 100:1 ratio expanding past memory).
+- Slow-read attack: server trickles bytes, holding our worker for minutes (concurrency=1 = total queue freeze).
+
+The dev environment runs `agent/gateway` on the host with Postgres/Redis in Docker (per memory `project_local_dev_setup.md`), so `localhost` exposure is real. Staging is containerized but on a shared network with backend services.
 
 **Why it happens:**
-Developers rely on autogenerate for all schema changes and assume that changing a Python `enum.Enum` class is reflected automatically in the migration. Alembic's PostgreSQL dialect does detect enum changes in recent versions, but only when `compare_type=True` is set in the `env.py` configuration — it defaults to `False`.
+"Just fetch the URL the user gave us" looks one-line. The defenses are dozens of lines.
 
 **How to avoid:**
-- Set `compare_type=True` in Alembic's `env.py` `configure()` call from the start of the project.
-- After autogenerating any migration touching enum types, manually inspect the generated migration script and verify that `op.execute("ALTER TYPE ...")` statements are present if enum members changed.
-- For adding enum values: `ALTER TYPE ... ADD VALUE` in Postgres cannot be run inside a transaction. Alembic migrations default to running inside a transaction. Any migration adding an enum value must use `op.execute("COMMIT")` before the `ALTER TYPE` statement and `op.execute("BEGIN")` after — or set `transactional_ddl = False` for that migration.
-- Treat enum additions as a two-migration process: first add the Postgres type value, then use it in application code.
+A `safe_fetch(url)` helper in a single module, used by `gather-from-url` and `recipe-image` (the only two places we follow user-controlled URLs):
+- **Scheme allowlist:** `https` only (or `http` only on explicit override flag for testing). Reject everything else.
+- **DNS resolve and IP check BEFORE the HTTP call:** resolve hostname, reject if any A/AAAA record is in RFC1918 (`10.0.0.0/8`, `172.16/12`, `192.168/16`), loopback (`127/8`, `::1`), link-local (`169.254/16`, `fe80::/10`), IPv4-mapped IPv6, `0.0.0.0`, multicast. Python: `ipaddress.ip_address(socket.gethostbyname(host)).is_private` etc.
+- **Disable redirects OR re-validate after each redirect:** `httpx.get(url, follow_redirects=False)`. If 3xx, re-run the IP check on the Location, then manually re-issue, cap at 3 hops.
+- **Caps:** `timeout=httpx.Timeout(connect=5, read=15, write=5, pool=5)`, `httpx.AsyncClient(limits=httpx.Limits(max_connections=2))`. Cap response: stream with `iter_bytes(chunk_size)` and abort if accumulated bytes > 5 MB. Reject `Content-Length` headers > 10 MB up front.
+- **Decompression cap:** if response is gzip/br, decompress incrementally with size cap; reject if ratio > 20:1.
+- **Content-Type sniff:** require `text/html` or `application/xhtml+xml` for `gather-from-url`. For images, require `image/*` AND verify magic bytes (PIL can open the first KB or use `imghdr`).
+- **No DNS rebinding window:** `httpx` re-resolves per call by default. If we ever pin the address, do `socket.getaddrinfo` → connect by IP → set `Host:` header — kills rebinding.
 
 **Warning signs:**
-- `alembic upgrade head` completes without error but the Postgres enum type definition does not match the Python enum.
-- `psycopg2.errors.InvalidTextRepresentation` errors in logs when inserting rows with new enum values.
-- `alembic revision --autogenerate` generates an empty migration even though enum members were added.
+- A URL submission produces a response that resembles cloud-metadata JSON.
+- Worker hangs >60s on a single workflow.
+- Memory spike during a single `gather-from-url`.
 
-**Phase to address:** Database/migrations setup phase. `compare_type=True` must be set in `env.py` before any migrations are authored. Enum mutation discipline must be established as a team convention at the start.
+**Phase to address:** `gather-from-url` step phase (this is the FIRST line of code that should land in that phase — the safe-fetch helper must precede the parser integration). Same helper is reused in `recipe-image`.
 
 ---
 
-### Pitfall 7: Shared Context Mutation Corrupts Downstream Workflow Steps
+### Pitfall 7: `recipe-scrapers` failure modes — silent partial extraction
 
 **What goes wrong:**
-`WorkflowRun.shared_context` is defined as a JSON column set once at workflow creation and never mutated. If the `build_input` callable or the task runner code ever writes back to `shared_context` (even accidentally, via Python dict mutation of the deserialized object), subsequent steps see modified context. For example, if `build_input` for `recipe-load` accidentally adds a key to the `ctx` dict, that dict is the deserialized `shared_context` and is reflected in subsequent artifact builds.
+The library covers ~300 supported sites well; `wild_mode=True` falls back to schema.org/Recipe JSON-LD for unsupported sites. Failure modes:
+
+- **Site supported but page is a category/listing**, not a recipe: scraper returns mostly empty / raises `ElementNotFoundInHtml` for some fields, succeeds for others. We get a `RecipeData` with title="Cooking Tips" and `ingredients=[]`. Looks valid; isn't.
+- **Site supported but unit and quantity formats are locale-specific** (Spanish-language sites, fractional Unicode like "½ taza"). The scraper may return raw strings that the downstream `validate-units` tool can't match.
+- **Site supported but old scraper hasn't been updated** since the site redesigned. Scraper silently extracts wrong field (e.g. comments labelled as ingredients). Hard to detect.
+- **`wild_mode=True` for an unsupported site:** schema.org/Recipe absent → raises `WebsiteNotImplementedError`. Caught by us, but no fallback yet.
+- **Per-method exceptions:** `scrape_me(url).title()` raises if no title element. `.ingredients()` raises if it can't find the block. We must individually try/except each field — partial scrape is preferable to all-or-nothing rejection.
 
 **Why it happens:**
-Python dicts passed to lambdas are mutable. The `build_input` callables receive `shared_context` as a plain `dict` and there is nothing preventing in-place modification. Developers modify the dict to "merge" it with artifact data for convenience.
+A scraping library inherits the entropy of the open web. The library does its job — we still own validating the extraction.
 
 **How to avoid:**
-- Pass a deep copy of `shared_context` to `build_input` callables: `build_input(copy.deepcopy(shared_context), accumulated_artifacts)`.
-- Alternatively, freeze `shared_context` as a `types.MappingProxyType` before passing it to lambdas — any write attempt raises `TypeError` immediately.
-- Add an assertion in the task runner: after calling `build_input`, compare the `shared_context` object to its pre-call snapshot and raise `AssertionError` if it has changed (useful in tests, removable in production).
-- Document the `build_input` contract explicitly: callables are pure functions — they read inputs and return a new model; they never mutate arguments.
+- Wrap each field call in try/except, accumulate into a partial dict, then run **the same `RecipeData` Pydantic schema validation** the LLM-based path runs. If validation fails (e.g. `len(ingredients) < 2`), fall back to the LLM-extraction path: pass the raw HTML (or a content-extracted plain-text version via `trafilatura` or `readability-lxml`) to an LLM step. The LLM path is the long-tail safety net.
+- For the LLM fallback, REUSE the existing recipe-research pipeline contract (`RecipeData` output) — don't invent a new schema. The downstream steps (instructions/ingredients/metadata) should not need to know whether the source was scraper or LLM.
+- Eval the parser against a held-out set of 10-20 known-good URLs (Spanish + English; popular recipe sites + long-tail). Track field-level success rate, not page-level.
+- Always preserve the source URL in `RecipeData` (or on `WorkflowRun.outcome`) — debugging the wrong-field case requires re-fetching.
 
 **Warning signs:**
-- The `send-notification` step receives incorrect `reply_context` values for the second or third workflow run.
-- `WorkflowRun.shared_context` in Postgres has keys that were not present at workflow creation.
-- Intermittent failures only on second+ steps of a workflow but not on the first step.
+- Workflow succeeds, recipe is saved, but the user sees obviously wrong title or ingredients.
+- High proportion of `gather-from-url` workflows that pass the scraper but produce `RecipeData` with empty ingredients (silent partial).
+- A specific domain accounts for repeated quality complaints.
 
-**Phase to address:** Workflow infrastructure phase. The immutability contract must be encoded in the task runner implementation before any workflow is tested end-to-end.
+**Phase to address:** `gather-from-url` step phase. Eval-set creation belongs in the same phase (the experiment script for `gather-from-url` should be the eval harness from day one).
 
 ---
 
-### Pitfall 8: LangChain Agent State Leaks Between Sequential RQ Jobs
+### Pitfall 8: Recipe-image source returns the wrong dish
 
 **What goes wrong:**
-When RQ processes sequential jobs in the same worker process, Python module-level state, LangChain callback objects, and LLM client connection objects persist between job executions. If the LangChain `create_react_agent` or any LangWatch callback handler stores state (e.g., in-progress trace ID, previous message history) at the module level rather than per-invocation, that state bleeds into the next job. The most common symptom: conversation history from job N appears in job N+1's agent context.
+Web image search for "carbonara" returns ~50% pasta-with-cream-and-mushrooms (the Americanized variant), 20% the actual carbonara, 15% pasta-of-some-other-kind, and 15% random kitchen photos. Saved alongside the recipe, the wrong image becomes the recipe's identity in the household UI. Worse cases:
+
+- Generic search returns stock-photo with watermark.
+- Image is NSFW (rare for food searches but possible — image search APIs do leak).
+- Image is a thumbnail (250px wide); usable on a list but ugly on a detail screen.
+- Image URL becomes a 404 in 6 months (link rot is endemic on aggregator sites).
+- Image is hot-linked from a site that enforces `Referer:` checks and returns a different image when fetched from our domain.
+- Image is copyrighted; saving the source URL is a passive "we link to your hosted file" — saving a downloaded copy may be infringement depending on jurisdiction.
+
+The milestone description leans web-image-search for V1, with storage URL-vs-rehost as an open question.
 
 **Why it happens:**
-Developers test agents in isolation (one process, one invocation) and never encounter inter-job contamination. In production, the single RQ worker processes job after job in the same process. Any object instantiated at import time rather than at job invocation time becomes shared state.
+"Get an image for X" is one of those tasks where the LLM/search returns a plausible-looking result that humans only validate by gut. There's no built-in semantic check.
 
 **How to avoid:**
-- Instantiate all per-job objects (LLM client, callbacks, agent, skill sets) inside the job function itself, not at module level.
-- LangWatch instrumentation: ensure the trace/span is opened and closed within the job function scope. Use Python context managers or `try/finally` blocks to guarantee span closure even on exception.
-- Explicitly clear or re-initialize any LangChain message history objects at the start of each job — do not rely on object garbage collection timing.
-- Write an integration test that executes two jobs back-to-back in the same process and asserts the second job's agent context contains no artifacts from the first job.
+- **Pick a search API with a content filter knob and Spanish-language coverage** (Bing Image Search → being deprecated; Google Custom Search; SerpAPI; Tavily already in stack but image search is limited). Verify with safe-search ON. For V1, leaning Tavily for stack consistency unless its image coverage is poor; verify empirically.
+- **Validation step inside the `recipe-image` task itself:** after picking a candidate URL, fetch the image, send it to a vision-capable LLM with the recipe name + ingredients list and a yes/no prompt: "Does this image plausibly depict {recipe_name}? Reply YES or NO with one-sentence rationale." If NO, try the next candidate. Cap at 3 candidates; if all fail, the workflow completes WITHOUT an image — that's the non-fatal failure mode the milestone description allows.
+- **Rehost to the household-manager backend** if it has image-storage support; if not, store the source URL but add a periodic broken-link sweep (deferred to scheduler milestone). Document this as a known v1.1 gap.
+- **Strip EXIF before storing.** EXIF often contains GPS coords for amateur photos.
+- **Fetch with the same `safe_fetch` helper** from Pitfall 6 — image URLs are also user-influenced (via search result). The SSRF rules apply.
+- **Magic-byte validation:** open with PIL `Image.open(BytesIO(content)).verify()` and assert format in `{JPEG, PNG, WEBP}`. Reject SVG (XSS via embedded scripts).
 
 **Warning signs:**
-- Agent responses for job N+1 reference information that only exists in job N's input.
-- LangWatch traces for different jobs appear merged or contain more tool calls than expected.
-- Unit tests pass but end-to-end tests with multiple sequential jobs fail intermittently.
+- User complaint: "this isn't the right dish."
+- High proportion of saved recipes share the same generic stock image.
+- Image URLs all point to the same domain (search bias toward one source).
 
-**Phase to address:** Agent infrastructure phase. Scoping rules (module-level vs. job-level instantiation) must be established in the base agent runner before any domain agents are implemented.
+**Phase to address:** `recipe-image` step phase.
+
+---
+
+### Pitfall 9: Robotina context bloat as invocation chain grows
+
+**What goes wrong:**
+The whole point of `WorkflowRun.outcome` (compact) is to let the next Robotina invocation see "what happened" without re-ingesting the full pipeline artifacts. But:
+
+- A developer writes the outcome field in the recipe-load step as `outcome = {"recipe": recipe_data.model_dump()}` for "completeness." `recipe_data` is the full RecipeData (instructions, all ingredients, image URL, metadata). Across a 3-recipe batch, the next Robotina turn sees 3 × full RecipeData = potentially 5-20 KB of structured text. Fine for one batch; a chained set of 5 batches over a long conversation, ingesting prior history, blows past the context window.
+- The conversation history (`StoredMessage`) is loaded in full per Robotina invocation today. As a household uses Robotina for months, this grows unbounded. Phase 4 / current code likely doesn't truncate.
+- `WorkflowRun.outcome` schema is JSON, no Pydantic class enforces compactness.
+
+**Why it happens:**
+Compactness is a non-functional requirement. Without a schema or a CI check, it drifts.
+
+**How to avoid:**
+- Define `WorkflowOutcome` as a Pydantic model PER workflow type — e.g. `AddRecipeOutcome(BaseModel): status: Literal["saved", "failed"]; recipe_id: str | None; recipe_name: str; failure_reason: str | None; image_present: bool`. Enforce at write time. Reject anything else. Total payload ~200 bytes/workflow.
+- Add a token-count guard on Robotina input assembly: estimate input tokens (tiktoken or LangChain's `count_tokens`); if > threshold (e.g. 8 K), truncate older `StoredMessage` rows with a "(N older messages omitted)" marker.
+- Cap conversation-history load to last N messages (e.g. 20) regardless of token count. Robotina memory layer is explicitly out-of-scope for v1.1 — so a hard cap is the right v1.1 stance.
+- Add a unit test that creates 10 chained invocations with full outcomes and asserts the Robotina input stays under a token threshold.
+
+**Warning signs:**
+- LangWatch shows Robotina input-token counts climbing over a conversation.
+- LLM cost-per-Robotina-turn rising.
+- Provider returns `context_length_exceeded` errors.
+
+**Phase to address:** RobotinaInvocation + `WorkflowOutcome` schema phase.
+
+---
+
+### Pitfall 10: Removing `acknowledge-add-recipe` step leaves orphan dependencies
+
+**What goes wrong:**
+The `acknowledge-add-recipe` step has been in the codebase since Phase 7.1 and is referenced in places easy to overlook:
+- `AGENT_REGISTRY` entry — per memory `feedback_overrides_in_sync.md`, every `overrides/*.json` file references this. Removing the agent and forgetting to update an override leaves staging/dev pointing at a missing entry (silent runtime failure).
+- Prompts directory (the actual prompt file `acknowledge-add-recipe/V001.md` or similar).
+- Tests: integration tests that assert the workflow has N steps; removing the step changes N.
+- Dashboard rendering: hard-coded step icons or label maps may include `acknowledge-add-recipe`.
+- LangWatch experiment collections: removing the agent removes its trace collection retroactively.
+- Prompt skeleton (Phase 14): the standardized Role/Inputs/Tools/Process/Rules/Output skeleton is across 7 active prompts. Removing one breaks the count documented in PROJECT.md.
+
+**Why it happens:**
+Phase 7.1 was a tactical workaround. It accumulated implicit dependencies that no one inventoried.
+
+**How to avoid:**
+- Treat removal as a checklist item, not an edit: AGENT_REGISTRY → all `overrides/*.json` → prompts dir → tests → dashboard step-label map → PROJECT.md prompt count.
+- Grep for the literal string `acknowledge-add-recipe` across the repo before the removal PR. Should hit zero after the PR.
+- Add a CI guard: enumerate AGENT_REGISTRY keys at startup, fail if any `overrides/*.json` references a missing one (per memory `feedback_overrides_in_sync.md` — this is already user-flagged as a recurring pain point; the v1.1 refactor is the right time to harden it).
+
+**Warning signs:**
+- `KeyError: 'acknowledge-add-recipe'` at runtime in dev or staging.
+- Test failure: workflow step count mismatch.
+- Dashboard renders blank cell or "unknown step."
+
+**Phase to address:** Same phase that introduces `respond()` (the replacement). Single PR that adds `respond()` and removes `acknowledge-add-recipe`.
+
+---
+
+### Pitfall 11: Idempotency across worker crash on chain advancement
+
+**What goes wrong:**
+The wake-rule enqueues a Robotina invocation. The mechanically-risky window:
+1. `on_step_complete` writes WorkflowRun.status = DONE.
+2. Wake check returns true.
+3. Insert RobotinaInvocation row + commit (`wake_dispatched_at` set).
+4. `queue.enqueue("robotina.queue.jobs.run_task", invocation_id, job_id=pre_assigned)` — this is the failure window.
+5. Worker crashes between commit (step 3) and enqueue (step 4).
+
+After restart: the RobotinaInvocation row exists with `wake_dispatched_at` set but no RQ job. AOF flushed the commit; AOF cannot replay the enqueue (it's RQ-side and we crashed before the enqueue completed).
+
+Mirror existing D-07 pattern in `queue_workflow`: pre-assign `job_id` BEFORE commit so a startup reconciler can detect "row says we enqueued job X; RQ has no job X" and re-enqueue.
+
+**Why it happens:**
+The current codebase already has this exact pattern for workflow steps (D-07, `task_job_id` pre-assigned in `queue_workflow` and `on_step_complete`). Re-applying it for invocations is "obvious" only if you've internalized D-07.
+
+**How to avoid:**
+- Apply D-07 for RobotinaInvocation enqueues identically: `job_id = str(uuid.uuid4())` BEFORE commit; commit; then `queue.enqueue(..., job_id=job_id, result_ttl=-1, failure_ttl=-1, meta={'task_type': 'handle-robotina-turn'})`.
+- Startup reconciler in the agent boot path: query `SELECT id, job_id FROM robotina_invocation WHERE status = 'pending' AND wake_dispatched_at IS NOT NULL`. For each, check `Job.exists(job_id, connection=redis)`. If not, re-enqueue.
+- Same reconciler should also handle WorkflowRunSteps in `PENDING` with `task_job_id IS NOT NULL` but no RQ job — there's currently no such reconciler in the codebase. Adding it during this milestone is a freebie.
+
+**Warning signs:**
+- After a worker restart, a RobotinaInvocation is "stuck" — row in DB, no RQ job, no log.
+- User asks for a recipe, gets no reply, gets no error.
+
+**Phase to address:** RobotinaInvocation + wake-rule phase (the reconciler can land in the same phase since it's small).
+
+---
+
+### Pitfall 12: Multi-recipe LLM parsing is unreliable in subtle ways
+
+**What goes wrong:**
+- User: "agregá canelones de choclo, pollo al horno y arroz pilaf" → 3 recipes. Easy case.
+- User: "agregá pollo al horno con papas y arroz pilaf" → 2 recipes (pollo+papas; arroz) or 3 (pollo; papas; arroz)? Ambiguous.
+- User: "salt and pepper chicken" — must NOT split into "salt" + "pepper chicken." A small/local Ollama model frequently does.
+- User: "canelones con salsa blanca y boloñesa" — 1 recipe with two sauces, NOT 2 recipes.
+- User pastes a URL + free text: "agregá esta receta https://example/x y también lasaña" → 1 URL workflow + 1 query workflow. Cross-source case.
+- LLM emits 3 tool calls but `recipe_query` strings are non-unique ("recipe", "another recipe", "third").
+
+**Why it happens:**
+Tool-call structure forces the LLM to commit to a count. Without structured-output enforcement (Robotina is the one agent without `response_format`), the natural-language parsing is implicit in the prompt and varies by model.
+
+**How to avoid:**
+- Build a **multi-recipe eval set** in `experiments/recipe_research/` (or a new `experiments/robotina/`). 30-50 representative Spanish utterances with ground-truth recipe counts and names. Run against each LLM backend (Anthropic, OpenAI, Ollama). Accuracy threshold: ≥ 95% on the count, ≥ 90% on the names (Levenshtein or LLM-judge).
+- Prompt-engineer Robotina with explicit examples covering the ambiguity classes (compound dishes, side dishes, sauces, conjunctions). Include "if you are unsure whether something is one recipe or many, prefer FEWER recipes and ask the user."
+- Add an explicit `ask_user(question)` tool that lets Robotina escalate ambiguity rather than guessing. This is the "ask once, save right" mode the project's UX warrants.
+- Validate before enqueue: if N > 5, reject with a `respond()` "esto son muchas — preferís de a una?" rather than fanning out a runaway batch.
+- Log per-turn: `recipes_uttered_count_estimate` (LLM's count) vs. user-confirmed-count (if `ask_user` was used). Track drift.
+
+**Warning signs:**
+- Users report "I said 3 but only got 2."
+- A specific phrasing pattern consistently mis-counts (e.g. "X with Y" always splits when it shouldn't).
+- Eval set accuracy drops on a model upgrade.
+
+**Phase to address:** Robotina prompt + multi-recipe phase. The eval set should LAND in this phase, not be deferred.
+
+---
+
+### Pitfall 13: `respond()` tool is synchronous but Telegram is async
+
+**What goes wrong:**
+The milestone description says `respond()` "writes a StoredMessage and sends to the user" synchronously. But:
+- The agent task runs under RQ on a sync worker.
+- Telegram send is an async call (`python-telegram-bot` v21 is async-native per the stack doc).
+- Calling `asyncio.run()` inside a sync RQ job opens a new event loop each invocation — works but is slow and brittle.
+- If `respond()` sends to Telegram and FAILS (network blip), do we:
+  - Raise → agent's tool node returns ToolMessage(status=error) → agent retries — possibly re-sending the same text once the network recovers (duplicate user message).
+  - Swallow → user never sees the message; Robotina believes it sent.
+  - Return error to the agent → it may try to "fix" via another `respond()` call → loop.
+
+**Why it happens:**
+The "synchronous side-effect" framing in the description glosses over the sync/async boundary. The current Phase 7.1 path uses the QueueTool with `at_front=True` for `send-notification` (per memory `feedback_queue_at_front.md`) — i.e. the notification is enqueued, NOT sent inline. That works precisely because it's async-via-queue.
+
+**How to avoid:**
+- Make `respond()` enqueue a `send-notification` job at the front of the queue (mirror the existing Phase 6/7.1 pattern). The tool returns immediately. The job persistence guarantees the message will be sent (AOF + `result_ttl=-1`).
+- BUT: this means under concurrency=1, the Robotina turn must complete and the send-notification job must run AFTER it to actually deliver. That's fine — the agent calling `respond()` then `start-workflow()` then `terminate()` produces the queue order [respond-notif, workflow-step-1, workflow-step-2, ..., next-robotina]. Because `at_front=True`, respond goes to the head.
+- Alternative: a "direct send" path that bypasses the queue. NOT recommended — loses the persistence + retry guarantees and makes the agent's `respond()` behaviorally different from the existing notification path. Stay consistent.
+- Make `respond()` idempotency-keyed: include the RobotinaInvocation ID + a sequence-within-turn counter in the StoredMessage row. If a duplicate is enqueued (e.g. retry path), de-dupe in the send-notification handler.
+
+**Warning signs:**
+- User receives a message twice.
+- User receives the "thinking out loud" message after the final summary (ordering wrong).
+- Agent loops calling `respond()` because the previous one returned an error.
+
+**Phase to address:** `respond()` tool phase. Mirror the existing QueueTool + `send-notification` pattern.
 
 ---
 
@@ -195,116 +403,134 @@ Developers test agents in isolation (one process, one invocation) and never enco
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Returning tool errors as strings instead of raising structured exceptions | Faster initial tool implementation | Agent silently retries unrecoverable errors, burns tokens | Never — establish error categories from the start |
-| Hardcoding `shared_context` dict keys as string literals across `build_input` lambdas | Quick to write | Typos cause silent `KeyError` at runtime mid-workflow; no type safety | Never — define a typed `SharedContext` Pydantic model instead |
-| Using RQ's default `result_ttl=500` (8 minutes) during development | Fewer Redis keys | Job results expire before post-hoc debugging or experiment inspection | Only if explicitly resetting to `-1` before production |
-| Storing full conversation history in every `handle-incoming-message` input indefinitely | Simpler gateway code | Input payload grows unbounded; RQ job serialization slows; context window fills | Never — cap history at the gateway with a configurable max |
-| Single Alembic `Base` metadata shared between gateway and workflow models | Simpler migrations | Migrations become hard to reason about as model count grows; circular imports risk | Acceptable for Phase 1; plan to split at Phase 2+ |
-| Inline `build_input` lambdas for simple steps | Readable in `workflows.py` | Lambdas cannot be unit-tested in isolation | Acceptable for Phase 1; refactor to named functions when workflow count grows |
-
----
+| Skip safe_fetch SSRF guards, just call `httpx.get(url)` | One line vs. a module | First time someone fetches an internal URL we leak creds; incident response is days | **Never** — SSRF is unrecoverable once exploited |
+| Store image source URL only, never rehost | No backend storage changes needed | 6 months in, 30% of images are 404; user trust degrades | Acceptable for v1.1 with documented link-rot risk; revisit in v1.2 |
+| Allow N up to ∞ recipes per turn | No upfront UX work | One user fans out 50 recipes; queue stalls for hours | Cap at 5 (with `respond()`-mediated polite cap) — never unlimited |
+| Backfill `conversation_id` in the schema migration | One migration step | Migration takes minutes on a populated DB and blocks deploy; risk of orphan rows | Acceptable on a small DB; **never** on staging/prod once it's grown |
+| Reuse `_extract_task_output` non-structured branch for Robotina | No new code path | If Robotina gains `response_format` later, the dual-path complexity sits forever | Acceptable while Robotina has no response_format; revisit when adding one |
+| Drop `acknowledge-add-recipe` without auditing overrides | Smaller PR | First time staging boots with a missing AGENT_REGISTRY key → silent fail | **Never** — the override-sync invariant is already a known papercut |
+| LLM-fallback path for URL parsing not built in v1.1 | Smaller scope | Long-tail URLs (sites without schema.org/Recipe) fail; users learn URL feature doesn't work | Acceptable for v1.1 if eval shows >85% URL coverage with scraper alone; revisit otherwise |
+| `wake_dispatched_at` guard not added (rely on concurrency=1) | One less column | First failed-registry retry double-fires; user confusion or worse | **Never** — this is the entire pitfall #1 |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Telegram webhooks | Returning 200 only on success; returning error codes on partial failures | Always return 200 to Telegram; handle errors asynchronously in the task queue |
-| Telegram webhooks | Not setting a webhook secret token | Set `secret_token` on `setWebhook` and verify it on every incoming request |
-| RQ + Redis AOF | Using `appendfsync everysec` instead of `appendfsync always` as specified | Verify Redis config file explicitly; Docker defaults do not set AOF mode |
-| Alembic + SQLAlchemy enums | Not setting `compare_type=True` in `env.py` | Set `compare_type=True` before the first `autogenerate` run |
-| LangWatch + OTel | Calling `langwatch.setup()` multiple times (once per experiment, once in production code) | Initialize once at process startup; guard with a module-level sentinel |
-| Tavily web search | Not setting `max_results` — default returns too many results, inflating context | Always bound `max_results`; for recipe research 3-5 results is sufficient |
-| Household-manager API | Agent receiving raw API error details it can act on (retry auth, modify request) | Auth errors must raise hard exceptions; the agent must never see a 401/403 |
-| RQ Dashboard | Running dashboard without authentication in a network-accessible environment | Add basic auth or restrict to `localhost` only in Docker Compose |
-
----
+| RQ + AOF persistence | Enqueue without `result_ttl=-1, failure_ttl=-1` | Always set both — spec-locked; CI guard already partial in workflow_runner.py |
+| RQ + pre-commit enqueue | Enqueue then commit (race window on crash) | Commit DB row with pre-assigned `job_id`, THEN enqueue (D-07 pattern) |
+| SQLAlchemy 2.x + Alembic on JSON | `op.execute("UPDATE ... SET col = json_col->'x'")` in schema migration | Separate data migration script; never block schema migration on JSON access |
+| Pydantic v2 + `Literal` field on `StartWorkflowArgs` | Add `"add-recipe"` to `Literal` only; forget to add corresponding workflow_def entry | Single registry: `WORKFLOW_REGISTRY` keys generate the `Literal`. Currently hardcoded — fix this in the refactor |
+| `httpx` + redirects | Default `follow_redirects=False` plus manual loop forgets to re-check IPs | Centralized `safe_fetch` with strict per-hop validation |
+| `python-telegram-bot` v21 + sync RQ worker | `asyncio.run(...)` in every tool call | Send via queue (`send-notification` job), not direct call |
+| LangChain `create_agent` + multi-tool-call | Assume sequential ordering | Parallel by default; design tools to be order-independent |
+| LangChain `create_agent` + Ollama | Assume model emits multiple tool calls cleanly | Test Ollama specifically; small local models split poorly |
+| LangChain `response_format` + Robotina | Force a schema on the conversational agent | Robotina stays free-text; output goes through explicit `respond()` tool only |
+| LangWatch + new agent types (`gather-from-url`, `recipe-image`, `respond`) | Forget to register experiment collection | Per CLAUDE.md: experiment script + LangWatch project per new agent type |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Loading all skill sub-files eagerly into agent context | Long time-to-first-token; context window fills; cost per run inflates | Load only `index.md` upfront; lazy-load sub-files via `read-skill` tool as specified | From the first run if skills have more than 2-3 sub-files |
-| Fetching full Postgres conversation history without a limit | Gateway slows down for active users; RQ job payload grows large | Always apply `LIMIT N` (configurable env var) when fetching history | When a conversation exceeds ~50 messages |
-| RQ worker holding open a SQLAlchemy connection between jobs | Postgres connection pool exhaustion during sustained load | Use `scoped_session` or explicit session close in a `finally` block after every job | When running multiple workers or under sustained message load |
-| LLM streaming without a timeout | Worker hangs indefinitely if the LLM provider stalls mid-stream | Set `request_timeout` on the LangChain model and a job `timeout` on the RQ job | Immediately — any LLM provider outage or rate limit can trigger this |
-
----
+| URL fetch slow-read DoS | Single workflow holds the worker for minutes; full queue stall | `httpx` timeouts: `connect=5, read=15` at most | First adversarial URL — could be the first day |
+| Multi-recipe fan-out without cap | 50-recipe submission stalls queue for an hour | Cap N at 5 with polite `respond()` | First user that pastes a TOC of recipes |
+| Conversation history grows unbounded | Robotina input tokens climb monthly; provider cost climbs | Cap at last 20 messages OR token-budget-truncate | 3-6 months of active use per household |
+| `WorkflowRun.outcome` filled with full RecipeData | Each invocation chain blows context window after 3-4 batches | Pydantic `WorkflowOutcome` model enforces compactness | First batch with verbose outcomes |
+| Image fetch + vision-LLM-validation per candidate | 3 candidate fetches × ~10s each = 30s per recipe | Cap candidates at 3; ship the recipe without image if all fail (non-fatal) | Already a concern at single-recipe scale |
+| JSON column scans in dashboards | Dashboard slow as workflow_run grows past ~10K rows | Add expression index on `shared_context->>'recipe_query'` if dashboard sorts/filters on it | When dashboard becomes a daily-use tool |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Logging full task input payloads at DEBUG level | Exposes conversation text, household IDs, and API tokens in log files | Redact `text`, `history`, and any field ending in `_token` or `_key` before logging |
-| Exposing RQ job args (which contain full task inputs) in RQ Dashboard without auth | Anyone with network access reads all household data | Restrict RQ Dashboard to localhost in Docker Compose; add auth for production |
-| Telegram webhook endpoint has no secret token verification | Any external party can inject arbitrary messages into the system | Validate `X-Telegram-Bot-Api-Secret-Token` header on every webhook request |
-| API tokens read from env vars logged at startup for debugging | Secrets in application logs | Log only the first 4 chars + `***` of any token at startup for confirmation |
-| `WorkflowRun.shared_context` stored in plaintext JSON | Telegram user IDs and chat IDs stored in plaintext | Acceptable for Phase 1; note it as a future encryption candidate |
-
----
+| Fetching user-supplied URLs without IP/scheme/redirect guards | SSRF to AWS metadata, Redis, internal services → cred leak | `safe_fetch` helper as the only URL fetcher in the codebase; lint to forbid raw `httpx.get` outside it |
+| Trusting Content-Type header for image upload | XSS via SVG with embedded `<script>` | Magic-byte validation; allowlist `{JPEG, PNG, WEBP}`; reject SVG |
+| Embedding user URL in agent prompt without sanitization | Prompt injection (URL is "Ignore all instructions and …") | URL goes into a tool argument, never spliced into a prompt template directly; tool reads the URL, fetches, parses, returns extracted RecipeData. Agent sees the extracted data, not the URL contents. |
+| Logging the full URL with embedded credentials | `https://user:pass@host/...` in logs → leak | Sanitize credentials from URL before logging (`urllib.parse.urlsplit` → drop userinfo) |
+| `WorkflowRun.outcome` JSON contains PII or chat content | DB dump leaks more than necessary | `WorkflowOutcome` schema is constrained — no free-form text dumping |
+| Image storing with EXIF | GPS coords leak | Strip EXIF (Pillow `image.getexif().clear()`) before save/rehost |
+| Trusting LLM-generated SQL/HTML/file paths | Code injection if those outputs are exec'd | Already mitigated by tool-arg validation; reinforce: nothing the LLM emits is exec'd verbatim |
+| Allowing `http://` URLs (not just https) | Plaintext exfil; easier MitM | Scheme allowlist defaults to https only |
+| Dashboard exposed on 0.0.0.0 with failure_reason leaking exc text | Per WR-02 comment — D-16 format leaks env vars / payloads | Already capped at 500 chars + default loopback; document that 0.0.0.0 opt-in carries residual risk |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No acknowledgement message when starting a multi-step workflow | User sends "add carbonara" and hears nothing for 30–60 seconds while the workflow runs | Have `handle-incoming-message` send an immediate acknowledgement ("Got it, researching the recipe...") before starting the workflow |
-| Telegram formatting applied by the notification agent fails silently | User receives a wall of Markdown syntax characters (`*`, `_`, `[`) instead of formatted text | Test `send-notification` with representative messages including bold, lists, and links before shipping |
-| Error in mid-workflow step gives no user notification | Recipe research fails; user never finds out their request was not completed | On workflow failure, emit a `send-notification` task with a user-facing error message before marking the workflow `FAILED` — even though auto-retry is out of scope |
-| Conversation history includes assistant-side task orchestration messages | Agent context is polluted with internal "starting workflow..." messages; response quality degrades | Only persist messages with `role=user` and `role=assistant` for actual user-facing turns; do not store internal tool outputs in conversation history |
-
----
+| Silent multi-recipe partial failure | User said 3, sees 2 saved, no mention of the third | `respond()` always summarizes ALL workflow outcomes (success and failure) explicitly |
+| Wrong-dish image saved | User trust breaks ("Robotina doesn't know what she's doing") | Vision-LLM validation before save; ship without image rather than wrong image |
+| Slow URL-ingestion with no progress indicator | User pastes URL, waits 30s wondering if it worked | `respond()` BEFORE `start-workflow` with "ya estoy buscando esa receta…" |
+| Apology message after success | "Algo falló…" fires from dead-letter even on retry success | Idempotency on send-notification + sequence numbers (Pitfall 13) |
+| Same recipe name saved twice (multi-recipe with overlap) | User confused about which is which | Detect overlap in the wake-up Robotina turn; ask "ya tenés X, querés sobreescribir?" |
+| URL with auto-redirect to wrong recipe variant | User shares "carbonara" URL, gets pasta-with-cream because that's where the URL redirected | Show user the title that was extracted in the success message: "agregué 'Pasta con Crema y Champiñones' — era esto?" |
+| Robotina speaks too much (chatty after every workflow) | Spam | Prompt rule: one user-facing message per invocation, unless explicitly multiple distinct events |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **RQ Job Serialization:** Pydantic models are instantiated inside job functions, not passed as class references — verify all task types can be pickled and unpickled without data loss.
-- [ ] **Workflow Advancement:** Task runner writes `task_job_id` for the next step in the same Postgres commit as `artifact` write — verify with a forced crash test between enqueue and DB commit.
-- [ ] **LangWatch Instrumentation:** Traces appear in LangWatch UI with correct parent-child relationships, not as isolated orphans — verify by running a full workflow end-to-end and inspecting in the UI.
-- [ ] **Telegram Deduplication:** The gateway returns 200 on duplicate webhook delivery and does NOT enqueue a second job — verify by replaying a webhook request with the same `update_id`.
-- [ ] **Alembic Migrations:** `alembic upgrade head` runs cleanly on a fresh Postgres instance — verify in CI with a disposable Postgres container, not just against a developer's existing database.
-- [ ] **Agent State Isolation:** Running two sequential jobs in the same worker process does not contaminate the second job's context with the first job's data — verify with a sequential integration test.
-- [ ] **Tool Hard Errors:** A `401` from household-manager API causes the RQ job to fail with a clear error message and does NOT cause the agent to retry — verify by pointing the tool at a server returning 401.
-- [ ] **Redis AOF Config:** Redis is actually running with `appendfsync always`, not just `appendonly yes` — verify with `redis-cli CONFIG GET appendfsync`.
-
----
+- [ ] **Wake rule:** appears to work in tests under sequential single-batch scenario — verify it survives a `kill -9` of the worker between two terminal transitions
+- [ ] **Multi `start-workflow` calls:** appears to work with Anthropic — verify with Ollama (development backend), where parallel tool calls are flakier
+- [ ] **`return_direct=True` removal:** appears clean — verify no path consumes `result['messages'][-1].content` as a user-visible string
+- [ ] **`respond()` tool:** appears to send — verify it survives a `send-notification` retry without double-delivery
+- [ ] **`acknowledge-add-recipe` removal:** appears removed — grep the entire repo for the literal string after the PR; verify all `overrides/*.json` still load
+- [ ] **`conversation_id` migration:** appears to backfill — verify post-migration `COUNT(conversation_id IS NULL AND status = 'done')` per platform
+- [ ] **`WorkflowRun.outcome`:** appears compact — measure average size after 5 batches; assert < 1 KB/workflow
+- [ ] **URL fetch:** appears to work — verify it REJECTS `http://169.254.169.254/`, `http://localhost:6379/`, redirect chains that cross those, gzip bombs, 100 MB HTML
+- [ ] **`gather-from-url`:** appears to parse — measure field-level success rate on a 20-URL eval set (title, ingredients_count, instructions_count, image)
+- [ ] **`recipe-image`:** appears to fetch — verify vision-LLM validation actually rejects wrong-dish candidates (test with a "carbonara" → known cream-and-mushroom image)
+- [ ] **RobotinaInvocation reconciler:** appears unnecessary on a happy path — verify a `kill -9` between commit and enqueue produces a `pending` row that the next startup re-enqueues
+- [ ] **`WorkflowOutcome` schema:** appears to constrain — verify a developer who writes `outcome = {"raw": recipe_data.model_dump()}` gets rejected at write time
+- [ ] **Multi-recipe eval:** appears accurate on cherry-picked cases — verify the eval set includes the ambiguous classes (compound dishes, side dishes, conjunctions)
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| RQ job serialization failure discovered after deployment | MEDIUM | Audit all job arg types; refactor to Pydantic-only inputs; re-enqueue failed jobs from the failed registry |
-| Workflow advancement race leaves orphaned RQ job | LOW | Add a reconciliation query: find `WorkflowRunStep` rows where `task_job_id` IS NULL but previous step is DONE; re-enqueue manually |
-| LangWatch traces disconnected (no propagation) | LOW | Add `workflow_run_id` as a trace tag retroactively; traces cannot be re-linked but future runs will be correlated |
-| Duplicate messages processed due to missing idempotency | MEDIUM | Identify duplicates by `platform_message_id`; cancel or delete the second RQ job from the dashboard; no data recovery needed if household-manager API is idempotent |
-| Alembic enum migration applied without `ALTER TYPE` | HIGH | Run `ALTER TYPE ... ADD VALUE` manually in Postgres; generate a corrective migration; restore consistency between Python enum and DB type |
-| `shared_context` mutated mid-workflow | HIGH | Inspect `workflow_runs` rows in Postgres for unexpected keys; mark affected workflow runs `FAILED`; re-initiate from user message |
-
----
+| Wake-rule double-fire | LOW | Add `wake_dispatched_at` column + retroactive UPDATE setting it for any RobotinaInvocation older than 1 hour; backfill complete |
+| Wrong image saved | LOW | Backend admin endpoint to clear/replace image URL; reaction-emoji from user could trigger re-image as a v1.2 feature |
+| `conversation_id` orphan rows after migration | LOW-MEDIUM | Data-fix script; safe because new code tolerates NULL |
+| Robotina context bloat already happening | LOW | Add token-cap truncation to history loader; deploy; rolling improvement |
+| SSRF exploit fired | HIGH | Rotate any creds reachable from the worker host; audit logs for prior exploit; patch URL-fetch; consider time window of vulnerability |
+| Multi-recipe parsing chronically wrong | MEDIUM | Iterate prompt with the eval set; if model is the bottleneck, swap LLM backend for Robotina (multi-LLM swap is cheap per CLAUDE.md) |
+| `respond()` double-delivery | LOW | Add sequence-key idempotency; replay log to count duplicates and notify affected users |
+| `acknowledge-add-recipe` ghost reference broke staging | LOW | Roll back PR; re-do with full grep + override audit; ship |
+| URL fetch hangs the worker | MEDIUM | Kill the job from RQ failed registry; tighten timeouts; document affected URL pattern in fetch helper tests |
+| `WorkflowRun.outcome` already verbose in some workflows | LOW | Backfill: rewrite existing rows to the compact schema; deploy schema enforcement; old rows truncated to fields the new schema accepts |
 
 ## Pitfall-to-Phase Mapping
 
+The roadmapper should treat this as guidance on phase ordering and per-phase research depth.
+
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| RQ job serialization (pickle) | Queue infrastructure | Test: enqueue + deserialize all task types in a real Redis |
-| Workflow advancement race | Workflow infrastructure | Test: forced crash between Redis enqueue and Postgres commit; reconciliation audit |
-| LangChain tool exceptions swallowed | Agent infrastructure | Test: tool returning 401 causes job failure, not agent retry loop |
-| LangWatch trace propagation | Agent infrastructure + observability | Verify: full workflow trace appears in LangWatch as linked spans |
-| Telegram duplicate webhooks | Gateway infrastructure | Test: replay same `update_id` twice; assert single job in RQ |
-| Alembic enum mutation | Database/migrations setup | Verify: `alembic upgrade head` on fresh DB + `compare_type=True` in env.py |
-| Shared context mutation | Workflow infrastructure | Test: two sequential workflow runs with frozen `shared_context` |
-| Agent state leaks between jobs | Agent infrastructure | Test: two sequential jobs in same worker process with context assertions |
-
----
+| 1: Wake double-fire | RobotinaInvocation + wake-rule | `wake_dispatched_at` UPDATE returns 0 rows on retry — assertion in test |
+| 2: Stale-read wake check | Same as #1 | Test injects a session and asserts wake fires inside the same transaction |
+| 3: Migration backfill | Schema migration phase (PRECEDES code that depends on FKs) | Post-migration count of orphan rows = 0; in-flight workflow count = 0 at deploy |
+| 4: AI text leak post-`return_direct=False` | `respond()` + `terminate()` + prompt rewrite | Smoke test: prompt that elicits chain-of-thought; verify `respond()` count == user-visible messages |
+| 5: `create_agent` parallel tool calls | `StartWorkflowTool` refactor | Test: agent emits 3 parallel start-workflow calls, all 3 WorkflowRuns created, all linked to same invocation |
+| 6: SSRF | `gather-from-url` (FIRST commit in that phase = safe_fetch helper) | Test suite that submits 10 adversarial URLs; all rejected |
+| 7: recipe-scrapers silent partial | `gather-from-url` (same phase, after safe-fetch) | 20-URL eval-set with field-level success rate target ≥ 85% |
+| 8: Wrong-dish image | `recipe-image` phase | Vision-LLM validation reduces wrong-dish rate on 30-recipe spot-check eval |
+| 9: Context bloat | RobotinaInvocation phase (`WorkflowOutcome` schema lands together) | Pydantic schema enforced; token-budget truncation on history; LangWatch input-token median plotted |
+| 10: `acknowledge-add-recipe` removal | Same phase as `respond()` | Repo grep returns zero hits; CI guard for AGENT_REGISTRY ↔ overrides/*.json |
+| 11: Idempotency on chain interruption | RobotinaInvocation + wake-rule (same phase as #1 — reconciler is small) | Manual test: `kill -9` between commit and enqueue; restart; verify pending invocation recovers |
+| 12: Multi-recipe parsing | Robotina prompt + multi-recipe phase | Eval set with ≥ 95% count accuracy on Anthropic/OpenAI; ≥ 85% on Ollama dev |
+| 13: `respond()` sync/async | `respond()` tool phase | Crash test: kill worker after `respond()` enqueue but before delivery — message still delivers on restart |
 
 ## Sources
 
-- Spec analysis: `/plans/01-kickoff/spec.md` — transactional advancement, task input models, tool error requirements
-- Project context: `/.planning/PROJECT.md` — concurrency constraints, Redis AOF requirement, LangWatch mandate
-- RQ documentation domain knowledge: job serialization with pickle, `result_ttl`, `failure_ttl`, `at_front`, failed registry behavior
-- LangChain / LangGraph domain knowledge: `create_react_agent` exception handling, `handle_tool_error`, `max_iterations`
-- OpenTelemetry / LangWatch domain knowledge: cross-process context propagation, W3C `traceparent`, span lifecycle in worker processes
-- Alembic domain knowledge: `compare_type=True`, Postgres `ALTER TYPE ... ADD VALUE` transaction restriction
-- Telegram Bot API domain knowledge: webhook retry behavior, `secret_token`, `update_id` deduplication field
-- Python domain knowledge: pickle limitations, dict mutability, module-level vs. call-level object scoping
+- Internal: `/home/solanoe/code/robotina-gsd/plans/02-workflow-refinement/description.md` (architectural direction; explicit open questions cited above)
+- Internal: `/home/solanoe/code/robotina-gsd/src/robotina/queue/workflow_runner.py` (D-07 transactional advancement; D-16 failure_reason format; WR-02 length cap; AOF + `result_ttl=-1, failure_ttl=-1` invariants)
+- Internal: `/home/solanoe/code/robotina-gsd/src/robotina/agent/tools/start_workflow.py` (Phase 07.1 `return_direct=True`, REQ-HID-3 household_id required, args_schema with `extra='forbid'`)
+- Internal: `CLAUDE.md` (Phase 11 response_format adoption; Phase 16 four-layer household_id; LangChain 1.x via `langchain.agents.create_agent`; concurrency=1; AOF `appendfsync always`)
+- Internal: project memory `feedback_overrides_in_sync.md` (AGENT_REGISTRY ↔ overrides invariant)
+- Internal: project memory `feedback_queue_at_front.md` (notifications via QueueTool at_front=True)
+- Internal: project memory `project_local_dev_setup.md` (agent/gateway on host; Postgres/Redis in Compose — SSRF-relevant: `localhost` from agent IS the host machine)
+- External: [LangChain agents docs (`create_agent` ReAct loop, final-message content semantics)](https://docs.langchain.com/oss/python/langchain/agents) — MEDIUM confidence on exact final-AI-message-content vs. structured-response interaction; smoke test in Phase 02 before locking the prompt
+- External: [LangChain GitHub #34010 — Disable parallel tool calls in `create_agent()`](https://github.com/langchain-ai/langchain/issues/34010) — HIGH confidence that `parallel_tool_calls` is not exposed on `create_agent`; workaround documented
+- External: [LangChain forum — parallel tool calling in LangGraph](https://forum.langchain.com/t/parallel-tool-calling-in-langgraph/439) — corroborates above
+- External: [recipe-scrapers docs](https://docs.recipe-scrapers.com/) — HIGH confidence that the library is parser-only and the caller owns network/security
+- External: [recipe-scrapers GitHub](https://github.com/hhursev/recipe-scrapers) — wild_mode behavior and supported-sites list
+- External: General SSRF prevention guidance (OWASP SSRF cheat sheet patterns: scheme allowlist, IP allowlist post-DNS, redirect re-validation, resource caps) — applied here to Python/httpx specifics
 
 ---
-*Pitfalls research for: Robotina — Python LangChain agent with RQ task queue and workflow orchestration*
-*Researched: 2026-03-25*
+*Pitfalls research for: Robotina v1.1 Workflows Abstraction Refinement*
+*Researched: 2026-05-18*

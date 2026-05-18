@@ -1,144 +1,281 @@
-# Feature Research
+# Feature Research — Milestone v1.1 Workflows Abstraction Refinement
 
-**Domain:** AI home assistant agent — Telegram bot + task queue + multi-step workflow orchestration
-**Researched:** 2026-03-25
-**Confidence:** HIGH (derived from authoritative spec and existing skill implementation; no web search available)
+**Domain:** Recipe-management Telegram agent — three product features (multi-recipe per message, URL-pointed recipe, recipe images)
+**Researched:** 2026-05-18
+**Confidence:** MEDIUM-HIGH (recipe-scrapers/SSRF/image-source patterns well-documented; consolidated-reply UX patterns are convention-driven, not standardized)
 
----
+## Scope & Reading Order
 
-## Feature Landscape
+This research is grouped by the THREE new feature categories in this milestone. Existing capabilities (single-recipe text-query pipeline, Telegram gateway, RQ queue, LangWatch instrumentation, 4-layer household_id validation, `response_format=PydanticModel`) are NOT re-researched — see `.planning/PROJECT.md` for the v1.0 baseline.
 
-### Table Stakes (Users Expect These)
+The architectural refactor (Robotina-as-decider, `RobotinaInvocation` entity, FK closure on `WorkflowRun`, wake-when-all-workflows-done, removal of `acknowledge-add-recipe`) is the *enabler* for these features but is documented separately in `plans/02-workflow-refinement/description.md`. This file focuses on what each *product feature* needs and what to skip.
 
-Features that must exist for the system to function at all. Missing any of these means the system does not deliver its core value.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Receive and parse Telegram messages | The entire system triggers on user messages; no message = no agent | LOW | Gateway persists message, fetches history, enqueues task — three atomic operations |
-| Deduplicate incoming messages | Telegram can redeliver webhooks; processing twice causes duplicate side effects | LOW | `platform_message_id` unique constraint on `StoredMessage` handles this at the DB layer |
-| Persist conversation history | Agent needs context across turns; stateless = feels like talking to amnesia | LOW | Postgres `Conversation` + `StoredMessage` models; history length configurable via env var |
-| Task queue with exactly-one concurrency | Multiple concurrent agent runs would corrupt shared state and create race conditions on workflow advancement | MEDIUM | RQ + single worker; not a limitation — an architectural invariant |
-| Task input/output as typed Pydantic models | Strong contracts between producer and consumer; prevents silent data corruption across task handoffs | LOW | All four task types (`IncomingMessageInput`, `RecipeResearchInput`, `RecipeLoadInput`, `SendNotificationInput`) fully specified |
-| Redis AOF persistence | A crash with pending tasks should not silently lose work | LOW | `appendfsync always` — every enqueue acknowledged only after disk flush |
-| Agent responds to user in Telegram | If the loop doesn't close back to the user, the system is invisible | LOW | `send-notification` task + Telegram send via gateway |
-| Telegram-safe message formatting | Telegram's MarkdownV2 rejects unescaped special characters and silently drops messages | MEDIUM | `send-notification` agent applies `format-telegram-message` skill before delivery; a dedicated agent step prevents formatting errors from corrupting content agents |
-| LLM provider abstraction | Different task types may need different models; hardcoding one provider blocks experimentation | MEDIUM | `LLMBackend` Protocol; adapters for Ollama, Anthropic, OpenAI; config per task type in `agents.py` |
-| Per-task-type system prompts | Each agent specialization needs its own focused prompt; one global prompt produces incoherent behavior | LOW | Versioned markdown prompts at `prompts/<task-type>/V001.md`; swappable at runtime |
-| Skill lazy loading | Full context bloat on every agent run degrades performance and wastes tokens | LOW | Index pre-loaded; sub-files fetched on demand via `read-skill` tool |
-| Household Manager API tool | Agents need to read/write household data; hard-coding HTTP in agents couples them to auth details | LOW | Tool handles Bearer auth invisibly; `401`/`403` raise hard errors — not passed back to LLM |
-| Workflow step isolation (no reply_context in intermediate tasks) | Intermediate agents (recipe-research, recipe-load) must not know about Telegram; coupling breaks reusability | MEDIUM | `reply_context` stored once in `WorkflowRun.shared_context`; task runner injects it only into `send-notification` input |
-| Workflow failure propagation | A failed step must not leave the workflow in a zombie "running" state indefinitely | LOW | On step failure: mark step `FAILED`, cancel remaining `PENDING` steps, mark `WorkflowRun` `FAILED` |
-| Failed job retention (dead letter queue) | Developers need to inspect failures post-mortem | LOW | RQ's built-in failed registry; `result_ttl = -1` and `failure_ttl = -1` on all jobs |
-| LangWatch + OTel instrumentation | Without traces, debugging LLM failures is guesswork | MEDIUM | Must be active in both production and experiment runs; traces scoped to experiment collection |
-
-### Differentiators (Competitive Advantage)
-
-Features that make this system good rather than mediocre. These align with the core value: "Families can delegate household tasks in natural language and trust that they get done."
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Centralized task-runner workflow orchestration | Individual agents stay dumb and reusable; sequence logic lives in one place (`workflows.py`), not scattered across agents | HIGH | `WorkflowDefinition` registry with `build_input` callables; agent independence is the payoff — adding a new workflow step only requires a new `WorkflowStepDef`, not changes to existing agent inputs |
-| Human-readable ingredient resolution (name → ID) | Recipe-research agent can name "Huevo" without knowing database IDs; recipe-load resolves names against `/api/foods?name=` and `/api/units?name=` lookups | MEDIUM | `RecipeData` uses `food_name`/`unit_name` strings; resolution happens at load time with targeted name-filter API calls |
-| Prompt versioning with runtime override | Swap prompts without a redeploy; keep old versions for regression comparison | LOW | `AGENT_OVERRIDES_FILEPATH` JSON file; version files named `V001.md`, `V002.md`, etc. |
-| Standalone experiment scripts per task type | Evaluate prompt quality independently from the full system; iterate without manual end-to-end testing | MEDIUM | One script per task type (recipe-research, recipe-load, send-notification); LangWatch traces scoped to named experiment collection |
-| Separate scheduler worker | Scheduled tasks don't compete with or block real-time agent processing | LOW | Two workers: `scheduler-worker` (moves jobs into `agent-tasks`) and `task-runner` (processes agent jobs); decoupled by design |
-| User messages enqueued at front of queue (urgent priority) | User messages are never delayed by background tasks already in queue | LOW | RQ `at_front=True` for `handle-incoming-message` tasks enqueued by gateway |
-| Accumulated artifacts pattern | Each workflow step's output is persisted and accessible to all subsequent steps; no re-fetching or re-computing data | MEDIUM | `WorkflowRunStep.artifact` → `accumulated_artifacts` dict keyed by `step_key`; enables clean data flow without coupling |
-| Per-task LLM configuration | Route cheap tasks to a small local model (Ollama), expensive tasks to a frontier API; optimize cost without architectural change | LOW | Full connection details (url, model, api_token) per task type in `agents.py`; env var convention: `RECIPE_RESEARCH_API_TOKEN` |
-| `source_url` on recipe data | Users can verify the original recipe source; preserves attribution | LOW | `RecipeData.source_url: str | None` — populated by recipe-research if the web source is found |
-
-### Anti-Features (Commonly Requested, Often Problematic)
-
-Features that seem useful but would harm the system in Phase 1 — either through scope creep, hidden complexity, or violating proven architectural decisions.
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Automatic workflow retry on failure | Failed workflows look like bugs, not permanent failures | Retry without fixing the underlying cause (bad recipe query, API 500) produces the same failure again; compensating actions (undo a half-created recipe) require saga logic not justified in Phase 1 | Manual inspection via RQ Dashboard + failed registry; fix and re-enqueue manually |
-| Agent-to-agent chaining (agents enqueue their own successors) | Seems more autonomous | Couples agents to workflow topology; adding a step requires editing multiple agents; breaks "agents know nothing about the sequence" invariant | Centralized task-runner advancement via `workflows.py` registry |
-| Prompt content embedded in `agents.py` / code | Feels simpler initially | Prompts can't be iterated without a redeploy; no version history; evaluation infrastructure can't pin a version | Versioned markdown files + `AGENT_OVERRIDES_FILEPATH` runtime swap |
-| Streaming responses back to Telegram | Real-time feedback feels polished | Telegram Bot API streaming is complex, requires maintaining open connections through the task queue, and breaks the queue's decoupled reply model | Send a complete formatted message via `send-notification`; acceptable latency for household tasks |
-| Multi-household support | Needed eventually | Requires per-household API keys, auth routing, and conversation isolation; adds non-trivial complexity before the single-household model is validated | `household_id` field exists in all models as a forward-compatibility shim; static from env var in Phase 1 |
-| Inline formatting in content agents | Content agents (recipe-research, recipe-load) could format their own output for Telegram | Couples content agents to the presentation layer; format changes require re-testing all agents | `send-notification` agent owns all Telegram formatting via `format-telegram-message` skill |
-| Conversation-level memory (summarization / vector store) | Long-running household context | Adds a retrieval layer before the core pipeline is validated; over-engineering for Phase 1 | Window-based history (last X messages, configurable); sufficient for household question/answer and recipe addition |
-| Web UI for task monitoring | RQ Dashboard is a dev tool | Building a custom UI before core functionality is proven wastes engineering time | RQ Dashboard (`rq-dashboard`) ships with RQ; zero implementation cost for job inspection |
-| Real-time push notifications (proactive agent messages) | Agent could notify family about expiring groceries | Scheduler tool and scheduler API are designed for this; the infrastructure exists but requires planned scheduled tasks, not ad-hoc push | Use scheduler once Phase 1 is stable; don't bolt proactive logic onto Phase 1 agents |
+Categories below are intended to become REQUIREMENTS.md sections.
 
 ---
 
-## Feature Dependencies
+## Category 1: Multi-Recipe Intake
+
+**Goal:** A single user message like *"agregá canelones de choclo, pollo al horno y arroz pilaf"* is parsed into N recipes; each becomes an independent `add-recipe` workflow; one consolidated final reply is sent after the last one drains.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / Dependencies |
+|---------|--------------|------------|----------------------|
+| LLM-driven N-recipe extraction from one message | Users speak naturally ("agregá A, B y C"); rule-based splitters fail on Spanish coordination ("y", "más", commas, "porfa"). Modern recipe/cooking assistants all accept compound requests. | M | Robotina prompt teaches the pattern + bound `start-workflow` tool. Depends on `response_format` / multi-tool-call already being available in the LangChain 1.x stack (Phase 11). |
+| Per-recipe independent fate (one failure ≠ batch failure) | Cancelling 3 recipes because canelones failed is unacceptable. Industry convention (AWS SQS partial-batch-failure, S3 Batch Operations PARTIAL status) treats per-item outcomes as independent. | S | Already aligned with the milestone's "fate-sharing is workflow's scope" rule. Each workflow = independent. |
+| Consolidated final reply summarizing N outcomes | The user sent one message; one final reply is the natural unit. Three separate "✓ done" messages spam the chat. | S | Wake-when-all-workflows-done rule already in milestone description. Robotina sees N `WorkflowRun.outcome` rows at wake time. |
+| Outcome status tri-state (SUCCESS / PARTIAL / FAILED) | S3 Batch Operations and most batch frameworks expose at minimum the three states; users need to know if *any* recipe got saved or none did. | S | Derived in the Robotina prompt from the N outcomes; no schema change beyond per-workflow `outcome`. |
+| Per-recipe failure reason in the final reply | A 2-of-3 partial summary that omits *why* canelones failed is useless ("¿pero por qué?"). Compact reason strings on the failed outcomes. | S | `WorkflowRun.outcome` carries a short structured failure reason; Robotina renders it. |
+| Order-preserving summary | If the user listed "A, B, C", the reply should reflect outcomes in that order. Reordering is confusing and looks like a bug. | S | Robotina prompt instruction; trivial once the dispatched workflow set is keyed by user-provided position. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes / Dependencies |
+|---------|-------------------|------------|----------------------|
+| Pre-dispatch ack ("voy con 3: A, B, C — te aviso al terminar") | Sets expectations during sequential drain (concurrency=1; 3 recipes ≈ 1-3 min). Without it, the user thinks Robotina ignored them. | S | One `respond()` call before the N `start-workflow` calls in the same Robotina turn. Already supported by the new tool surface. |
+| Inline correction / deduplication ("ya tenés pollo al horno; lo agregás igual?") | Saves the user from creating duplicates when their library is small. Differentiator vs. raw batch ingest. | M | Robotina pre-checks via `household-manager-api` read tools before dispatching workflows. Depends on the existing list-recipes read tool. |
+| Mixed intent in one batch (e.g. "agregá A y B, y borrá C") | Power-user UX; the same dispatch model trivially supports heterogeneous workflow types. | M | Future-friendly: the `start-workflow` tool already accepts `workflow_type`. Requires `delete-recipe` workflow (not in this milestone) so deferred. |
+| Chunked progress chatter ("listo canelones, sigo con pollo…") | More engaging during long batches. | M | The milestone description explicitly punts this: "mid-batch progress chatter from a single Robotina turn" is **out of scope** for V1; the answer is workflow chunking, not a wake-policy knob. Deferred. |
+
+### Anti-Features (DO NOT BUILD)
+
+| Anti-Feature | Why Tempting | Why Problematic | Alternative |
+|--------------|--------------|-----------------|-------------|
+| `start-workflow(list_of_workflows=[...])` — single list-form tool call | Looks cleaner than N tool calls; one call is "simpler". | Tool-calling reliability research shows LLMs are *more* reliable emitting N independent tool calls than one tool call with an array argument, especially across providers. Structured-output success rates per step compound: 95% per-step × 10 steps ≈ 60% completion. Per-call validation is better. The milestone description lists this as an open question — research consensus leans multi-call. | Multi-call: `start-workflow` invoked N times in one Robotina turn. Matches OpenAI/Anthropic parallel-tool-call patterns. |
+| Per-recipe inline assistant messages while batch drains | Feels "live" / "responsive". | Spec explicitly out of scope. The concurrency=1 worker is also processing those `send-notification` jobs in series, so they'd interleave badly with workflow steps, and there's no clear winner for ordering. Also defeats the consolidated-reply UX. | One pre-dispatch ack + one post-batch consolidated reply. Use workflow chunking if mid-batch is truly needed. |
+| Rule-based regex/grammar splitter (commas, "y", "más") | Cheap, no LLM cost. | Spanish coordination + user-paste variability + emojis + URLs mixed with names = fragile. The same Robotina turn that needs to decide *intent* is already an LLM call; let it produce the N items as structured tool calls. | LLM extraction (Robotina turn) producing N `start-workflow` calls. |
+| Hard cap "max 10 recipes per message" enforced at gateway | "Safety" against runaway batches. | Premature; concurrency=1 already throttles. A cap at the Robotina-prompt level (soft guidance) is fine, but a hard gateway reject creates a confusing failure mode. | Soft guidance in the Robotina prompt: if the user lists >N, ask for confirmation. Hard caps only at higher layers if abuse appears. |
+| Retry-failed-only "redo" tool | Looks helpful; mirrors AWS SQS partial-batch retry. | Each workflow is already idempotent at the household-manager level (recipe name uniqueness check); a redo is just "send the message again". No retry state machine needed in V1. | The user re-asks; failed-registry rows are visible in the queue dashboard for operator inspection (already shipped in Phase 13). |
+
+### Complexity Hint Summary
+
+| Concern | Hint | Driver |
+|---------|------|--------|
+| Robotina prompt — multi-recipe extraction | S | Single prompt change + `response_format` already in place |
+| Robotina prompt — consolidated-reply composition over N outcomes | M | Prompt-quality work, but small structurally |
+| Removing the `return_direct=True` on `StartWorkflowTool` | S | Already called out in the milestone migration notes |
+| Tracking outcomes back to the originating Robotina invocation | M | New `triggered_by_invocation_id` FK + wake check |
+| Test coverage (1, 2, 3, all-fail, partial-fail, all-success) | M | 5-6 integration test scenarios needed |
+
+### Dependencies on Existing Features
+
+- **`RobotinaInvocation` entity** (milestone refactor) — wake rule requires it
+- **`WorkflowRun.outcome`** column (milestone refactor) — compact per-recipe summary
+- **`StartWorkflowTool` without `return_direct=True`** (milestone refactor) — allows N calls per turn
+- **Existing `add-recipe` workflow** (v1.0) — unchanged; each batch item is one instance
+- **Existing `response_format=PydanticModel`** (Phase 11) — schema-constrained outputs
+- **Existing 4-layer `household_id` validation** (Phase 16) — same household across all N dispatches
+
+---
+
+## Category 2: URL-Pointed Recipe Ingestion
+
+**Goal:** *"agregá esta receta: https://example.com/foo"* ingests THAT recipe (not a hallucinated variant). New `gather-from-url` first step; downstream pipeline unchanged.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / Dependencies |
+|---------|--------------|------------|----------------------|
+| schema.org Recipe JSON-LD extraction (primary path) | The overwhelming majority of food-blog and recipe sites publish JSON-LD Recipe markup; `recipe-scrapers` library handles 639 explicitly supported sites plus generic schema.org via `wild_mode`. | S | Use `recipe-scrapers` (`pip install recipe-scrapers`). Library parses JSON-LD, Microdata, RDFa, OpenGraph; the spec already names it. |
+| Microdata + RDFa + OpenGraph fallback | Older sites use Microdata/RDFa; many blogs at least set OpenGraph image + title. `recipe-scrapers` covers all of these natively. | S | Included in `recipe-scrapers`; no extra work. |
+| LLM fallback for sites without structured data | The long tail of personal blogs publishes recipes as plain HTML. Without LLM extraction, those URLs hard-fail. | M | New `gather-from-url` agent: fetches HTML, runs LLM extraction with `response_format=RecipeData`. Reuses the Pydantic schema already produced by `recipe-research-gather`. |
+| SSRF defense: scheme allowlist (`http`, `https` only) | Without it, `file://`, `gopher://`, `ftp://` schemes can hit local files / internal services. CodeQL, Bearer, Snyk all flag this. | S | Validate parsed URL scheme before fetch. One-liner. |
+| SSRF defense: block private/loopback/link-local IP ranges after DNS resolution | Attacker provides a URL whose hostname resolves to `127.0.0.1`, `169.254.169.254` (cloud metadata), `10.x.x.x`, `192.168.x.x`. Requires post-DNS-resolution IP check. | M | Resolve hostname → check IP against private ranges before issuing the HTTP request. Standard SSRF mitigation. |
+| Redirect handling — manually-followed, re-validated | `requests`/`httpx` defaults follow redirects and do NOT re-validate the destination IP. SSRF papers cite this as the #1 bypass. | M | Set `follow_redirects=False`; manually iterate up to N redirects, re-running scheme + IP checks each hop. |
+| Connection + read timeouts | An attacker URL that hangs forever blocks the sequential worker (concurrency=1). | S | `httpx.Timeout(connect=5, read=15)` baseline. |
+| Content-Type validation | Servers can return non-HTML (huge binaries, video streams). | S | Check `Content-Type` starts with `text/html` or `application/xhtml+xml`; reject otherwise. |
+| Response size cap | A 100MB HTML page exhausts memory. | S | Stream + abort after ~5MB (configurable). |
+| Source-discriminator at workflow input (`{kind: "query" \| "url", value: ...}`) | The add-recipe pipeline must know which first step to run; downstream stays identical. | S | Already designed in milestone description. Pydantic discriminated union. |
+| URL extraction from the user message | The user types "agregá esta: https://...", not a bare URL. Robotina must extract the URL substring before calling `start-workflow`. | S | Standard URL regex in the Robotina prompt; or pass the whole message as `value` and let the `gather-from-url` agent re-parse. The former is cleaner. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes / Dependencies |
+|---------|-------------------|------------|----------------------|
+| Robust LLM fallback with HTML→markdown reduction before extraction | Cleaner LLM context, lower hallucination on prose blogs. | M | Use `readability-lxml` or similar to strip nav/ads before LLM extraction. Defer to V2 unless wild_mode failure rate is high. |
+| Translate non-Spanish recipe content into Spanish at ingestion | Family speaks Spanish; English/Italian recipe sites are common. | M | Add a translation step (or instruct the existing `recipe-research-instructions` / `recipe-research-ingredients` steps to translate during their already-LLM-driven refinement). Cheaper than a dedicated translation step. |
+| Cache scraped URL → RecipeData for re-ingestion / idempotency | Avoid re-fetching when the user pastes the same URL twice. | M | Hash URL → DB row. Marginal value at our scale; defer. |
+| Per-site adapter fallback (curated scraper override) | `recipe-scrapers` already has 639 site-specific adapters. | S | Free — `recipe-scrapers` picks site-specific adapter automatically before `wild_mode`. Not extra work. |
+| Honor `robots.txt` / publisher ToS | Reputational/legal. Most cooking-blog ToS allow user-driven scraping for personal use, but it's polite. | S | Optional; many open-source recipe apps skip this. Document as a known concern. |
+
+### Anti-Features (DO NOT BUILD)
+
+| Anti-Feature | Why Tempting | Why Problematic | Alternative |
+|--------------|--------------|-----------------|-------------|
+| "Just pass the URL to Tavily and let the existing query-pipeline figure it out" | Reuses the existing 5-step pipeline; one less code path. | This is *exactly* the bug the milestone exists to fix — Tavily returns *similar* recipes, and the LLM hallucinates a variant. Defeats the entire "use THIS exact recipe" promise. | New `gather-from-url` first step that does deterministic extraction first, LLM fallback second. |
+| Following redirects with `follow_redirects=True` (the `requests`/`httpx` default) | "Simpler code." | Re-enables every SSRF bypass. `requests.get(url, allow_redirects=False, timeout=5)` is the documented secure pattern. | Manual redirect loop with re-validation per hop. |
+| Trust-the-URL-scheme-from-user-input | Bare check on `urlparse(url).scheme in {"http","https"}` looks safe. | An attacker can craft `urlparse("javascript:...")` or use schemes a registered transport adapter handles. Combined with redirects, can land elsewhere. | Allowlist + scheme + IP-range + content-type, all four. Defense in depth. |
+| Custom HTML parser ("we'll handle JSON-LD ourselves") | Avoids a dependency. | `recipe-scrapers` covers 639 sites + wild_mode for free, with active maintenance. Hand-rolling reimplements years of edge cases. | Use `recipe-scrapers`; only the LLM-fallback path is custom. |
+| Allowing `data:` URIs / base64-embedded HTML | "Power user feature." | Bypasses all network defenses; no real use case. | Reject anything that isn't `http(s)://`. |
+| Aggressive retry on URL fetch | "Robustness." | A slow/down site blocks the sequential worker even longer; user gets nothing for minutes. | One attempt, short timeout, clean failure → workflow outcome = `recipe_fetch_failed` with a Spanish reason. |
+| Caching scraped HTML on disk | "Performance." | Compliance/PII risk (third-party content), and the worker is single-tenant on a single household; cache hit rate is near-zero. | None — re-fetch on retry. |
+
+### Complexity Hint Summary
+
+| Concern | Hint | Driver |
+|---------|------|--------|
+| `recipe-scrapers` integration | S | One library call, well-documented |
+| LLM fallback agent (`gather-from-url` task type) | M | New agent definition, prompt, tool wiring (similar shape to `recipe-research-gather`) |
+| SSRF defenses (scheme + IP + redirect + content-type + size + timeout) | M | Layered checks; existing patterns from CodeQL/Bearer/Snyk; ~100 LOC including tests |
+| Source-discriminator wiring in `add-recipe` workflow definition | S | Pydantic discriminated union + first-step branch |
+| Robotina prompt — extracting URLs from "agregá esta receta: https://..." | S | One prompt rule + a few examples |
+| Integration tests against fixture HTML (known JSON-LD site + LLM-fallback site) | M | Need realistic HTML fixtures for both paths |
+
+### Dependencies on Existing Features
+
+- **Existing `add-recipe` workflow pipeline** — downstream steps (instructions/ingredients/metadata/load) reused verbatim; the `gather-from-url` step produces a `RecipeData` matching the existing schema
+- **Existing `RecipeData` Pydantic schema** (Phase 15) — must be sufficient as the contract; the milestone description flags as an open question whether downstream "research" steps can tolerate well-populated input vs. needing refinement semantics
+- **Existing `response_format=PydanticModel`** (Phase 11) — LLM fallback agent uses it
+- **Existing `httpx` dependency** (already in stack) — for the URL fetch; configure with SSRF defenses
+- **Existing food/unit semantic validation tools** (Phase 15) — downstream `recipe-research-ingredients` will still validate URL-sourced ingredient names
+
+---
+
+## Category 3: Image Acquisition
+
+**Goal:** Every saved recipe gets an associated image when one is available. Failure to acquire an image is non-fatal (recipe still saves); the gap is reported in `WorkflowRun.outcome`.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / Dependencies |
+|---------|--------------|------------|----------------------|
+| Image URL associated with each saved recipe | Recipes without images "feel half-done in any household UI" (milestone description). Industry-standard table stakes for recipe apps. | S | New `image_url` column on the recipe record (household-manager backend; coordinate with that team) OR Robotina stores it as part of the recipe payload. |
+| Non-fatal image failure (recipe still saves; outcome reports gap) | Image-source APIs are flaky; blocking recipe save on flaky third-party APIs is unacceptable. | S | Already designed in milestone description. Image step's failure does not cancel the downstream `recipe-load` step. **Note:** This breaks the existing "fate-sharing" rule for one specific step — needs explicit handling. |
+| Source for the image: web image search (V1 lean) | Milestone description says "V1 lean: web image search." Cheaper, faster, and yields real food photos rather than AI hallucinations. | S | Tavily already in the stack supports image search; or Unsplash/Pexels APIs (free tiers; well-documented). |
+| Source URL pinned (not re-hosted) for V1 | Self-hosting needs CDN/storage decisions out of scope for this milestone. The milestone description leaves this open. | S | Store the third-party URL on the recipe record. Document link-rot risk; revisit if it becomes a real problem. |
+| Per-recipe image-search query construction | "Canelones de choclo" + locale hint produces better results than just the dish name. | S | Image-search agent gets the full `RecipeData` and constructs a query. |
+| URL validation before save (same SSRF hardening as Category 2) | Image URLs come from third-party APIs but still need scheme + content-type + IP-range checks since the URL gets persisted and re-served. | S | Reuse the SSRF-validation helper from Category 2. |
+| Honor the image API's attribution requirement | Unsplash/Pexels require attribution per ToS. If we don't honor it, we violate API terms. | S | Persist photographer + source URL alongside the image; render attribution wherever the image is shown. |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes / Dependencies |
+|---------|-------------------|------------|----------------------|
+| Image taken directly from the source page when URL-ingesting | For URL-pointed recipes, the page's own hero image (from `recipe-scrapers`' `.image()` method or OpenGraph `og:image`) is the *right* image. Avoids a redundant search. | S | `recipe-scrapers` returns image URL natively. Use it as the V1 default for URL-sourced recipes; fall back to web image search only if missing. |
+| AI image generation fallback (DALL-E / Stable Diffusion) | When neither the source page nor image search yields a usable image, generate one. Surface differentiator. | L | Expensive, slow, and AI-generated food images have a known "uncanny valley" quality. Defer to V2 unless image-search hit rate is poor. |
+| Image-quality heuristic ("is this actually food?") via a vision model | Image search returns plenty of off-topic results; a classifier filter improves hit rate. | L | Real value but high complexity. Defer to V2. |
+| Re-host (download + store in backend) to avoid link rot | Long-term archive value; Unsplash URLs can change. | M | Requires backend image-storage endpoint, which is out of scope for this milestone (and a household-manager-side decision). Defer. |
+| Alt-text generation for accessibility | Best practice for any UI that displays images. | S | Trivial — use the recipe name as alt text. Add when client app surfaces images. |
+| Image-quality heuristic without ML (dimensions, file size, aspect ratio) | Reject 50×50 thumbnails. | S | Cheap; check during URL validation. |
+
+### Anti-Features (DO NOT BUILD)
+
+| Anti-Feature | Why Tempting | Why Problematic | Alternative |
+|--------------|--------------|-----------------|-------------|
+| AI image generation as the primary image source | "Always produces an image; never depends on third-party search APIs." | Cost (DALL-E is $0.04+ per image, 3× the cost of the *whole rest of the recipe workflow*), latency (slow on the sequential worker — blocks the queue), and the well-documented "AI-generated food looks plastic" problem. Real food photos from Unsplash/Pexels look better and are free or cheap. | Web image search (Tavily / Unsplash / Pexels); generation only as a Differentiator fallback in V2. |
+| Block recipe save on image-acquisition failure | "Better not to save a half-done recipe." | The milestone description explicitly forbids this: "Failure to acquire an image is non-fatal (recipe still saves)." Real users prefer a saved recipe with no image to no saved recipe at all. | Non-fatal failure; report gap in `outcome`. |
+| Aggressive retry on image search | "Robustness." | Same as URL-fetch retry: blocks the sequential worker. | One attempt, short timeout, mark gap, continue. |
+| Image hotlinking via API URL without compliance with `Authorization`/cache rules | "Simplest possible thing." | Unsplash requires hotlinking through their proxied URLs (not raw S3 paths). Bypassing means breakage when they rotate URLs, plus ToS violation. | Use the official API's returned URL exactly; honor cache headers. |
+| Per-recipe image *skip* control (user-driven "no image please") | Could be useful for some users. | Milestone description says "Per-recipe skippability (later; not V1 blocker)." | Defer. |
+| Store images directly in Postgres (BYTEA) | Avoids a separate storage system. | Image data in Postgres bloats backups, hurts query performance, and locks us out of CDN serving later. Industry consensus: blob storage, not relational. | Store URL only in V1; consider object storage + CDN in V2 if re-hosting becomes a requirement. |
+| Inferring image acceptability from search result rank alone | "Top result is usually best." | False often enough to matter: top Tavily/Unsplash result for "tarta" might be a generic tart, not the Argentine version. | Accept top result for V1; add quality filtering only if user complaints accumulate. |
+
+### Complexity Hint Summary
+
+| Concern | Hint | Driver |
+|---------|------|--------|
+| New `recipe-image` task type + agent + prompt | M | Standard agent shape, similar to existing research steps |
+| Image-source tool wiring (Tavily image search OR Unsplash/Pexels) | S | One HTTP-tool wrapper; choose one provider |
+| Non-fatal step semantics in the workflow runner | M | New: existing runner cancels remaining steps on any step failure. Image step needs an exception. Either a per-step `non_fatal=True` flag or a `try-extract-image-then-load` shape where the image step writes "missing" instead of failing. |
+| `image_url` field on recipe — coordination with household-manager backend | S-M | External team coordination; treated as a known precondition. |
+| URL-sourced path uses `recipe-scrapers`' `.image()` directly | S | Free; comes from the library already used for URL ingestion |
+| SSRF/content-type validation on image URL before persist | S | Reuse helper from Category 2 |
+
+### Dependencies on Existing Features
+
+- **`recipe-scrapers` library** (from Category 2) — provides the source-page image for URL-sourced recipes
+- **Existing `recipe-load` step** (v1.0) — receives an `image_url` field on the recipe payload; needs schema extension
+- **`WorkflowRun.outcome`** (milestone refactor) — reports the "image missing" gap in a non-fatal way
+- **Existing food/unit validation pipeline** (Phase 15) — image step runs *after* validation, *before* `recipe-load`; doesn't interact with validation
+- **household-manager backend** (external) — must accept and store an `image_url` field on the recipe entity (out-of-repo coordination)
+
+---
+
+## Cross-Cutting Concerns
+
+### URL Fetching Safety (used by Categories 2 + 3)
+
+Both URL ingestion and image-URL persistence need the same hardened HTTP-fetch helper. Build it once.
+
+**Required defenses (defense in depth):**
+1. Scheme allowlist: `{"http", "https"}`
+2. Hostname resolution → reject private/loopback/link-local IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16`, `::1`, `fc00::/7`)
+3. Manual redirect handling with per-hop re-validation (no `follow_redirects=True`)
+4. Connect + read timeouts (e.g. 5s / 15s)
+5. Content-Type validation (HTML for Category 2; image/* for Category 3)
+6. Response size cap (stream + abort)
+
+**Implementation note:** A single `safe_fetch(url, allowed_content_types=...)` helper at the `tools/` layer is cleanest. Used by both `gather-from-url` and `recipe-image`.
+
+### Spanish-Language UX
+
+All user-facing output (per the existing project rules in `CLAUDE.md` and stored memories) must be in Spanish. The consolidated reply, partial-failure summaries, and image-missing notices all flow through Robotina's reply composition.
+
+### LangWatch Trace Correlation
+
+Each of the three feature categories adds new agent task types (`gather-from-url`, `recipe-image`) and changes Robotina's tool-call patterns. All new agents must be wired with the existing middleware-based LangWatch instrumentation (Phase 12) so traces appear in the correct experiment collection. Existing pattern is well-documented; no new work beyond following it.
+
+### Queue Visibility Dashboard
+
+The dashboard (Phase 13) already shows `step_input` and `failure_reason`. Multi-recipe batches will produce N concurrent-looking workflows (actually sequential under concurrency=1). The dashboard should remain usable without changes; verify in QA that the `triggered_by_invocation_id` grouping is queryable for debugging.
+
+---
+
+## Feature Dependencies Across Categories
 
 ```
-[Telegram message receipt (Gateway)]
-    └──requires──> [Message persistence (Postgres)]
-    └──requires──> [handle-incoming-message task enqueue (Queue)]
-                       └──requires──> [Redis + RQ queue (Task Runner)]
-                                          └──requires──> [LLM Backend abstraction]
-                                                             └──requires──> [Per-task prompt versioning]
-                                                             └──requires──> [Skill lazy loading (read-skill tool)]
+Multi-Recipe Intake (Category 1)
+    └── requires ──> Robotina-as-decider refactor (RobotinaInvocation, wake rule, return_direct removal)
+                          └── enables ──> chaining (post-batch Robotina turn re-dispatches if needed)
 
-[Multi-step workflow (add-recipe)]
-    └──requires──> [handle-incoming-message agent]
-    └──requires──> [WorkflowRun / WorkflowRunStep models (Postgres)]
-    └──requires──> [Workflow Registry (workflows.py)]
-    └──requires──> [Task Runner workflow advancement hook]
-                       └──requires──> [Accumulated artifacts persistence]
-                                          └──requires──> [recipe-research agent]
-                                          └──requires──> [recipe-load agent]
-                                                             └──requires──> [Food/unit name resolution (household-manager-api tool)]
-                                          └──requires──> [send-notification agent]
-                                                             └──requires──> [format-telegram-message skill]
-                                                             └──requires──> [send-notification tool (gateway)]
+URL Ingestion (Category 2)
+    └── requires ──> new gather-from-url task type + source-discriminator on add-recipe input
+    └── enables ──> source-page image (Category 3 differentiator)
 
-[LangWatch experiment scripts]
-    └──requires──> [LangWatch + OTel instrumentation (on all agents)]
-    └──requires──> [Prompt versioning (version pinned per experiment run)]
+Image Acquisition (Category 3)
+    └── requires ──> new recipe-image task type
+    └── requires ──> non-fatal-step semantics in workflow runner (NEW exception to fate-sharing rule)
+    └── requires ──> image_url field on recipe entity (household-manager backend coordination)
+    └── enhances ──> URL ingestion (Category 2): source-page image is the best path when available
 
-[Scheduler]
-    └──enhances──> [Task Queue] (adds deferred and recurring trigger capability)
-    └──requires──> [Two separate RQ workers (scheduler-worker + task-runner)]
+Cross-cutting:
+    safe_fetch(url) helper
+    ├── used by Category 2 (URL ingestion)
+    └── used by Category 3 (image URL validation)
 ```
-
-### Dependency Notes
-
-- **Workflow advancement requires Task Runner hook:** The task runner must wrap job execution — not just run it — to persist artifacts and enqueue next steps. This is the most critical integration point in the entire system.
-- **send-notification requires reply_context from WorkflowRun.shared_context:** The task runner builds `SendNotificationInput` from shared context, not from prior step outputs. This is a deliberate decoupling — intermediate agents must not carry reply context.
-- **format-telegram-message skill requires send-notification agent:** Formatting is applied by the Notification agent at delivery time. If the formatting skill is wrong, all notifications break. It must be validated via an experiment script before wiring the full workflow.
-- **recipe-load requires food/unit name resolution:** The recipe-load agent must call `/api/foods?name=` and `/api/units?name=` before creating a recipe. If the household-manager API lacks a food or unit, the load either fails or creates a recipe with missing ingredient details. The agent must handle both gracefully.
-- **LangWatch instrumentation must be active during experiments:** Experiments that bypass instrumentation produce traces invisible to the experiment collection in LangWatch, making evaluation meaningless. Instrumentation is a hard dependency for the experiment infrastructure.
 
 ---
 
-## MVP Definition
+## MVP Definition for This Milestone
 
-### Launch With (v1 — Phase 1)
+### Launch With (v1.1)
 
-Everything needed for both user stories to work end-to-end.
+- [ ] **Multi-recipe parsing in Robotina** — N `start-workflow` calls in one turn, consolidated post-batch reply (Category 1 table stakes)
+- [ ] **URL-pointed ingestion** via `recipe-scrapers` (JSON-LD + Microdata + RDFa + OpenGraph + wild_mode) with LLM fallback (Category 2 table stakes)
+- [ ] **`safe_fetch` helper** with all six SSRF defenses (cross-cutting)
+- [ ] **Image acquisition** — source-page image when URL-sourced, web image search otherwise; non-fatal failure (Category 3 table stakes)
+- [ ] **Per-recipe `WorkflowRun.outcome`** with structured success/failure rendering in the final reply
+- [ ] **Order-preserving consolidated reply** in Spanish
+- [ ] **Image URL validated via the SSRF helper** before persist (Category 3 table stakes)
 
-- [ ] Gateway: receive Telegram message, persist, fetch history, enqueue `handle-incoming-message` — the entry point for all user interaction
-- [ ] Task queue: Redis + RQ, single worker, Pydantic input/output models, AOF persistence — the backbone; nothing works without it
-- [ ] `handle-incoming-message` agent: understands intent, answers directly or starts workflow — the main routing brain
-- [ ] `send-notification` agent: formats and sends Telegram reply — closes the user feedback loop
-- [ ] `format-telegram-message` skill: correct Telegram MarkdownV2 escaping — prevents silently dropped messages
-- [ ] `household-manager-api` tool: authenticated API calls to household-manager — enables recipe/meal-plan queries
-- [ ] `start-workflow` tool: creates `WorkflowRun` + steps, enqueues first step — enables multi-step delegation
-- [ ] `WorkflowRun` / `WorkflowRunStep` models + workflow advancement hook in task runner — the orchestration layer
-- [ ] `recipe-research` agent: web search via Tavily, produces structured `RecipeData` — the research capability
-- [ ] `recipe-load` agent: resolves food/unit names to IDs, creates recipe via API — persists the research output
-- [ ] LangWatch + OTel instrumentation on all agents — required for debugging LLM failures in production
+### Add After Validation (v1.2+)
 
-### Add After Validation (v1.x)
-
-- [ ] Scheduler worker + scheduler API — add when users need proactive or recurring tasks (triggered by need, not speculation)
-- [ ] Experiment scripts for recipe-research, recipe-load, send-notification — technically Phase 1 deliverables but don't block the user-facing workflows; add during agent implementation phases
-- [ ] RQ Dashboard — zero-implementation (just install); add when first debugging session reveals the need
+- [ ] **Pre-dispatch ack** ("voy con 3…") — easy win, defer if Robotina prompt is already complex enough
+- [ ] **Inline deduplication check** before dispatch (Category 1 differentiator)
+- [ ] **Spanish translation** of non-Spanish source pages (Category 2 differentiator)
+- [ ] **Image dimension/aspect-ratio sanity filter** (Category 3 cheap differentiator)
+- [ ] **`recipe-scrapers` site-specific adapter coverage audit** — pin a tested list
 
 ### Future Consideration (v2+)
 
-- [ ] Multi-household support — defer until single-household model is validated; `household_id` field is already a shim
-- [ ] Additional workflow types (grocery ordering, meal plan generation) — defer until add-recipe workflow is proven
-- [ ] Streaming responses — defer indefinitely; complexity not justified for household assistant use case
-- [ ] Conversation-level memory (summarization, embeddings) — defer until window-based history proves insufficient
-- [ ] Additional messaging platforms (WhatsApp, Slack) — gateway abstraction supports it; don't implement until there is a concrete user need
+- [ ] **Workflow chunking for mid-batch chatter** — when real use cases push on it
+- [ ] **Mixed-intent batches** (add + delete + update in one message) — requires more workflow types
+- [ ] **AI image generation fallback** — only if image-search hit rate proves poor
+- [ ] **Vision-model "is this food?" filter** — requires a vision model in the stack
+- [ ] **Re-host images on a household-manager-hosted CDN** — requires backend storage decisions
+- [ ] **HTML→markdown reduction before LLM extraction** — V1 wild_mode + raw HTML is fine for an early version
+- [ ] **URL/HTML caching for idempotent re-ingestion** — premature at current scale
 
 ---
 
@@ -146,88 +283,70 @@ Everything needed for both user stories to work end-to-end.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Gateway: Telegram receive + persist | HIGH | LOW | P1 |
-| Task queue (Redis + RQ, single worker) | HIGH | LOW | P1 |
-| `handle-incoming-message` agent | HIGH | MEDIUM | P1 |
-| `send-notification` agent + format skill | HIGH | LOW | P1 |
-| `household-manager-api` tool (authenticated) | HIGH | LOW | P1 |
-| Workflow infrastructure (WorkflowRun models + advancement hook) | HIGH | HIGH | P1 |
-| `recipe-research` agent (Tavily web search) | HIGH | MEDIUM | P1 |
-| `recipe-load` agent (name→ID resolution + API create) | HIGH | MEDIUM | P1 |
-| LangWatch instrumentation | MEDIUM | MEDIUM | P1 |
-| Prompt versioning + runtime override | MEDIUM | LOW | P1 |
-| Skill lazy loading | MEDIUM | LOW | P1 |
-| `start-workflow` tool | HIGH | LOW | P1 |
-| Redis AOF persistence | HIGH | LOW | P1 |
-| Message deduplication (`platform_message_id`) | HIGH | LOW | P1 |
-| Scheduler worker + API | LOW | MEDIUM | P2 |
-| Experiment scripts (3 task types) | MEDIUM | MEDIUM | P2 |
-| RQ Dashboard | MEDIUM | LOW | P2 |
-| Multi-household support | LOW | HIGH | P3 |
-| Streaming responses | LOW | HIGH | P3 |
+| N-call multi-recipe extraction | HIGH | LOW (prompt change + existing tooling) | P1 |
+| Consolidated final reply | HIGH | LOW (prompt + outcome rendering) | P1 |
+| Per-workflow `outcome` field on `WorkflowRun` | HIGH | LOW (schema + writer) | P1 |
+| `recipe-scrapers` integration | HIGH | LOW (one library) | P1 |
+| `gather-from-url` LLM-fallback agent | HIGH | MEDIUM (new agent + prompt + tool wiring) | P1 |
+| `safe_fetch` SSRF helper | HIGH (correctness/security) | MEDIUM (multiple defenses + tests) | P1 |
+| `recipe-image` agent (search-based) | HIGH | MEDIUM (new agent + image-search tool wiring) | P1 |
+| Non-fatal step semantics in runner | HIGH (required by image step) | MEDIUM (runner change + tests) | P1 |
+| Source-page image (recipe-scrapers `.image()`) | MEDIUM | LOW (free with recipe-scrapers) | P1 |
+| Image URL validation pre-persist | HIGH (security) | LOW (reuse helper) | P1 |
+| Pre-dispatch ack message | MEDIUM | LOW | P2 |
+| Pre-dispatch dedup check | MEDIUM | MEDIUM (extra read call before dispatch) | P2 |
+| Spanish translation of foreign recipes | MEDIUM | MEDIUM | P2 |
+| Image dimension sanity filter | LOW-MEDIUM | LOW | P2 |
+| AI image generation fallback | LOW-MEDIUM | HIGH | P3 |
+| Vision-model "is this food" filter | MEDIUM | HIGH | P3 |
+| Image re-hosting on backend CDN | MEDIUM | HIGH (requires backend work) | P3 |
+| Workflow chunking pattern | LOW (until real demand) | MEDIUM | P3 |
+| URL/HTML caching | LOW | MEDIUM | P3 |
 
 **Priority key:**
-- P1: Must have for Phase 1 launch
-- P2: Should have, add during Phase 1 agent implementation phases
-- P3: Future consideration (v2+)
+- **P1:** Must have for v1.1 launch
+- **P2:** Should have, add when implementation bandwidth allows; not launch-blocking
+- **P3:** Defer until product feedback justifies the cost
 
 ---
 
-## Competitor Feature Analysis
+## Open Questions Carried From Milestone Description
 
-This is an internal household assistant, not a commercial product. "Competitors" are patterns from comparable AI assistant systems rather than market competitors.
+These come straight from `plans/02-workflow-refinement/description.md` "Decisions deferred to milestone discovery". This research informs them but does not close them — phase planning will:
 
-| Feature | Generic ChatGPT wrapper | LangChain ReAct agent (no queue) | Robotina approach |
-|---------|------------------------|----------------------------------|-------------------|
-| Multi-step task execution | Relies on single-run tool chaining; brittle on long tasks | Single agent run with many tool calls; fails on timeout or context limit | Sequential task queue with specialized per-step agents; each step is independently recoverable |
-| Observability | Black box unless vendor provides tracing | Depends on LangSmith or manual logging | LangWatch + OTel on every agent; per-experiment trace collection |
-| Prompt iteration | Redeploy required | Redeploy required | Runtime override via `AGENT_OVERRIDES_FILEPATH`; versioned prompt files |
-| Message platform coupling | Usually hardcoded | Usually hardcoded | Gateway abstraction; `platform` field in models; only gateway knows about Telegram |
-| Data persistence | Ephemeral or vendor-managed | Ephemeral in-memory | Postgres for conversations + workflow state; Redis AOF for task queue |
-| Workflow failure handling | Retry everything or fail silently | No concept of multi-run workflows | Explicit FAILED status propagation; dead-letter queue for inspection |
-
----
-
-## Behavioral Expectations by Subsystem
-
-### Agent Reliability
-
-- An agent that calls a tool and receives a 400 validation error **must** attempt to correct its request using the error message and retry — not surface the error to the user raw. The spec explicitly states "the agent can recover by understanding the mistake and retrying with different parameters or a different tool."
-- A `401` or `403` from the household-manager API is **unrecoverable** — the tool raises a hard error immediately; this response must never be passed back to the LLM as a recoverable signal.
-- An agent that exhausts retries or encounters an unrecoverable error fails the job, landing it in RQ's failed registry.
-
-### Workflow Observability
-
-- Every `WorkflowRunStep` carries `started_at`, `completed_at`, and `status` — sufficient to diagnose where a workflow stalled.
-- `artifact` on each completed step is the full structured output, enabling post-mortem inspection of what data flowed through the workflow.
-- The task runner must log workflow state transitions (step started, step completed, step failed, workflow done, workflow failed) at the same verbosity level as task queue events.
-
-### Telegram Formatting Quirks
-
-- Telegram MarkdownV2 requires escaping of: `. ! ( ) - _ * [ ] { } # + = | ~ > ^`
-- Unescaped special characters in MarkdownV2 cause the entire message to be rejected silently (the API returns success but the message is not displayed).
-- The `format-telegram-message` skill must be a standalone verification step (the `send-notification` agent) — content agents must not attempt to format their own output.
-- Links in Telegram MarkdownV2 use `[text](url)` format; parentheses in URLs must be escaped.
-- The `send-notification` agent receives pre-written text and only reformats it — it does not compose content. This separation means format bugs don't corrupt content.
-
-### Recipe Data Quality
-
-- `RecipeData` uses human-readable names (`food_name`, `unit_name`) not IDs. The recipe-load agent is responsible for the name→ID resolution step.
-- Food and unit names from web-scraped recipes may not match household-manager's canonical names (e.g., "egg" vs. "Huevo"). The recipe-load agent must handle partial matches and zero matches gracefully.
-- `GET /api/foods?name=` is a case-insensitive substring match — use specific enough names to avoid ambiguous matches (e.g., "tomate" matches both "Tomate" and "Tomate cherry").
-- `source_url` is optional but important for recipe attribution; the recipe-research agent should populate it when the web source URL is clearly identifiable.
-- `RecipeStep.title` is optional; the research agent should populate it when the recipe source has titled steps, leave it null otherwise.
-- `servings_qty` + `servings_unit` should be extracted as separate fields (e.g., `4` + `"porciones"`), not merged into a single string.
+1. **Multi-call vs list-form `start-workflow`** — Research leans **multi-call** (research consensus on tool-calling reliability, parallel-tool-call patterns in OpenAI/Anthropic). Confirm during Robotina prompt design.
+2. **URL scraping library choice + fallback ladder** — Research recommends **`recipe-scrapers` (JSON-LD via library) → wild_mode → LLM fallback → fail**. Confirm by validating `recipe-scrapers` against the family's likely recipe-blog corpus in early phase work.
+3. **Image source for V1 + storage location** — Research recommends **source-page image first (recipe-scrapers `.image()`) → web image search (Tavily or Unsplash) → mark missing**. Storage: pin source URL in V1; defer re-hosting decisions.
+4. **Prompt shape for reliable multi-`start-workflow`** — Phase 11 (`response_format`) and the LangChain 1.x `create_agent` API already enable this. The risk is prompt-quality, not engine-capability. Plan iteration time in the phase.
+5. **Wake edge cases (timeout vs failure)** — Both should count as terminal for wake. Confirm by pinning RQ failure-registry semantics in the runner change.
+6. **`RobotinaInvocation` first-class vs in-memory** — Milestone description leans first-class; this research has no reason to disagree.
+7. **Downstream pipeline tolerance of pre-populated `RecipeData` (URL path)** — A real risk: instructions/ingredients/metadata steps were authored assuming sparse input. May need a "refine vs create" mode flag on each. Surface as a Phase risk.
 
 ---
 
 ## Sources
 
-- `plans/01-kickoff/spec.md` — Primary authoritative source; all feature descriptions derive directly from this spec (HIGH confidence)
-- `agent/skills/household-manager/index.md` + `shared.md` — Existing skill implementation confirming household-manager API conventions (HIGH confidence)
-- `.planning/PROJECT.md` — Project scope, constraints, and out-of-scope decisions (HIGH confidence)
-- Training knowledge on RQ, LangChain, Telegram Bot API MarkdownV2 behavior, and LangWatch patterns (MEDIUM confidence — consistent with spec design decisions)
+- [recipe-scrapers GitHub (hhursev/recipe-scrapers)](https://github.com/hhursev/recipe-scrapers) — 639 supported sites; JSON-LD + Microdata + RDFa + OpenGraph; `wild_mode` fallback (HIGH confidence)
+- [recipe-scrapers docs (Getting Started)](https://docs.recipe-scrapers.com/) — installation + `.image()` / `.to_json()` API (HIGH)
+- [scrape-schema-recipe (alternative)](https://pypi.org/project/scrape-schema-recipe/) — schema.org-only Python lib; thinner alternative to recipe-scrapers (MEDIUM)
+- [Mitigating SSRF — Datadog Static Analysis rule](https://docs.datadoghq.com/security/code_security/static_analysis/static_analysis_rules/python-flask/avoid-ssrf/) — Python SSRF prevention patterns (HIGH)
+- [CodeQL: Full SSRF query help — Python](https://codeql.github.com/codeql-query-help/python/py-full-ssrf/) — formal SSRF criteria (HIGH)
+- [Bearer CLI — Python unsanitized URL rule](https://docs.bearer.com/reference/rules/python_lang_http_url_using_user_input/) — defense layers (HIGH)
+- [Tachyon — Why SSRFs are tricky to fix](https://tachyon.so/blog/ssrfs-trickiest-issue) — redirect-revalidation bypass (MEDIUM-HIGH)
+- [Writing Secure Python Applications — SSRF, SQLi, XSS](https://chs.us/2025/11/writing-secure-python-applications-preventing-ssrf-sql-injection-and-xss/) — practical Python patterns (MEDIUM)
+- [Unsplash API docs](https://unsplash.com/developers) — image search API; attribution requirements (HIGH)
+- [Pexels API](https://www.pexels.com/api/) — alternative image API; simpler ToS (HIGH)
+- [LaoZhang AI Blog — Free Image API Comparison (Unsplash vs Pexels vs Pixabay vs Wikimedia)](https://blog.laozhang.ai/en/posts/free-image-api) — comparison rationale (LOW-MEDIUM)
+- [Max Woolf — AI-Generated Food Photography with DALL-E 2](https://minimaxir.com/2022/07/food-photography-ai/) — limitations of generated food images (MEDIUM)
+- [Agenta — Structured Outputs and Function Calling with LLMs](https://agenta.ai/blog/the-guide-to-structured-outputs-and-function-calling-with-llms) — multi-tool-call vs list-form (MEDIUM-HIGH)
+- [DEV — Structured Outputs vs Tool Calling: When Your Agent Needs Which](https://dev.to/thedailyagent/structured-outputs-vs-tool-calling-when-your-agent-actually-needs-which-kgk) — parallel tool calls preferred over list-form (MEDIUM-HIGH)
+- [ML Journey — Reliable Structured Output from LLMs](https://mljourney.com/how-to-get-reliable-structured-output-from-llms/) — 95%→60% compounding-failure framing (MEDIUM)
+- [LangChain docs — Structured output](https://docs.langchain.com/oss/javascript/langchain/structured-output) — `response_format` (HIGH)
+- [AWS Lambda — Reporting batch item failures (SQS trigger)](https://docs.aws.amazon.com/lambda/latest/dg/example_serverless_SQS_Lambda_batch_item_failures_section.html) — partial-batch-success pattern (HIGH)
+- [AWS S3 — Tracking job status and completion reports](https://docs.aws.amazon.com/AmazonS3/latest/userguide/batch-ops-job-status.html) — SUCCESS / PARTIAL / FAILED status tri-state (HIGH)
+- [OneUptime — How to Implement Batch Reporting](https://oneuptime.com/blog/post/2026-01-30-batch-processing-reporting/view) — consolidated summary patterns (MEDIUM)
+- Project context: `/home/solanoe/code/robotina-gsd/.planning/PROJECT.md`, `/home/solanoe/code/robotina-gsd/plans/02-workflow-refinement/description.md` (HIGH — authoritative for this milestone)
 
 ---
-*Feature research for: Robotina — AI home assistant agent (Phase 1)*
-*Researched: 2026-03-25*
+*Feature research for: Robotina v1.1 — multi-recipe, URL ingestion, recipe images*
+*Researched: 2026-05-18*
