@@ -8,6 +8,18 @@ Robotina is the AI agent component of a household management system. It listens 
 
 Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
 
+## Current Milestone: v1.1 Workflows Abstraction Refinement
+
+**Goal:** Polish the recipe-adding capability into something genuinely useful by closing three product gaps (multi-recipe per message, URL-pointed recipes, recipe images) and the architectural cleanup that closing them cleanly requires (Robotina-as-decider outside the work graph; new RobotinaInvocation entity; Conversation↔WorkflowRun FK closure; remove `acknowledge-add-recipe` workaround and `StartWorkflowTool.return_direct=True`).
+
+**Target features:**
+- Multi-recipe in one message (fan-out to N workflows; one consolidated final reply)
+- URL-pointed recipe ingestion (new `gather-from-url` first step; rest of pipeline reused)
+- Recipe images saved alongside each recipe (non-fatal failure)
+- Architectural refactor: Robotina-as-decider, `RobotinaInvocation` entity, wake-when-all-workflows-done rule, immutable workflows once created
+
+**Reference:** `plans/02-workflow-refinement/description.md` — full architectural direction and out-of-scope items.
+
 ## Requirements
 
 ### Validated
@@ -34,8 +46,9 @@ Families can delegate household tasks to Robotina in natural language and trust 
 
 ### Active
 
-- [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API (carried into next milestone)
-- [ ] Shared-link recipe ingestion: ingest a recipe from a URL the user shares in Telegram (next milestone — `recipe-scrapers` dependency already declared)
+<!-- Milestone v1.1 in progress — requirements minted during /gsd:new-milestone, see REQUIREMENTS.md -->
+
+- [ ] Scheduler: scheduled-tasks queue + worker, RQ cron/enqueue_at, scheduler tool, Scheduler HTTP API (deferred — moved to a later milestone after v1.1)
 
 ### Out of Scope
 
@@ -93,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-18 after v1.0 MVP milestone ship — 18 phases, 70 plans, end-to-end add-recipe gold path live in Spanish via Telegram*
+*Last updated: 2026-05-18 after starting milestone v1.1 — workflows abstraction refinement (multi-recipe, URL ingestion, images + Robotina-as-decider refactor)*

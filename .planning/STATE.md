@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: v1.0 MVP
-status: Milestone v1.0 SHIPPED — awaiting /gsd:new-milestone for v1.1
-stopped_at: Milestone v1.0 archived (tagged v1.0); next milestone TBD
-last_updated: "2026-05-18T18:30:00.000Z"
-last_activity: 2026-05-18 — Milestone v1.0 archived, ROADMAP reorganized, RETROSPECTIVE created, tagged v1.0
+milestone: v1.1
+milestone_name: Workflows Abstraction Refinement
+status: planning
+stopped_at: Milestone v1.1 started — defining requirements
+last_updated: "2026-05-18T19:00:00.000Z"
+last_activity: 2026-05-18 — Milestone v1.1 started (workflows abstraction refinement)
 progress:
-  total_phases: 18
-  completed_phases: 18
-  total_plans: 70
-  completed_plans: 70
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-18 after v1.0 MVP shipped)
+See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Milestone v1.0 SHIPPED 2026-05-18 — end-to-end add-recipe gold path live in Spanish via Telegram. Next: `/gsd:new-milestone` to scope v1.1 (shared-link recipe ingestion + scheduler track).
+**Current focus:** Milestone v1.1 — Workflows Abstraction Refinement. Closing three product gaps (multi-recipe per message, URL-pointed recipes, recipe images) and the architectural cleanup that closing them cleanly requires.
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-18 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-18 — Milestone v1.1 started
 
 ## Performance Metrics
 
