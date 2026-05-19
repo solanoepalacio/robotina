@@ -107,6 +107,7 @@ def queue_workflow(
     workflow_type: str,
     shared_context: dict,
     household_id: NonEmptyHouseholdId,
+    conversation_id: str,
     queue,
     session: Session,
 ) -> str:
@@ -121,6 +122,12 @@ def queue_workflow(
                         WorkflowRun.shared_context. Contains reply_context,
                         household_id, recipe_query, etc.
         household_id: Stored on WorkflowRun for filtering/monitoring.
+        conversation_id: FK to Conversation that originated this workflow run.
+            Resolved by run_task (jobs.py handle-incoming-message branch) via
+            session.query(Conversation).filter_by(platform=..., chat_id=...).one()
+            and constructor-injected into StartWorkflowTool. No Python-level guard
+            here — FK NOT NULL + upstream .one() raise carry the invariant
+            (ARCH-01, Phase 17 / D-04 / D-05).
         queue: RQ Queue instance connected to "agent-tasks".
         session: SQLAlchemy session (injected for testability — D-11).
 
@@ -152,6 +159,7 @@ def queue_workflow(
     run = WorkflowRun(
         workflow_type=workflow_type,
         household_id=household_id,
+        conversation_id=conversation_id,
         shared_context=shared_context,
         status=WorkflowStatus.PENDING,
     )
