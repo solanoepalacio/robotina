@@ -29,6 +29,10 @@ def db_session():
         try:
             yield session
         finally:
+            # Phase 18: robotina_invocations.trigger_ref_id -> stored_messages.id
+            # and robotina_invocations.conversation_id -> conversations.id, so
+            # invocations must be cleaned BEFORE their parent rows.
+            session.execute(text("DELETE FROM robotina_invocations"))
             session.execute(text("DELETE FROM stored_messages"))
             session.execute(text("DELETE FROM conversations"))
             session.commit()

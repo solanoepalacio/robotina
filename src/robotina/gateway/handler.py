@@ -28,6 +28,7 @@ from telegram.ext import ContextTypes
 
 from robotina.db import SessionLocal
 from robotina.gateway.models import Conversation, MessageRole, Platform, StoredMessage
+from robotina.queue.models import InvocationStatus, InvocationTrigger, RobotinaInvocation
 from robotina.queue.task_types import IncomingMessageInput
 from robotina.queue.task_types import Message as HistoryMessage
 
@@ -88,6 +89,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.debug("Duplicate message %s — skipping", platform_message_id)
             return  # deduplicated; do not enqueue
 
+        # Step 2b (Phase 18 / ARCH-02 / D-11): persist RobotinaInvocation in
+        # the SAME transaction as the StoredMessage. MUST run AFTER the
+        # IntegrityError short-circuit above — a duplicate message must NOT
+        # create an orphan PENDING invocation (Phase 20's wake reconciler
+        # would treat orphans as stuck; D-24, Pitfall 1).
+        inv = RobotinaInvocation(
+            conversation_id=conv.id,
+            trigger=InvocationTrigger.USER_MESSAGE,
+            trigger_ref_id=stored.id,
+            status=InvocationStatus.PENDING,
+        )
+        session.add(inv)
+        session.flush()  # materialize inv.id for the meta dict below
+        invocation_id = inv.id
+
         # Step 3: Fetch history (oldest->newest)
         rows = (
             session.query(StoredMessage)
@@ -128,7 +144,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         at_front=True,
         result_ttl=-1,
         failure_ttl=-1,
-        meta={"task_type": "handle-incoming-message"},
+        meta={"task_type": "handle-incoming-message", "invocation_id": invocation_id},
     )
     logger.info(
         "Enqueued handle-incoming-message at front of agent-tasks | "
