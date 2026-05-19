@@ -557,9 +557,11 @@ def test_migration_0005_upgrades_and_downgrades():
 
     cfg = Config("alembic.ini")
 
-    # Ensure DB is at head (0005) — this is the test's starting precondition AND
-    # exercises the upgrade path.
-    command.upgrade(cfg, "head")
+    # Upgrade explicitly to 0005 — isolates this test from later revisions
+    # (Phase 17's 0006 and Phase 18's 0007 shift head; downgrade -1 from
+    # head would test the wrong boundary). Pin both endpoints so the test
+    # scope stays 0004<->0005 regardless of where head lives.
+    command.upgrade(cfg, "0005")
 
     session = SessionLocal()
     try:
@@ -581,8 +583,8 @@ def test_migration_0005_upgrades_and_downgrades():
     finally:
         session.close()
 
-    # Downgrade -1: revert 0005 → 0004. Both columns should be gone.
-    command.downgrade(cfg, "-1")
+    # Downgrade to 0004: revert 0005. Both columns should be gone.
+    command.downgrade(cfg, "0004")
 
     session = SessionLocal()
     try:
