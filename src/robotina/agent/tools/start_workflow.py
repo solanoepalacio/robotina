@@ -136,6 +136,18 @@ class StartWorkflowTool(BaseTool):
     # that motivated NonEmptyHouseholdId does not exist here. FK NOT NULL on
     # WorkflowRun.conversation_id + .one() raise upstream cover the invariant.
     conversation_id: str
+    # Phase 18 (ARCH-02 / D-13): invocation_id is constructor-injected by
+    # run_task() from ``job.meta["invocation_id"]`` (bracket read — KeyError
+    # if missing is an invariant violation; the gateway boot-time enqueue
+    # contract is the guarantee). No Pydantic alias — same rationale as
+    # ``conversation_id`` above: the LLM never supplies this field
+    # (it is not in args_schema), so the LLM-shadowing attack surface that
+    # motivated NonEmptyHouseholdId does not exist here. FK NULLABLE on
+    # WorkflowRun.triggered_by_invocation_id + bracket-key meta read upstream
+    # cover the invariant. CONSTRUCTOR-INJECTED, not mutable state — when
+    # Phase 21 lands multi-call StartWorkflowTool, this prevents the
+    # concurrent-tool-call race that Pitfall 5 calls out.
+    invocation_id: str
 
     def _run(self, workflow_type: str, recipe_query: str) -> str:
         from redis import Redis
@@ -176,6 +188,7 @@ class StartWorkflowTool(BaseTool):
                 shared_context=shared_context,
                 household_id=household_id,
                 conversation_id=self.conversation_id,
+                triggered_by_invocation_id=self.invocation_id,
                 queue=queue,
                 session=session,
             )
