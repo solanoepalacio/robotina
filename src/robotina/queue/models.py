@@ -30,8 +30,20 @@ class WorkflowRun(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     workflow_type: Mapped[str] = mapped_column(String, nullable=False)
     household_id: Mapped[str] = mapped_column(String, nullable=False)
+    # Phase 17 / ARCH-01: FK to Conversation that originated this workflow run.
+    # NOT NULL upfront (D-01). Operator pre-cleans workflow_runs before migrate
+    # (D-08 runbook). FK NOT NULL + run_task's session.query(Conversation).one()
+    # in jobs.py carry the write-time invariant; no parallel Python-level guard.
+    conversation_id: Mapped[str] = mapped_column(
+        String, ForeignKey("conversations.id"), nullable=False
+    )
     status: Mapped[WorkflowStatus] = mapped_column(Enum(WorkflowStatus, values_callable=lambda x: [e.value for e in x]), default=WorkflowStatus.PENDING, nullable=False)
     shared_context: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Phase 17 / D-06: nullable JSON slot for Phase 20's AddRecipeOutcome
+    # (and per-workflow-type extensions). Unused in Phase 17 — no producer or
+    # consumer this phase; the column exists so Phase 20 reads as "fill in
+    # the shape" rather than "introduce a new concept."
+    outcome: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     steps: Mapped[list["WorkflowRunStep"]] = relationship(back_populates="workflow_run")
