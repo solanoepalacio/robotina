@@ -5,10 +5,12 @@ template-only tests render against the fixture-inserted empty / 1-row state.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from robotina.gateway.models import Conversation, Platform
 from robotina.queue.models import WorkflowRun, WorkflowStatus
 
 
@@ -79,9 +81,19 @@ async def test_list_view_renders_rows_newest_first(client, db_session):
     # deterministic (single-transaction inserts can share a default timestamp).
     base = datetime.now(timezone.utc) - timedelta(minutes=10)
     for i in range(3):
+        # Phase 17 closure: workflow_runs.conversation_id is NOT NULL.
+        # Create a per-run Conversation with the matching household_id.
+        conv = Conversation(
+            platform=Platform.TELEGRAM,
+            chat_id=f"test-{uuid.uuid4()}",
+            household_id=f"h-{i}",
+        )
+        session.add(conv)
+        session.flush()
         r = WorkflowRun(
             workflow_type="add-recipe",
             household_id=f"h-{i}",
+            conversation_id=conv.id,
             status=WorkflowStatus.DONE,
             shared_context={},
             created_at=base + timedelta(seconds=i),
@@ -110,9 +122,17 @@ async def test_list_view_renders_rows_newest_first(client, db_session):
 async def test_list_row_links_to_detail(client, db_session):
     """Each list row links to /workflows/{id} (anchor in the ID column)."""
     session, ids = db_session
+    conv = Conversation(
+        platform=Platform.TELEGRAM,
+        chat_id=f"test-{uuid.uuid4()}",
+        household_id="h-link",
+    )
+    session.add(conv)
+    session.flush()
     r = WorkflowRun(
         workflow_type="add-recipe",
         household_id="h-link",
+        conversation_id=conv.id,
         status=WorkflowStatus.RUNNING,
         shared_context={},
     )
