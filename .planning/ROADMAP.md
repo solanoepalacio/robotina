@@ -52,7 +52,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 **Requirements**: ARCH-01, ARCH-05
 **Success Criteria** (what must be TRUE):
   1. A new WorkflowRun written via `StartWorkflowTool` has `conversation_id` set and matches the Conversation the originating message belonged to.
-  2. The three-step Alembic sequence (add nullable → backfill → enforce NOT NULL) runs on a staging DB clone without orphan rows (post-migration `COUNT(*) WHERE conversation_id IS NULL` returns 0).
+  2. The single Alembic revision 0006 (add `conversation_id` NOT NULL + `outcome` nullable JSON in one upgrade) runs cleanly on a pre-cleaned database; post-migration `COUNT(*) WHERE conversation_id IS NULL` returns 0 trivially because the runbook truncates `workflow_runs` before applying 0006.
   3. Existing code paths that previously read `shared_context.reply_context.chat_id` continue to function (deprecation window) — single-recipe happy path unaffected.
   4. `WorkflowRun.outcome` JSON column exists (nullable, unused this phase) ready for Phase 20.
 **Plans**: 4 plans
