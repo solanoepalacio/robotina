@@ -829,7 +829,7 @@ No State-of-the-Art research needed. Phase 18 uses the same library versions as 
 |---|-------|---------|---------------|
 | — | (none) | — | — |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `pyproject.toml` need an entry-point update for any new test file?**
    - What we know: `[tool.pytest.ini_options].testpaths = ["tests"]` already covers nested directories like `tests/dashboard/`.
