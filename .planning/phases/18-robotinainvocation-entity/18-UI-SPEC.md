@@ -1,10 +1,11 @@
 ---
 phase: 18
 slug: robotinainvocation-entity
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-19
+reviewed_at: 2026-05-19
 inherits_from: ../13-queue-visibility-dashboard/13-UI-SPEC.md
 ---
 
