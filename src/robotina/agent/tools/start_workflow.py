@@ -128,6 +128,14 @@ class StartWorkflowTool(BaseTool):
     user_id: str = ""
     platform: str = ""
     household_id: NonEmptyHouseholdId
+    # Phase 17 (ARCH-01 / D-03): conversation_id is constructor-injected by
+    # run_task() from the Conversation row resolved via
+    # session.query(Conversation).filter_by(platform=..., chat_id=...).one().
+    # Plain ``str`` (not an Annotated alias) — the LLM never supplies this
+    # field (it is not in args_schema), so the LLM-shadowing attack surface
+    # that motivated NonEmptyHouseholdId does not exist here. FK NOT NULL on
+    # WorkflowRun.conversation_id + .one() raise upstream cover the invariant.
+    conversation_id: str
 
     def _run(self, workflow_type: str, recipe_query: str) -> str:
         from redis import Redis
@@ -167,6 +175,7 @@ class StartWorkflowTool(BaseTool):
                 workflow_type=workflow_type,
                 shared_context=shared_context,
                 household_id=household_id,
+                conversation_id=self.conversation_id,
                 queue=queue,
                 session=session,
             )

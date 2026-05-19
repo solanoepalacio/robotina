@@ -16,7 +16,8 @@ def test_start_workflow_tool_is_terminal_via_return_direct():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
     assert tool.return_direct is True
 
@@ -26,7 +27,8 @@ def test_start_workflow_tool_returns_workflow_run_id_on_success():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     mock_session = MagicMock()
@@ -54,7 +56,8 @@ def test_start_workflow_tool_error_path_returns_string():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     mock_session = MagicMock()
@@ -81,7 +84,8 @@ def test_start_workflow_tool_auto_injects_reply_context():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="chat-42", user_id="user-7", platform="telegram", household_id="house-1"
+        chat_id="chat-42", user_id="user-7", platform="telegram", household_id="house-1",
+        conversation_id="conv-1",
     )
 
     mock_session = MagicMock()
@@ -125,7 +129,8 @@ def test_start_workflow_tool_short_circuits_create_agent():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     mock_session = MagicMock()
@@ -174,7 +179,8 @@ def test_start_workflow_tool_description_no_prompt_level_stop_hack():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
     assert "do not call" not in tool.description.lower()
     assert "task is done" not in tool.description.lower()
@@ -200,7 +206,8 @@ def test_args_schema_forbids_unknown_field():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     bad_args = {
@@ -221,7 +228,8 @@ def test_args_schema_allows_required_only():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     mock_session = MagicMock()
@@ -253,7 +261,8 @@ def test_args_schema_json_schema_forbids_extra():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
     schema = tool.args_schema.model_json_schema()
     assert schema.get("additionalProperties") is False
@@ -271,7 +280,7 @@ def test_constructor_rejects_empty_household_id():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     with pytest.raises(ValidationError) as exc_info:
-        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="")
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="", conversation_id="conv-1")
     assert "household_id" in str(exc_info.value)
 
 
@@ -283,7 +292,7 @@ def test_constructor_requires_household_id_no_default():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     with pytest.raises(ValidationError) as exc_info:
-        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram")
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", conversation_id="conv-1")
     assert "household_id" in str(exc_info.value)
 
 
@@ -292,7 +301,8 @@ def test_constructor_accepts_non_empty_household_id():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
     assert tool.household_id == "h1"
 
@@ -313,7 +323,8 @@ def test_args_schema_rejects_top_level_household_id():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     for hostile_field, hostile_value in [
@@ -341,7 +352,8 @@ def test_args_schema_rejects_unknown_workflow_type():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     tool = StartWorkflowTool(
-        chat_id="c1", user_id="u1", platform="telegram", household_id="h1"
+        chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
+        conversation_id="conv-1",
     )
 
     bad_args = {
