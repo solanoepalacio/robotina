@@ -904,9 +904,11 @@ def test_migration_0006_upgrades_and_downgrades():
 
     cfg = Config("alembic.ini")
 
-    # Ensure DB is at head (0006) — this is the test's starting precondition AND
-    # exercises the upgrade path.
-    command.upgrade(cfg, "head")
+    # Upgrade explicitly to 0006 — this isolates the test from later revisions
+    # (e.g. Phase 18's 0007 shifts ``head``; downgrade -1 from head would test
+    # the wrong boundary). Targeting 0006 + downgrade to 0005 keeps this test
+    # scoped to the 0005<->0006 transition regardless of where head lives.
+    command.upgrade(cfg, "0006")
 
     session = SessionLocal()
     try:
@@ -928,8 +930,8 @@ def test_migration_0006_upgrades_and_downgrades():
     finally:
         session.close()
 
-    # Downgrade -1: revert 0006 -> 0005. Both columns should be gone.
-    command.downgrade(cfg, "-1")
+    # Downgrade to 0005: revert 0006. Both columns should be gone.
+    command.downgrade(cfg, "0005")
 
     session = SessionLocal()
     try:
@@ -1128,7 +1130,14 @@ def test_migration_0007_upgrades_and_downgrades():
     (lines 893-948)."""
     import importlib.util
 
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect, text
+
+    from robotina.db import SessionLocal
+
     # Import the migration module by file path (Alembic versions aren't a package)
+    # to lock the revision identifiers — this part runs even without DB access.
     spec = importlib.util.spec_from_file_location(
         "m0007", "migrations/versions/0007_robotina_invocations.py"
     )
@@ -1137,8 +1146,69 @@ def test_migration_0007_upgrades_and_downgrades():
     assert mod.revision == "0007"
     assert mod.down_revision == "0006"
 
-    # The actual upgrade/downgrade exercising the live DB follows the same
-    # idiom as the Phase 17 test — use the project's Alembic harness or a
-    # direct sa.inspect on the connection. Implementer: mirror the existing
-    # test_migration_0006_upgrades_and_downgrades helper at lines 893-948.
-    pytest.skip("filled in by Wave 1 once 0007 file lands — Wave 0 just locks the import contract")
+    cfg = Config("alembic.ini")
+
+    # Ensure DB is at head (0007) — starting precondition AND upgrade-path exercise.
+    command.upgrade(cfg, "head")
+
+    session = SessionLocal()
+    try:
+        conn = session.connection()
+        insp = inspect(conn)
+
+        # Table exists.
+        assert insp.has_table("robotina_invocations"), (
+            "robotina_invocations table missing after upgrade"
+        )
+
+        # FK column exists and is nullable.
+        wf_cols = {c["name"]: c for c in insp.get_columns("workflow_runs")}
+        assert "triggered_by_invocation_id" in wf_cols, (
+            f"triggered_by_invocation_id missing after upgrade; columns: {list(wf_cols)}"
+        )
+        assert wf_cols["triggered_by_invocation_id"]["nullable"] is True, (
+            "D-02: triggered_by_invocation_id must be NULLABLE"
+        )
+
+        # Named unique constraint exists with the expected column set (order-insensitive).
+        uniques = insp.get_unique_constraints("robotina_invocations")
+        matching = [
+            u for u in uniques
+            if u["name"] == "ux_invocation_workflow_completion_once"
+            and set(u["column_names"]) == {"trigger_ref_id", "trigger"}
+        ]
+        assert len(matching) == 1, (
+            f"D-08: expected ux_invocation_workflow_completion_once constraint; got {uniques}"
+        )
+
+        # Confirm ENUM types are present in pg_type.
+        types = {
+            r[0] for r in conn.execute(
+                text("SELECT typname FROM pg_type WHERE typname IN ('invocationtrigger', 'invocationstatus')")
+            ).all()
+        }
+        assert types == {"invocationtrigger", "invocationstatus"}, (
+            f"expected both enum types created; got {types}"
+        )
+    finally:
+        session.close()
+
+    # Downgrade -1: revert 0007 -> 0006. Table + FK column should be gone.
+    command.downgrade(cfg, "-1")
+
+    session = SessionLocal()
+    try:
+        conn = session.connection()
+        insp = inspect(conn)
+        assert not insp.has_table("robotina_invocations"), (
+            "robotina_invocations still present after downgrade"
+        )
+        wf_cols = {c["name"] for c in insp.get_columns("workflow_runs")}
+        assert "triggered_by_invocation_id" not in wf_cols, (
+            "triggered_by_invocation_id still present on workflow_runs after downgrade"
+        )
+    finally:
+        session.close()
+
+    # Re-apply so the DB is back at head for subsequent tests in the session.
+    command.upgrade(cfg, "head")
