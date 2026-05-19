@@ -68,3 +68,51 @@ async def test_failed_vs_cancelled_badges(client, db_session):
     assert "badge--cancelled" in text
     # And they are not the same substring (sanity check)
     assert "badge--failed" != "badge--cancelled"
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 / DASH-13 — RED tests (Wave 0)
+# ---------------------------------------------------------------------------
+# These tests will be GREEN after Wave 3 adds the <dt>/<dd> rows to
+# src/robotina/dashboard/templates/workflow.html (D-19).
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_detail_view_renders_triggered_by_invocation_id_when_set(
+    client, db_session, invocation_factory
+):
+    """DASH-13: WorkflowRun detail view surfaces triggered_by_invocation_id.
+    UI-SPEC mandates the exact label 'Triggered by invocation' and the UUID
+    in a <dd class="mono">."""
+    session, ids = db_session
+    run = make_failed_cascade_run(session)
+    ids.append(run.id)
+    inv = invocation_factory(session, conversation_id=run.conversation_id)
+    run.triggered_by_invocation_id = inv.id
+    session.commit()
+
+    resp = await client.get(f"/workflows/{run.id}")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Triggered by invocation" in body, "DASH-13: label missing"
+    assert inv.id in body, "DASH-13: invocation id not rendered"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_detail_view_renders_em_dash_when_invocation_id_null(client, db_session):
+    """DASH-13 / D-02: legacy WorkflowRuns predate the FK (or v1.1-window rows
+    without FK) render the em-dash placeholder per UI-SPEC."""
+    session, ids = db_session
+    run = make_failed_cascade_run(session)
+    ids.append(run.id)
+    run.triggered_by_invocation_id = None
+    session.commit()
+
+    resp = await client.get(f"/workflows/{run.id}")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Triggered by invocation" in body
+    # Em-dash U+2014. The cell must include this glyph after the label.
+    assert "—" in body, "DASH-13: em-dash placeholder missing for null FK"

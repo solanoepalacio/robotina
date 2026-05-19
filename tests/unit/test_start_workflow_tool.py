@@ -10,6 +10,11 @@ tool runs (both happy and error paths).
 from unittest.mock import MagicMock, patch
 
 
+# Phase 18 — every StartWorkflowTool ctor call needs invocation_id (D-13).
+# Constant kept short for diff readability.
+_TEST_INV_ID = "inv-test"
+
+
 def test_start_workflow_tool_is_terminal_via_return_direct():
     """Phase 07.1: return_direct=True makes the agent graph terminate after
     the tool runs."""
@@ -18,6 +23,7 @@ def test_start_workflow_tool_is_terminal_via_return_direct():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
     assert tool.return_direct is True
 
@@ -29,6 +35,7 @@ def test_start_workflow_tool_returns_workflow_run_id_on_success():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     mock_session = MagicMock()
@@ -58,6 +65,7 @@ def test_start_workflow_tool_error_path_returns_string():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     mock_session = MagicMock()
@@ -86,6 +94,7 @@ def test_start_workflow_tool_auto_injects_reply_context():
     tool = StartWorkflowTool(
         chat_id="chat-42", user_id="user-7", platform="telegram", household_id="house-1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     mock_session = MagicMock()
@@ -131,6 +140,7 @@ def test_start_workflow_tool_short_circuits_create_agent():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     mock_session = MagicMock()
@@ -181,6 +191,7 @@ def test_start_workflow_tool_description_no_prompt_level_stop_hack():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
     assert "do not call" not in tool.description.lower()
     assert "task is done" not in tool.description.lower()
@@ -208,6 +219,7 @@ def test_args_schema_forbids_unknown_field():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     bad_args = {
@@ -230,6 +242,7 @@ def test_args_schema_allows_required_only():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     mock_session = MagicMock()
@@ -263,6 +276,7 @@ def test_args_schema_json_schema_forbids_extra():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
     schema = tool.args_schema.model_json_schema()
     assert schema.get("additionalProperties") is False
@@ -280,7 +294,7 @@ def test_constructor_rejects_empty_household_id():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     with pytest.raises(ValidationError) as exc_info:
-        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="", conversation_id="conv-1")
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="", conversation_id="conv-1", invocation_id=_TEST_INV_ID)
     assert "household_id" in str(exc_info.value)
 
 
@@ -292,7 +306,7 @@ def test_constructor_requires_household_id_no_default():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     with pytest.raises(ValidationError) as exc_info:
-        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", conversation_id="conv-1")
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", conversation_id="conv-1", invocation_id=_TEST_INV_ID)
     assert "household_id" in str(exc_info.value)
 
 
@@ -303,6 +317,7 @@ def test_constructor_accepts_non_empty_household_id():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
     assert tool.household_id == "h1"
 
@@ -325,6 +340,7 @@ def test_args_schema_rejects_top_level_household_id():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     for hostile_field, hostile_value in [
@@ -354,6 +370,7 @@ def test_args_schema_rejects_unknown_workflow_type():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram", household_id="h1",
         conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     bad_args = {
@@ -382,7 +399,7 @@ def test_constructor_requires_conversation_id_no_default():
     from robotina.agent.tools.start_workflow import StartWorkflowTool
 
     with pytest.raises(ValidationError) as exc_info:
-        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="h1")
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="h1", invocation_id=_TEST_INV_ID)
     assert "conversation_id" in str(exc_info.value)
 
 
@@ -393,6 +410,7 @@ def test_constructor_accepts_non_empty_conversation_id():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram",
         household_id="h1", conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
     assert tool.conversation_id == "conv-1"
 
@@ -405,6 +423,7 @@ def test_run_passes_conversation_id_to_queue_workflow():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram",
         household_id="h1", conversation_id="conv-1",
+        invocation_id=_TEST_INV_ID,
     )
 
     with patch("robotina.queue.workflow_runner.queue_workflow", return_value="wf-1") as mock_qw:
@@ -417,3 +436,63 @@ def test_run_passes_conversation_id_to_queue_workflow():
     assert kwargs.get("conversation_id") == "conv-1", (
         f"queue_workflow must receive conversation_id='conv-1'; got kwargs={kwargs}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 / ARCH-02 + D-13 + D-22 — RED tests (Wave 0)
+# ---------------------------------------------------------------------------
+
+
+def test_constructor_requires_invocation_id_no_default():
+    """D-13: StartWorkflowTool() without invocation_id must fail — caller MUST pass
+    (no default). Mirrors the Phase-17 conversation_id required-arg test pattern."""
+    import pytest
+    from pydantic import ValidationError
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+    with pytest.raises(ValidationError):
+        StartWorkflowTool(
+            chat_id="c1",
+            user_id="u1",
+            platform="telegram",
+            household_id="h1",
+            conversation_id="conv-1",
+            # invocation_id intentionally omitted
+        )
+
+
+def test_start_workflow_tool_propagates_invocation_id():
+    """D-22: invocation_id constructor field flows into queue_workflow as
+    triggered_by_invocation_id. Mirror the Phase-17 propagation test."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="chat-42",
+        user_id="user-7",
+        platform="telegram",
+        household_id="house-1",
+        conversation_id="conv-1",
+        invocation_id="inv-abc",
+    )
+
+    captured: dict = {}
+
+    def capture_queue_workflow(**kwargs):
+        captured.update(kwargs)
+        return "run-1"
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+
+    with (
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("rq.Queue", return_value=mock_queue),
+        patch("redis.Redis"),
+        patch(
+            "robotina.queue.workflow_runner.queue_workflow",
+            side_effect=capture_queue_workflow,
+        ),
+    ):
+        tool._run(workflow_type="add-recipe", recipe_query="lentejas")
+
+    assert captured.get("triggered_by_invocation_id") == "inv-abc"
+    assert captured.get("conversation_id") == "conv-1"  # Phase 17 rail still wired

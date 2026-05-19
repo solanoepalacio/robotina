@@ -61,3 +61,35 @@ def make_update():
         update.effective_user.id = user_id
         return update
     return _make
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 / Wave 0 — shared invocation_factory fixture
+# ---------------------------------------------------------------------------
+# Used by gateway + dashboard tests to build RobotinaInvocation rows.
+
+
+@pytest.fixture
+def invocation_factory():
+    """Build a RobotinaInvocation row in a session, defaulting to USER_MESSAGE + PENDING.
+
+    Usage:
+        inv = invocation_factory(session, conversation_id="conv-1", trigger_ref_id="msg-7")
+    """
+    def _make(session, *, conversation_id: str, trigger=None, trigger_ref_id=None, status=None):
+        from robotina.queue.models import (
+            RobotinaInvocation,
+            InvocationTrigger,
+            InvocationStatus,
+        )
+        inv = RobotinaInvocation(
+            conversation_id=conversation_id,
+            trigger=trigger or InvocationTrigger.USER_MESSAGE,
+            trigger_ref_id=trigger_ref_id,
+            status=status or InvocationStatus.PENDING,
+        )
+        session.add(inv)
+        session.flush()
+        return inv
+
+    return _make

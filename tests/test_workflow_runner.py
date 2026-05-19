@@ -1029,6 +1029,7 @@ def test_shared_context_reply_context_still_written():
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram",
         household_id="hh-1", conversation_id="conv-1",
+        invocation_id="inv-test",  # Phase 18 D-13: required ctor field
     )
 
     captured = {}

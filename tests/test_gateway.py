@@ -160,3 +160,69 @@ async def test_conversation_upsert(db_session, redis_conn, make_update):
         StoredMessage.conversation_id == conversations[0].id
     ).all()
     assert len(messages) == 2
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 / ARCH-02 + D-11 + D-24 — RED tests (Wave 0)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+async def test_user_message_creates_invocation(db_session, redis_conn, make_update):
+    """D-11 / success-criterion #1: a fresh user message inserts a
+    RobotinaInvocation(trigger=USER_MESSAGE, status=PENDING) row whose
+    trigger_ref_id matches the StoredMessage.id, AND the enqueued RQ job has
+    meta['invocation_id'] = inv.id."""
+    from robotina.gateway.handler import handle_message
+    from robotina.queue.models import (
+        RobotinaInvocation,
+        InvocationTrigger,
+        InvocationStatus,
+    )
+
+    update = make_update(message_id=18001, chat_id=98001, user_id=55001, text="hola")
+    await handle_message(update, None)
+
+    msgs = db_session.query(StoredMessage).filter_by(platform_message_id="18001").all()
+    assert len(msgs) == 1
+    stored = msgs[0]
+
+    invs = db_session.query(RobotinaInvocation).filter_by(trigger_ref_id=stored.id).all()
+    assert len(invs) == 1
+    inv = invs[0]
+    assert inv.trigger == InvocationTrigger.USER_MESSAGE
+    assert inv.status == InvocationStatus.PENDING
+    assert inv.conversation_id == stored.conversation_id
+
+    # The RQ job carries the invocation id on its meta dict (D-12).
+    q = Queue("agent-tasks", connection=redis_conn)
+    jobs = q.get_jobs()
+    assert any(j.meta.get("invocation_id") == inv.id for j in jobs), (
+        "no enqueued job carries meta['invocation_id']=<inv.id>"
+    )
+
+
+@pytest.mark.integration
+async def test_duplicate_message_no_orphan_invocation(db_session, redis_conn, make_update):
+    """D-24 (LOAD-BEARING): a duplicate platform_message_id (IntegrityError on
+    StoredMessage) MUST short-circuit BEFORE the invocation insert. Exactly ONE
+    RobotinaInvocation exists despite two handle_message calls. Pitfall 1 guard.
+
+    This is the single most important new test in Phase 18 — if it regresses,
+    Phase 20's wake reconciler will see orphan PENDING invocations and treat
+    them as stuck."""
+    from robotina.gateway.handler import handle_message
+    from robotina.queue.models import RobotinaInvocation
+
+    update = make_update(message_id=18002, chat_id=98002, user_id=55002, text="dup")
+    await handle_message(update, None)
+    await handle_message(update, None)  # exact-duplicate replay
+
+    msgs = db_session.query(StoredMessage).filter_by(platform_message_id="18002").all()
+    assert len(msgs) == 1, "dedup at StoredMessage layer must still hold"
+    stored = msgs[0]
+    invs = db_session.query(RobotinaInvocation).filter_by(trigger_ref_id=stored.id).all()
+    assert len(invs) == 1, (
+        f"D-24 violated: duplicate message produced {len(invs)} invocation rows "
+        f"(expected 1). Phase 18's step-2b insert MUST run AFTER the dedup short-circuit."
+    )
