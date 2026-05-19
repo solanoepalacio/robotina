@@ -135,6 +135,26 @@ def run_task(task_input) -> object:
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
             from robotina.agent.tools.queue import QueueTool
             from robotina.agent.tools.start_workflow import StartWorkflowTool
+            from robotina.gateway.models import Conversation, Platform
+
+            # Phase 17 / ARCH-01 / D-04: resolve the Conversation row that
+            # originated this message. The gateway always upserts a
+            # Conversation BEFORE enqueuing (handler.py:55-72, then commit at
+            # :110, then enqueue at :125-132), so by the time run_task is
+            # invoked the row IS guaranteed present. ``.one()`` raises
+            # sqlalchemy.exc.NoResultFound on miss = invariant violation =
+            # fail loud (the existing try/except calls on_step_failed and
+            # re-raises). Phase 18 will also use this lookup site to insert
+            # the RobotinaInvocation row.
+            conversation = (
+                _session.query(Conversation)
+                .filter_by(
+                    platform=Platform(task_input.platform),
+                    chat_id=task_input.chat_id,
+                )
+                .one()
+            )
+
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
             tools.append(QueueTool(
                 chat_id=task_input.chat_id,
@@ -146,6 +166,7 @@ def run_task(task_input) -> object:
                 user_id=task_input.user_id,
                 platform=task_input.platform,
                 household_id=task_input.household_id,
+                conversation_id=conversation.id,
             ))
         elif task_type == "recipe-research-gather":
             from robotina.agent.tools.web_search import WebSearchTool
