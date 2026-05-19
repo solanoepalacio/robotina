@@ -155,6 +155,15 @@ def run_task(task_input) -> object:
                 .one()
             )
 
+            # Phase 18 / ARCH-02 / D-15: invocation_id flows through
+            # ``job.meta["invocation_id"]`` (D-12). Bracket read — not
+            # ``.get()`` — because this branch is reached only for
+            # ``handle-incoming-message`` jobs, where the gateway ALWAYS
+            # sets the meta key (handler.py step 4). A missing key is an
+            # invariant violation; fail loud (KeyError) is the contract.
+            # ``job`` is in scope from get_current_job() higher in run_task.
+            invocation_id = job.meta["invocation_id"]
+
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
             tools.append(QueueTool(
                 chat_id=task_input.chat_id,
@@ -167,6 +176,7 @@ def run_task(task_input) -> object:
                 platform=task_input.platform,
                 household_id=task_input.household_id,
                 conversation_id=conversation.id,
+                invocation_id=invocation_id,
             ))
         elif task_type == "recipe-research-gather":
             from robotina.agent.tools.web_search import WebSearchTool

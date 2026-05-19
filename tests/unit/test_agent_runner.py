@@ -275,7 +275,7 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
 
     mock_job = MagicMock()
     mock_job.id = "job-hm-001"
-    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks", "invocation_id": "inv-test"}
 
     mock_config = MagicMock()
     mock_config.skills = []
@@ -444,7 +444,7 @@ def test_run_task_resolves_and_injects_conversation_id():
 
     mock_job = MagicMock()
     mock_job.id = "job-conv-001"
-    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks", "invocation_id": "inv-test"}
 
     mock_config = MagicMock()
     mock_config.skills = []
@@ -514,7 +514,7 @@ def test_run_task_raises_when_conversation_missing():
 
     mock_job = MagicMock()
     mock_job.id = "job-conv-miss"
-    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks", "invocation_id": "inv-test"}
 
     mock_config = MagicMock()
     mock_config.skills = []
