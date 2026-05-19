@@ -32,7 +32,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -322,3 +322,20 @@ class AcknowledgeAddRecipeInput(BaseModel):
             "Compose a brief, friendly acknowledgment in Spanish that you will "
             "search for the recipe and that data will be updated directly in the application."
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 17 / D-07 — WorkflowOutcome stub
+# ---------------------------------------------------------------------------
+# Placeholder shape; Phase 20 will define the per-workflow-type concrete
+# shapes (AddRecipeOutcome, etc.) that the deterministic ``finalize-outcome``
+# step writes into ``WorkflowRun.outcome``. Not imported by workflow_runner.py
+# or any agent in Phase 17 — the stub exists so Phase 20 reads as "fill in
+# the shape" rather than "introduce a new concept."
+
+
+class WorkflowOutcome(BaseModel):
+    """Placeholder — Phase 20 defines the per-workflow-type shape."""
+
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["pending"] = "pending"
