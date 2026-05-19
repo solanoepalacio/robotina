@@ -845,3 +845,202 @@ def test_queue_workflow_rejects_whitespace_household_id():
     assert "household_id" in str(exc_info.value)
     mock_session.add.assert_not_called()
     mock_queue.enqueue.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 17 / ARCH-01: Conversation FK + outcome column
+# ---------------------------------------------------------------------------
+# Wave 0 RED-state lock tests. These tests encode the Phase 17 contracts BEFORE
+# the source changes. Each test below FAILS at commit time of this plan and
+# turns GREEN as the relevant wave lands:
+#   - schema-introspection tests  -> GREEN after Wave 1 (Plan 17-02)
+#   - signature/ctor/lookup tests -> GREEN after Wave 2 (Plan 17-03)
+#   - ARCH-05 regression guard    -> GREEN after Wave 2 and STAYS green forever
+
+
+def test_workflow_run_has_conversation_id_column():
+    """ARCH-01: WorkflowRun has conversation_id (String, NOT NULL, FK to conversations.id) added in migration 0006.
+
+    Pure in-memory model inspection — no DB connection required.
+    """
+    from robotina.queue.models import WorkflowRun
+
+    cols = WorkflowRun.__table__.columns
+    assert "conversation_id" in cols, "conversation_id column missing on WorkflowRun"
+    assert cols["conversation_id"].type.python_type is str
+    assert cols["conversation_id"].nullable is False, "conversation_id must be NOT NULL (D-01)"
+    fks = list(cols["conversation_id"].foreign_keys)
+    assert len(fks) >= 1, "conversation_id must declare at least one ForeignKey"
+    assert any("conversations.id" in str(fk.target_fullname) for fk in fks), (
+        f"conversation_id FK target must be conversations.id; got {[str(fk.target_fullname) for fk in fks]}"
+    )
+
+
+def test_workflow_run_has_outcome_column():
+    """D-06: WorkflowRun has outcome (JSON, nullable) — slot for Phase 20 AddRecipeOutcome."""
+    from robotina.queue.models import WorkflowRun
+
+    cols = WorkflowRun.__table__.columns
+    assert "outcome" in cols, "outcome column missing on WorkflowRun"
+    assert cols["outcome"].type.python_type is dict
+    assert cols["outcome"].nullable is True
+
+
+@pytest.mark.integration
+def test_migration_0006_upgrades_and_downgrades():
+    """ARCH-01 AC: migration 0006 adds conversation_id (varchar NOT NULL, FK to
+    conversations.id) and outcome (json, NULL) on workflow_runs. alembic downgrade
+    -1 reverses cleanly; subsequent upgrade re-adds them. Touches the live test
+    Postgres.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    from robotina.db import SessionLocal
+
+    cfg = Config("alembic.ini")
+
+    # Ensure DB is at head (0006) — this is the test's starting precondition AND
+    # exercises the upgrade path.
+    command.upgrade(cfg, "head")
+
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            text(
+                "SELECT column_name, data_type, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'workflow_runs' "
+                "AND column_name IN ('conversation_id', 'outcome')"
+            )
+        ).all()
+        by_name = {r[0]: (r[1], r[2]) for r in rows}
+        assert "conversation_id" in by_name, f"conversation_id missing after upgrade; columns: {by_name}"
+        assert "outcome" in by_name, f"outcome missing after upgrade; columns: {by_name}"
+        assert by_name["conversation_id"][0] == "character varying"
+        assert by_name["conversation_id"][1] == "NO"
+        assert by_name["outcome"][0] == "json"
+        assert by_name["outcome"][1] == "YES"
+    finally:
+        session.close()
+
+    # Downgrade -1: revert 0006 -> 0005. Both columns should be gone.
+    command.downgrade(cfg, "-1")
+
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            text(
+                "SELECT column_name "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'workflow_runs' "
+                "AND column_name IN ('conversation_id', 'outcome')"
+            )
+        ).all()
+        names = {r[0] for r in rows}
+        assert "conversation_id" not in names, "conversation_id still present after downgrade"
+        assert "outcome" not in names, "outcome still present after downgrade"
+    finally:
+        session.close()
+
+    # Re-apply so the DB is back at head for subsequent tests in the session.
+    command.upgrade(cfg, "head")
+
+
+def test_queue_workflow_persists_conversation_id():
+    """ARCH-01: queue_workflow assigns conversation_id on the WorkflowRun before commit."""
+    from robotina.queue.workflow_runner import queue_workflow
+
+    added_runs: list = []
+    added_steps: list = []
+    session = MagicMock()
+
+    def _add(obj):
+        if hasattr(obj, "step_key") and obj.step_key:
+            added_steps.append(obj)
+        else:
+            added_runs.append(obj)
+
+    session.add.side_effect = _add
+    queue = MagicMock()
+    queue.name = "agent-tasks"
+
+    shared_context = {
+        "household_id": "hh-1",
+        "recipe_query": "spaghetti",
+        "reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"},
+    }
+
+    queue_workflow(
+        workflow_type="add-recipe",
+        shared_context=shared_context,
+        household_id="hh-1",
+        conversation_id="conv-1",
+        queue=queue,
+        session=session,
+    )
+
+    assert len(added_runs) == 1, f"expected 1 WorkflowRun added, got {added_runs}"
+    assert added_runs[0].conversation_id == "conv-1"
+
+
+def test_queue_workflow_requires_conversation_id():
+    """D-05: queue_workflow signature gains required conversation_id arg (no default).
+
+    Missing arg = TypeError at call time (no Python-level guard — FK + .one() upstream
+    cover the invariant).
+    """
+    from unittest.mock import MagicMock
+    import pytest
+
+    from robotina.queue.workflow_runner import queue_workflow
+
+    mock_session = MagicMock()
+    mock_queue = MagicMock()
+
+    with pytest.raises(TypeError) as exc_info:
+        queue_workflow(
+            workflow_type="add-recipe",
+            shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
+            household_id="hh-1",
+            queue=mock_queue,
+            session=mock_session,
+        )
+    assert "conversation_id" in str(exc_info.value)
+
+
+def test_shared_context_reply_context_still_written():
+    """ARCH-05 deprecation window: StartWorkflowTool must continue to write reply_context
+    into shared_context (workflow steps' build_input + dead-letter block still read it).
+    This test guards against premature removal of reply_context writes.
+
+    RED in Wave 0 / 1, GREEN after Wave 2 (depends on the conversation_id ctor field
+    landing on StartWorkflowTool). After Wave 2 this must STAY green forever — any
+    accidental removal of the reply_context write in start_workflow.py:144-152 flips
+    it back to RED.
+    """
+    from unittest.mock import MagicMock, patch
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram",
+        household_id="hh-1", conversation_id="conv-1",
+    )
+
+    captured = {}
+
+    def _capture(**kwargs):
+        captured.update(kwargs)
+        return "wf-run-id-1"
+
+    with patch("robotina.queue.workflow_runner.queue_workflow", side_effect=_capture):
+        with patch("robotina.db.SessionLocal", return_value=MagicMock()):
+            with patch("rq.Queue"), patch("redis.Redis"):
+                tool._run(workflow_type="add-recipe", recipe_query="carbonara")
+
+    assert "shared_context" in captured
+    rc = captured["shared_context"].get("reply_context")
+    assert rc == {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}, (
+        f"reply_context must still be written into shared_context (ARCH-05 deprecation window); got {rc!r}"
+    )
