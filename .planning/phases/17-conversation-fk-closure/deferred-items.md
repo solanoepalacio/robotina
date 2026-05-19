@@ -15,3 +15,12 @@ preceding Plan 17-02 via `git stash` reproduction.
 **Resolution path:** Surface as quick tasks (`/gsd:quick`) after Plan 17-04
 closes Phase 17. Not blocking for v1.1 since none touch the workflow run
 path or the FK closure surface.
+
+## Plan 17-04 additional observations (2026-05-19)
+
+| Test | File | Notes |
+|------|------|-------|
+| `test_migration_0005_upgrades_and_downgrades` | `tests/test_workflow_runner.py` | Pre-existing environmental — the live test Postgres has leftover `workflow_runs` rows from prior development. Once `alembic upgrade head` runs 0006 on the dirty DB, it raises `NotNullViolation` exactly as the runbook predicts. Test 0005 fails as a downstream effect (the test relies on `alembic upgrade head` succeeding to set up state). Plan 17-04 touched only documentation files; it cannot have introduced this. **Resolution:** execute the Phase 17 runbook (Step 3 TRUNCATE) against the local test DB, then these tests pass. Tracking under the same operator-gate that flips ARCH-01 / ARCH-05 to `[x]`. |
+| `test_migration_0006_upgrades_and_downgrades` | `tests/test_workflow_runner.py` | Same root cause as above — non-empty `workflow_runs` rejects the NOT NULL ALTER. The test failure literally vindicates the runbook's failure-modes table. |
+
+**Resolution path:** These flip green automatically the moment the Phase 17 runbook executes against any environment whose test DB has leftover v1.0 `workflow_runs` rows. Not blocking for v1.1 close-out — they are the operator-gate signal, not regressions.

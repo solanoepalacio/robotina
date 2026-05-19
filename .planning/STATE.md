@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: executing
-stopped_at: Phase 17 context gathered
-last_updated: "2026-05-19T01:02:31.568Z"
-last_activity: 2026-05-19 -- Phase 17 planning complete
+stopped_at: Plan 17-04 complete (Phase 17 close pending operator runbook execution)
+last_updated: "2026-05-19T01:29:33.539Z"
+last_activity: 2026-05-19 — Plan 17-04 complete (REQUIREMENTS.md + ROADMAP.md wording alignment + 17-RUNBOOK.md created)
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 4
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Milestone v1.1 — Workflows Abstraction Refinement. Closing three product gaps (multi-recipe per message, URL-pointed recipes, recipe images) and the architectural cleanup that closing them cleanly requires.
+**Current focus:** Phase 17 — Conversation FK closure
 
 ## Current Position
 
-Phase: 18 — RobotinaInvocation entity (context gathered; auto-mode discuss)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-05-19 -- Phase 17 planning complete
+Phase: 17 (Conversation FK closure) — EXECUTING (awaiting operator runbook to flip ARCH-01/ARCH-05 → Complete)
+Plan: 4 of 4 (all plans shipped; phase close is gated on the operator running `.planning/phases/17-conversation-fk-closure/17-RUNBOOK.md` against the live DB)
+Status: Plan 17-04 complete; phase status not advanced per --no-transition directive
+Last activity: 2026-05-19 — Plan 17-04 complete (REQUIREMENTS.md + ROADMAP.md wording alignment + 17-RUNBOOK.md created)
 
 ## Performance Metrics
 
@@ -102,6 +102,7 @@ Last activity: 2026-05-19 -- Phase 17 planning complete
 | Phase 16 P06 | 6min | 3 tasks | 3 files |
 | Phase 16 P05 | 326 | 2 tasks | 2 files |
 | Phase 16 P03 | 158 | 2 tasks | 4 files |
+| Phase 17 P04 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -273,10 +274,10 @@ None yet.
 
 Last activity: 2026-05-18
 
-Last session: 2026-05-18T23:39:21.365Z
+Last session: 2026-05-19T01:29:26.859Z
 Stopped at: Phase 17 context gathered
 Resume file: 
-.planning/phases/17-conversation-fk-closure/17-CONTEXT.md
+None
 
 ## Operator Next Steps
 

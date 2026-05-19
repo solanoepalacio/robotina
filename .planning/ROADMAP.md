@@ -35,7 +35,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 
 ### 🚧 v1.1 Workflows Abstraction Refinement (Phases 17–24)
 
-- [ ] **Phase 17: Conversation FK closure** — Three-step Alembic adds `WorkflowRun.conversation_id` (nullable → backfill → NOT NULL) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable.
+- [ ] **Phase 17: Conversation FK closure** — Single Alembic revision 0006 adds `WorkflowRun.conversation_id` NOT NULL FK (table pre-cleaned via runbook) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable. Code/migration shipped 2026-05-19; checkbox flips to `[x]` after operator runs `17-RUNBOOK.md` against the live DB.
 - [ ] **Phase 18: RobotinaInvocation entity** — New `robotina_invocations` table + `InvocationTrigger` enum + idempotency `UniqueConstraint`; gateway inserts invocation on user_message; `WorkflowRun.triggered_by_invocation_id` FK populated by `StartWorkflowTool`; dashboard surfaces the new FK on detail view.
 - [ ] **Phase 19: LLM multi-call smoke test** — Standalone load-bearing experiment in `experiments/robotina/` verifying that target backends emit N `start-workflow` tool calls per turn; committed pass-rate evidence gates downstream phases.
 - [ ] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell.
@@ -56,10 +56,10 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
   3. Existing code paths that previously read `shared_context.reply_context.chat_id` continue to function (deprecation window) — single-recipe happy path unaffected.
   4. `WorkflowRun.outcome` JSON column exists (nullable, unused this phase) ready for Phase 20.
 **Plans**: 4 plans
-- [ ] 17-01-PLAN.md — Wave 0 RED-state lock tests (schema/ctor/signature/lookup/stub)
-- [ ] 17-02-PLAN.md — Wave 1 schema + ORM model + WorkflowOutcome Pydantic stub (Alembic 0006)
-- [ ] 17-03-PLAN.md — Wave 2 signatures + wire-up (queue_workflow / StartWorkflowTool / run_task Conversation lookup) + bulk-update existing test ctor sites
-- [ ] 17-04-PLAN.md — Wave 3 REQUIREMENTS.md ARCH-01 wording edit + deploy runbook (D-08)
+- [x] 17-01-PLAN.md — Wave 0 RED-state lock tests (schema/ctor/signature/lookup/stub)
+- [x] 17-02-PLAN.md — Wave 1 schema + ORM model + WorkflowOutcome Pydantic stub (Alembic 0006)
+- [x] 17-03-PLAN.md — Wave 2 signatures + wire-up (queue_workflow / StartWorkflowTool / run_task Conversation lookup) + bulk-update existing test ctor sites
+- [x] 17-04-PLAN.md — Wave 3 REQUIREMENTS.md ARCH-01 wording edit + deploy runbook (D-08)
 
 ### Phase 18: RobotinaInvocation entity
 **Goal**: Every Robotina LLM turn is recorded as a persisted row, and every new WorkflowRun points back to the invocation that dispatched it.
@@ -165,7 +165,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 | 14. Prompt Cleanup and Structural Standardization    | v1.0      | 8/8   | Complete    | 2026-05-14 |
 | 15. Recipe Artifact Accumulation                     | v1.0      | 6/6   | Complete    | 2026-05-15 |
 | 16. household_id propagation fix                     | v1.0      | 7/7   | Complete    | 2026-05-15 |
-| 17. Conversation FK closure                          | v1.1      | 0/4   | Not started | —          |
+| 17. Conversation FK closure                          | v1.1      | 4/4 | Complete   | 2026-05-19 |
 | 18. RobotinaInvocation entity                        | v1.1      | 0/0   | Not started | —          |
 | 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
 | 20. Wake rule + outcome plumbing                     | v1.1      | 0/0   | Not started | —          |
