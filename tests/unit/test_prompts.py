@@ -66,6 +66,16 @@ def test_skill_index_appended_to_prompt():
     mock_job.meta = {"task_type": "handle-incoming-message"}
 
     mock_session = MagicMock()
+    # Phase 17 / D-04: run_task's handle-incoming-message branch resolves
+    # Conversation via session.query(Conversation).filter_by(...).one().
+    # Stub the lookup so .id returns a string (not a MagicMock) — the
+    # StartWorkflowTool ctor field validation requires a str.
+    fake_conversation = MagicMock()
+    fake_conversation.id = "conv-stub-1"
+    query_mock = MagicMock()
+    query_mock.filter_by.return_value = query_mock
+    query_mock.one.return_value = fake_conversation
+    mock_session.query.return_value = query_mock
     mock_session_factory = MagicMock(return_value=mock_session)
 
     with (
