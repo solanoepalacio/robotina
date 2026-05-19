@@ -272,30 +272,69 @@ def test_recipe_load_input_user_message_contains_full_recipe():
 
 
 # ---------------------------------------------------------------------------
-# Phase 17 / D-07: WorkflowOutcome stub
+# Phase 18 / ARCH-04 — AddRecipeOutcome
 # ---------------------------------------------------------------------------
-# Wave 0 RED-state lock test. Encodes Phase 17 D-07: WorkflowOutcome is a
-# minimal Pydantic placeholder in robotina.queue.task_types that Phase 20 will
-# fill in (AddRecipeOutcome, etc.). RED until Wave 1 (Plan 17-02) defines the
-# class in task_types.py.
+# Per-workflow outcome summary written by the Phase-20 ``finalize-outcome``
+# step. Phase 18 only defines the Pydantic shape — no producer or consumer
+# this phase. Replaces the Phase-17 WorkflowOutcome placeholder (D-18).
 
 
-def test_workflow_outcome_stub():
-    """D-07: WorkflowOutcome is importable from robotina.queue.task_types,
-    has status: Literal['pending'] = 'pending' default, and rejects unknown fields."""
+def test_add_recipe_outcome_success_round_trip():
+    """D-17: success variant round-trips with recipe_id/recipe_name/recipe_slug."""
+    from robotina.queue.task_types import AddRecipeOutcome
+    o = AddRecipeOutcome(
+        status="success",
+        recipe_id="r1",
+        recipe_name="Lentejas",
+        recipe_slug="lentejas",
+    )
+    dumped = o.model_dump()
+    assert dumped["status"] == "success"
+    assert dumped["recipe_id"] == "r1"
+    assert dumped["recipe_name"] == "Lentejas"
+    assert dumped["recipe_slug"] == "lentejas"
+    assert dumped["image_present"] is False  # default
+
+
+def test_add_recipe_outcome_failure_round_trip():
+    """D-17: failure variant carries failure_reason."""
+    from robotina.queue.task_types import AddRecipeOutcome
+    o = AddRecipeOutcome(status="failure", failure_reason="boom")
+    assert o.status == "failure"
+    assert o.failure_reason == "boom"
+    assert o.recipe_id is None
+
+
+def test_add_recipe_outcome_rejects_unknown_fields():
+    """D-17: model_config = ConfigDict(extra='forbid')."""
     import pytest
     from pydantic import ValidationError
-
-    from robotina.queue.task_types import WorkflowOutcome
-
-    # Default-construction yields status='pending'
-    instance = WorkflowOutcome()
-    assert instance.status == "pending"
-
-    # Unknown field rejected (extra='forbid')
+    from robotina.queue.task_types import AddRecipeOutcome
     with pytest.raises(ValidationError):
-        WorkflowOutcome(unknown_field="oops")
+        AddRecipeOutcome(status="success", unknown_field="oops")
 
-    # status must be the Literal value (no other strings allowed)
+
+def test_add_recipe_outcome_rejects_invalid_status():
+    """D-17: status is Literal['success', 'failure']."""
+    import pytest
+    from pydantic import ValidationError
+    from robotina.queue.task_types import AddRecipeOutcome
     with pytest.raises(ValidationError):
-        WorkflowOutcome(status="completed")
+        AddRecipeOutcome(status="completed")
+
+
+def test_add_recipe_outcome_image_present_defaults_false():
+    """D-17: image_present default False — Phase 24 flips it."""
+    from robotina.queue.task_types import AddRecipeOutcome
+    o = AddRecipeOutcome(status="success")
+    assert o.image_present is False
+
+
+def test_workflow_outcome_class_no_longer_exists():
+    """D-18: WorkflowOutcome stub is REPLACED (not supplemented) by AddRecipeOutcome.
+    Imports of the old name must fail at module-attribute level."""
+    import robotina.queue.task_types as tt
+    assert not hasattr(tt, "WorkflowOutcome"), (
+        "Phase 17 stub WorkflowOutcome must be removed by Phase 18 D-18 — "
+        "AddRecipeOutcome replaces it; no envelope wrapper in v1.1."
+    )

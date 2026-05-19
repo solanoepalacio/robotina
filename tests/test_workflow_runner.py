@@ -1047,3 +1047,97 @@ def test_shared_context_reply_context_still_written():
     assert rc == {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}, (
         f"reply_context must still be written into shared_context (ARCH-05 deprecation window); got {rc!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 18 / ARCH-02 + ARCH-03 — RED tests (Wave 0)
+# ---------------------------------------------------------------------------
+# Will be GREEN after Wave 2 lands the queue_workflow signature change.
+
+
+def test_queue_workflow_requires_triggered_by_invocation_id():
+    """D-14: queue_workflow signature gains REQUIRED triggered_by_invocation_id arg
+    (no default, no fallback). Calling without it must raise TypeError. Mirrors the
+    Phase 17 conversation_id required-arg test (lines 991-1013)."""
+    from unittest.mock import MagicMock
+    from robotina.queue.workflow_runner import queue_workflow
+
+    shared_context = {
+        "household_id": "hh-1",
+        "recipe_query": "lentejas",
+        "reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"},
+    }
+    with pytest.raises(TypeError):
+        queue_workflow(
+            workflow_type="add-recipe",
+            shared_context=shared_context,
+            household_id="hh-1",
+            conversation_id="conv-1",
+            # triggered_by_invocation_id intentionally omitted — must TypeError
+            queue=MagicMock(),
+            session=MagicMock(),
+        )
+
+
+def test_queue_workflow_persists_triggered_by_invocation_id():
+    """D-23: queue_workflow assigns triggered_by_invocation_id on the WorkflowRun
+    row before commit. Mirrors Phase 17 test_queue_workflow_persists_conversation_id
+    (lines 954-988)."""
+    from robotina.queue.workflow_runner import queue_workflow
+
+    added_runs: list = []
+    added_steps: list = []
+
+    def _add(obj):
+        if hasattr(obj, "step_key") and obj.step_key:
+            added_steps.append(obj)
+        else:
+            added_runs.append(obj)
+
+    session = MagicMock()
+    session.add.side_effect = _add
+    queue = MagicMock()
+    queue.name = "agent-tasks"
+
+    shared_context = {
+        "household_id": "hh-1",
+        "recipe_query": "lentejas",
+        "reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"},
+    }
+
+    queue_workflow(
+        workflow_type="add-recipe",
+        shared_context=shared_context,
+        household_id="hh-1",
+        conversation_id="conv-1",
+        triggered_by_invocation_id="inv-1",
+        queue=queue,
+        session=session,
+    )
+
+    assert len(added_runs) == 1
+    assert added_runs[0].triggered_by_invocation_id == "inv-1"
+    assert added_runs[0].conversation_id == "conv-1"  # Phase 17 still wired
+
+
+@pytest.mark.integration
+def test_migration_0007_upgrades_and_downgrades():
+    """D-23: 0007_robotina_invocations upgrade creates the table + the new FK
+    column; downgrade removes both. Mirrors Phase 17 test_migration_0006_*
+    (lines 893-948)."""
+    import importlib.util
+
+    # Import the migration module by file path (Alembic versions aren't a package)
+    spec = importlib.util.spec_from_file_location(
+        "m0007", "migrations/versions/0007_robotina_invocations.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.revision == "0007"
+    assert mod.down_revision == "0006"
+
+    # The actual upgrade/downgrade exercising the live DB follows the same
+    # idiom as the Phase 17 test — use the project's Alembic harness or a
+    # direct sa.inspect on the connection. Implementer: mirror the existing
+    # test_migration_0006_upgrades_and_downgrades helper at lines 893-948.
+    pytest.skip("filled in by Wave 1 once 0007 file lands — Wave 0 just locks the import contract")
