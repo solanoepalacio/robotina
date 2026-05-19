@@ -325,17 +325,33 @@ class AcknowledgeAddRecipeInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Phase 17 / D-07 — WorkflowOutcome stub
+# Phase 18 / ARCH-04 — AddRecipeOutcome
 # ---------------------------------------------------------------------------
-# Placeholder shape; Phase 20 will define the per-workflow-type concrete
-# shapes (AddRecipeOutcome, etc.) that the deterministic ``finalize-outcome``
-# step writes into ``WorkflowRun.outcome``. Not imported by workflow_runner.py
-# or any agent in Phase 17 — the stub exists so Phase 20 reads as "fill in
-# the shape" rather than "introduce a new concept."
+# Per-workflow outcome summary written by the deterministic ``finalize-outcome``
+# step in Phase 20. Phase 18 defines the shape; no code writes it yet. Replaces
+# the Phase-17 ``WorkflowOutcome`` placeholder (D-18 — no envelope wrapper in
+# v1.1, since ``add-recipe`` is the only workflow type; URL ingestion in
+# Phase 23 reuses this shape).
+#
+# Target serialized size: < ~300 bytes per workflow (ARCH-04 / DASH-12).
 
 
-class WorkflowOutcome(BaseModel):
-    """Placeholder — Phase 20 defines the per-workflow-type shape."""
+class AddRecipeOutcome(BaseModel):
+    """Per-workflow outcome summary for the ``add-recipe`` workflow type.
+
+    Phase 20's ``finalize-outcome`` deterministic step is the single producer.
+    Optional fields encode the success/failure variant at the producer-contract
+    level (not via a discriminated union — Pydantic's ``Field(discriminator=...)``
+    adds verbose construction friction for a 2-variant shape; if the
+    producer-side contract ever gets violated downstream, add a
+    ``model_validator`` then).
+    """
 
     model_config = ConfigDict(extra="forbid")
-    status: Literal["pending"] = "pending"
+
+    status: Literal["success", "failure"]
+    recipe_id: str | None = None        # success only
+    recipe_name: str | None = None      # success only
+    recipe_slug: str | None = None      # success only
+    failure_reason: str | None = None   # failure only
+    image_present: bool = False         # always False in v1.1 until Phase 24 lands recipe-image
