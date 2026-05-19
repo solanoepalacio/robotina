@@ -659,6 +659,7 @@ def test_step_input_persisted_on_first_enqueue():
         workflow_type="add-recipe",
         shared_context=shared_context,
         household_id="hh-1",
+        conversation_id="conv-1",
         queue=queue,
         session=session,
     )
@@ -811,6 +812,7 @@ def test_queue_workflow_rejects_empty_household_id():
             workflow_type="add-recipe",
             shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
             household_id="",
+            conversation_id="conv-1",
             queue=mock_queue,
             session=mock_session,
         )
@@ -838,6 +840,7 @@ def test_queue_workflow_rejects_whitespace_household_id():
             workflow_type="add-recipe",
             shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
             household_id="   ",
+            conversation_id="conv-1",
             queue=mock_queue,
             session=mock_session,
         )
