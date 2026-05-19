@@ -35,7 +35,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 
 ### 🚧 v1.1 Workflows Abstraction Refinement (Phases 17–24)
 
-- [ ] **Phase 17: Conversation FK closure** — Single Alembic revision 0006 adds `WorkflowRun.conversation_id` NOT NULL FK (table pre-cleaned via runbook) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable. Code/migration shipped 2026-05-19; checkbox flips to `[x]` after operator runs `17-RUNBOOK.md` against the live DB.
+- [x] **Phase 17: Conversation FK closure** — Single Alembic revision 0006 adds `WorkflowRun.conversation_id` NOT NULL FK (table pre-cleaned via runbook) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable. Code/migration shipped 2026-05-19; runbook executed and Telegram smoke test + integration migration test confirmed green against live DB (2026-05-19).
 - [ ] **Phase 18: RobotinaInvocation entity** — New `robotina_invocations` table + `InvocationTrigger` enum + idempotency `UniqueConstraint`; gateway inserts invocation on user_message; `WorkflowRun.triggered_by_invocation_id` FK populated by `StartWorkflowTool`; dashboard surfaces the new FK on detail view.
 - [ ] **Phase 19: LLM multi-call smoke test** — Standalone load-bearing experiment in `experiments/robotina/` verifying that target backends emit N `start-workflow` tool calls per turn; committed pass-rate evidence gates downstream phases.
 - [ ] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell.
@@ -70,7 +70,11 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
   2. Every WorkflowRun created during that turn carries `triggered_by_invocation_id` matching the invocation row.
   3. The `RobotinaInvocation` schema includes the `AddRecipeOutcome`-shaped `outcome` JSON contract on `WorkflowRun` (Pydantic model defined; not yet written).
   4. Dashboard's WorkflowRun detail view surfaces `triggered_by_invocation_id`; module-isolation grep gate still passes (RobotinaInvocation imported from `queue.models` only).
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 18-01-PLAN.md — Wave 0 RED-state lock tests (model introspection, AddRecipeOutcome shape, queue_workflow signature, StartWorkflowTool ctor, gateway insert + dedup-no-orphan, dashboard render)
+- [ ] 18-02-PLAN.md — Wave 1 schema (Alembic 0007 + RobotinaInvocation ORM + InvocationTrigger/Status enums + WorkflowRun.triggered_by_invocation_id) + AddRecipeOutcome Pydantic replacement
+- [ ] 18-03-PLAN.md — Wave 2 wiring (queue_workflow signature + StartWorkflowTool.invocation_id + jobs.py bracket-read + gateway handler step 2b with dedup-no-orphan guard)
+- [ ] 18-04-PLAN.md — Wave 3 dashboard row (DASH-13) + REQUIREMENTS.md ARCH-02 wording (rq_job_id) + deploy runbook + manual smoke checkpoint
 **UI hint**: yes
 
 ### Phase 19: LLM multi-call smoke test
@@ -166,7 +170,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 | 15. Recipe Artifact Accumulation                     | v1.0      | 6/6   | Complete    | 2026-05-15 |
 | 16. household_id propagation fix                     | v1.0      | 7/7   | Complete    | 2026-05-15 |
 | 17. Conversation FK closure                          | v1.1      | 4/4 | Complete   | 2026-05-19 |
-| 18. RobotinaInvocation entity                        | v1.1      | 0/0   | Not started | —          |
+| 18. RobotinaInvocation entity                        | v1.1      | 0/4   | Not started | —          |
 | 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
 | 20. Wake rule + outcome plumbing                     | v1.1      | 0/0   | Not started | —          |
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
