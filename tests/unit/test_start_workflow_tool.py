@@ -351,3 +351,57 @@ def test_args_schema_rejects_unknown_workflow_type():
     with pytest.raises(ValidationError) as exc_info:
         tool.invoke(bad_args)
     assert "workflow_type" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Phase 17 / ARCH-01: conversation_id constructor field
+# ---------------------------------------------------------------------------
+# Wave 0 RED-state lock tests. These tests encode the Phase 17 D-03 contract
+# (StartWorkflowTool gains a constructor-injected conversation_id, mirroring
+# the Phase 16 NonEmptyHouseholdId pattern). RED until Wave 2 (Plan 17-03)
+# lands the field on the tool.
+
+
+def test_constructor_requires_conversation_id_no_default():
+    """D-03: StartWorkflowTool() without conversation_id must fail — caller MUST pass (no default)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowTool(chat_id="c1", user_id="u1", platform="telegram", household_id="h1")
+    assert "conversation_id" in str(exc_info.value)
+
+
+def test_constructor_accepts_non_empty_conversation_id():
+    """Regression guard: new conversation_id field accepts a non-empty string."""
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram",
+        household_id="h1", conversation_id="conv-1",
+    )
+    assert tool.conversation_id == "conv-1"
+
+
+def test_run_passes_conversation_id_to_queue_workflow():
+    """D-03: StartWorkflowTool._run threads self.conversation_id into queue_workflow."""
+    from unittest.mock import MagicMock, patch
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+
+    tool = StartWorkflowTool(
+        chat_id="c1", user_id="u1", platform="telegram",
+        household_id="h1", conversation_id="conv-1",
+    )
+
+    with patch("robotina.queue.workflow_runner.queue_workflow", return_value="wf-1") as mock_qw:
+        with patch("robotina.db.SessionLocal", return_value=MagicMock()):
+            with patch("rq.Queue"), patch("redis.Redis"):
+                tool._run(workflow_type="add-recipe", recipe_query="lentejas")
+
+    assert mock_qw.called
+    _, kwargs = mock_qw.call_args
+    assert kwargs.get("conversation_id") == "conv-1", (
+        f"queue_workflow must receive conversation_id='conv-1'; got kwargs={kwargs}"
+    )

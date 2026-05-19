@@ -269,3 +269,33 @@ def test_recipe_load_input_user_message_contains_full_recipe():
         assert ing.food_name in msg
     for step in recipe.steps:
         assert step.body in msg
+
+
+# ---------------------------------------------------------------------------
+# Phase 17 / D-07: WorkflowOutcome stub
+# ---------------------------------------------------------------------------
+# Wave 0 RED-state lock test. Encodes Phase 17 D-07: WorkflowOutcome is a
+# minimal Pydantic placeholder in robotina.queue.task_types that Phase 20 will
+# fill in (AddRecipeOutcome, etc.). RED until Wave 1 (Plan 17-02) defines the
+# class in task_types.py.
+
+
+def test_workflow_outcome_stub():
+    """D-07: WorkflowOutcome is importable from robotina.queue.task_types,
+    has status: Literal['pending'] = 'pending' default, and rejects unknown fields."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.queue.task_types import WorkflowOutcome
+
+    # Default-construction yields status='pending'
+    instance = WorkflowOutcome()
+    assert instance.status == "pending"
+
+    # Unknown field rejected (extra='forbid')
+    with pytest.raises(ValidationError):
+        WorkflowOutcome(unknown_field="oops")
+
+    # status must be the Literal value (no other strings allowed)
+    with pytest.raises(ValidationError):
+        WorkflowOutcome(status="completed")

@@ -294,6 +294,16 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     mock_backend.create_agent.return_value = mock_agent
 
     mock_session = MagicMock()
+    # Phase 17 / D-04: run_task resolves a Conversation row before constructing
+    # StartWorkflowTool. The handle-incoming-message branch threads
+    # conversation.id into the tool. Stub the lookup here so the existing
+    # assertions survive Wave 2 atomically (no test-update churn in Plan 17-03).
+    fake_conversation = MagicMock()
+    fake_conversation.id = "conv-from-db"
+    query_mock = MagicMock()
+    query_mock.filter_by.return_value = query_mock
+    query_mock.one.return_value = fake_conversation
+    mock_session.query.return_value = query_mock
 
     # Task input with all fields needed for tool construction
     task_input = MagicMock()
@@ -344,6 +354,8 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     assert sw_tools[0].user_id == "user-hm-1"
     assert sw_tools[0].platform == "telegram"
     assert sw_tools[0].household_id == "household-abc"
+    # Phase 17 / D-04: conversation_id resolved via session.query(Conversation).one().id
+    assert sw_tools[0].conversation_id == "conv-from-db"
 
     # Verify AgentConfig.tools was NOT mutated
     assert mock_config.tools == []
@@ -412,3 +424,130 @@ def test_run_task_injects_queue_tool_for_acknowledge_add_recipe():
     assert q_tools[0].platform == "telegram"
     # No other tools — ack agent only has queue.
     assert len(injected_tools) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 17 / ARCH-01: run_task Conversation lookup + injection
+# ---------------------------------------------------------------------------
+# Wave 0 RED-state lock tests. Encode the Phase 17 D-04 contract:
+# run_task's handle-incoming-message branch resolves Conversation via
+# session.query(Conversation).filter_by(platform=..., chat_id=...).one() and
+# threads conversation.id into the StartWorkflowTool constructor. Failure to
+# find a Conversation raises sqlalchemy.exc.NoResultFound (fail loud per D-04).
+# RED until Wave 2 (Plan 17-03) wires the lookup.
+
+
+def test_run_task_resolves_and_injects_conversation_id():
+    """D-04: run_task handle-incoming-message branch resolves Conversation via .one()
+    and threads conversation.id into StartWorkflowTool constructor."""
+    from unittest.mock import MagicMock, patch
+
+    mock_job = MagicMock()
+    mock_job.id = "job-conv-001"
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+
+    mock_config = MagicMock()
+    mock_config.skills = []
+    mock_config.tools = []
+    mock_config.model_config = {
+        "provider": "ollama", "url": "http://localhost:11434",
+        "model": "gpt-oss:20b", "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
+    }
+    mock_config.prompt_path = "/tmp/test_prompt.md"
+
+    mock_backend = MagicMock()
+    mock_agent = MagicMock()
+    mock_agent.invoke.return_value = {"messages": []}
+
+    # Session mock returns a Conversation row when queried by (platform, chat_id)
+    fake_conversation = MagicMock()
+    fake_conversation.id = "conv-from-db"
+
+    mock_session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter_by.return_value = query_mock
+    query_mock.one.return_value = fake_conversation
+    mock_session.query.return_value = query_mock
+
+    task_input = MagicMock()
+    task_input.chat_id = "chat-1"
+    task_input.user_id = "user-1"
+    task_input.platform = "telegram"
+    task_input.household_id = "household-abc"
+    task_input.text = "agregá lentejas"
+
+    injected_tools = []
+
+    def capture_tools(**kwargs):
+        injected_tools.extend(kwargs.get("tools", []))
+        return mock_agent
+
+    mock_backend.create_agent.side_effect = capture_tools
+
+    with (
+        patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
+        patch("robotina.agent.agents.get_agent_config", return_value=mock_config),
+        patch("robotina.llm.make_backend", return_value=mock_backend),
+        patch("pathlib.Path.read_text", return_value="system prompt"),
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("robotina.queue.workflow_runner.on_step_start"),
+        patch("robotina.queue.workflow_runner.on_step_complete"),
+        patch("robotina.queue.workflow_runner.on_step_failed"),
+    ):
+        from robotina.queue.jobs import run_task
+        run_task(task_input)
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+    sw_tools = [t for t in injected_tools if isinstance(t, StartWorkflowTool)]
+    assert len(sw_tools) == 1, f"Expected 1 StartWorkflowTool, got {injected_tools}"
+    assert sw_tools[0].conversation_id == "conv-from-db", (
+        f"StartWorkflowTool.conversation_id must come from session.query(Conversation).one().id; "
+        f"got {sw_tools[0].conversation_id!r}"
+    )
+
+
+def test_run_task_raises_when_conversation_missing():
+    """D-04: .one() raises NoResultFound = fail loud = correct invariant-violation signal."""
+    from unittest.mock import MagicMock, patch
+    import pytest
+    from sqlalchemy.exc import NoResultFound
+
+    mock_job = MagicMock()
+    mock_job.id = "job-conv-miss"
+    mock_job.meta = {"task_type": "handle-incoming-message", "queue_name": "agent-tasks"}
+
+    mock_config = MagicMock()
+    mock_config.skills = []
+    mock_config.tools = []
+    mock_config.model_config = {
+        "provider": "ollama", "url": "http://localhost:11434",
+        "model": "gpt-oss:20b", "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
+    }
+    mock_config.prompt_path = "/tmp/test_prompt.md"
+
+    mock_session = MagicMock()
+    query_mock = MagicMock()
+    query_mock.filter_by.return_value = query_mock
+    query_mock.one.side_effect = NoResultFound("no Conversation matches")
+    mock_session.query.return_value = query_mock
+
+    task_input = MagicMock()
+    task_input.chat_id = "chat-missing"
+    task_input.user_id = "u1"
+    task_input.platform = "telegram"
+    task_input.household_id = "household-abc"
+    task_input.text = "agregá lentejas"
+
+    with (
+        patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
+        patch("robotina.agent.agents.get_agent_config", return_value=mock_config),
+        patch("robotina.llm.make_backend", return_value=MagicMock()),
+        patch("pathlib.Path.read_text", return_value="system prompt"),
+        patch("robotina.db.SessionLocal", return_value=mock_session),
+        patch("robotina.queue.workflow_runner.on_step_start"),
+        patch("robotina.queue.workflow_runner.on_step_complete"),
+        patch("robotina.queue.workflow_runner.on_step_failed"),
+    ):
+        from robotina.queue.jobs import run_task
+        with pytest.raises(NoResultFound):
+            run_task(task_input)
