@@ -10,9 +10,9 @@
 ### Architecture Foundation
 
 - [x] **ARCH-01**: `WorkflowRun` rows have a `conversation_id` FK to `Conversation`; the column lands as NOT NULL in a single Alembic revision (table is pre-cleaned before deploy per the Phase 17 runbook). Existing v1.0 rows are discarded by the deploy runbook; the post-migration `COUNT(*) WHERE conversation_id IS NULL` returns 0 trivially because no rows exist when 0006 runs.
-- [ ] **ARCH-02**: A new `RobotinaInvocation` SQLAlchemy model records every Robotina LLM turn with `trigger` (`user_message` | `workflow_completion` | `cron`), `trigger_ref_id`, `conversation_id`, `started_at`, `completed_at`, `rq_job_id`, `wake_dispatched_at`.
-- [ ] **ARCH-03**: `WorkflowRun` rows have a `triggered_by_invocation_id` FK to `RobotinaInvocation`; the `StartWorkflowTool` populates it; the column lands nullable in v1.1.
-- [ ] **ARCH-04**: `WorkflowRun.outcome` is a JSON column written by a deterministic terminal step; for the `add-recipe` workflow types it serializes a Pydantic `AddRecipeOutcome` model (success/failure + recipe id/name OR failure reason + `image_present` flag) targeted at < ~300 bytes per workflow.
+- [x] **ARCH-02**: A new `RobotinaInvocation` SQLAlchemy model records every Robotina LLM turn with `trigger` (`user_message` | `workflow_completion` | `cron`), `trigger_ref_id`, `conversation_id`, `started_at`, `completed_at`, `rq_job_id`, `wake_dispatched_at`.
+- [x] **ARCH-03**: `WorkflowRun` rows have a `triggered_by_invocation_id` FK to `RobotinaInvocation`; the `StartWorkflowTool` populates it; the column lands nullable in v1.1.
+- [x] **ARCH-04**: `WorkflowRun.outcome` is a JSON column written by a deterministic terminal step; for the `add-recipe` workflow types it serializes a Pydantic `AddRecipeOutcome` model (success/failure + recipe id/name OR failure reason + `image_present` flag) targeted at < ~300 bytes per workflow.
 - [x] **ARCH-05**: The legacy `shared_context.reply_context` JSON path remains readable through v1.1 (deprecation window); new code reads `WorkflowRun.conversation_id` instead.
 
 ### Wake Rule & Control Loop
@@ -70,8 +70,8 @@ The Phase 13 queue-visibility dashboard must continue to function through the sc
 - [ ] **DASH-10**: Dashboard renders WorkflowRun rows with the new `conversation_id`, `triggered_by_invocation_id`, and `outcome` columns surfaced in the detail view; no template / query regression on the existing list view.
 - [ ] **DASH-11**: Dashboard's task-type label map is updated — `gather-from-url`, `recipe-image`, and `finalize-outcome` get Spanish labels; `acknowledge-add-recipe` and the standalone `notify` step are removed; CI / template tests guard against unknown task-type fallbacks producing raw enum values.
 - [ ] **DASH-12**: Dashboard surfaces a compact `outcome` summary on the WorkflowRun row (renders the structured `AddRecipeOutcome` JSON — success/failure + recipe name + image_present flag — without dumping raw JSON).
-- [ ] **DASH-13**: Dashboard surfaces RobotinaInvocation rows linked to a WorkflowRun (at minimum: `triggered_by_invocation_id` appears on the detail page; a dedicated invocation view is a nice-to-have).
-- [ ] **DASH-14**: Dashboard module-isolation grep gate (Phase 13 D-01) still passes after model imports change — `RobotinaInvocation` is imported from `robotina.queue.models` like `WorkflowRun`, not via a cross-module shortcut.
+- [x] **DASH-13**: Dashboard surfaces RobotinaInvocation rows linked to a WorkflowRun (at minimum: `triggered_by_invocation_id` appears on the detail page; a dedicated invocation view is a nice-to-have).
+- [x] **DASH-14**: Dashboard module-isolation grep gate (Phase 13 D-01) still passes after model imports change — `RobotinaInvocation` is imported from `robotina.queue.models` like `WorkflowRun`, not via a cross-module shortcut.
 
 ### Experiments Compatibility
 
@@ -127,9 +127,9 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ARCH-01 | Phase 17 | Completed |
-| ARCH-02 | Phase 18 | Pending |
-| ARCH-03 | Phase 18 | Pending |
-| ARCH-04 | Phase 18 | Pending |
+| ARCH-02 | Phase 18 | Complete |
+| ARCH-03 | Phase 18 | Complete |
+| ARCH-04 | Phase 18 | Complete |
 | ARCH-05 | Phase 17 | Completed |
 | WAKE-01 | Phase 20 | Pending |
 | WAKE-02 | Phase 20 | Pending |
@@ -164,8 +164,8 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | DASH-10 | Phase 20 | Pending |
 | DASH-11 | Phase 21 | Pending |
 | DASH-12 | Phase 20 | Pending |
-| DASH-13 | Phase 18 | Pending |
-| DASH-14 | Phase 18 | Pending |
+| DASH-13 | Phase 18 | Complete |
+| DASH-14 | Phase 18 | Complete |
 | EXP-01 | Phase 24 | Pending |
 | EXP-02 | Phase 23 | Pending |
 | EXP-03 | Phase 24 | Pending |

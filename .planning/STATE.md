@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
-status: executing
-stopped_at: Phase 18 UI-SPEC approved
-last_updated: "2026-05-19T12:29:36.102Z"
+status: ready_to_plan
+stopped_at: Phase 18 complete (4/4) — ready to discuss Phase 999.1
+last_updated: 2026-05-19T18:34:46.200Z
 last_activity: 2026-05-19 -- Phase 18 execution started
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 73
   percent: 11
 ---
 
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 18 — robotinainvocation-entity
+**Current focus:** Phase 999.1 — custom state schemas for reply context and household id
 
 ## Current Position
 
-Phase: 18 (robotinainvocation-entity) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 18
-Last activity: 2026-05-19 -- Phase 18 execution started
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-19
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 4
 - Average duration: -
 - Total execution time: 0 hours
 
@@ -42,7 +42,7 @@ Last activity: 2026-05-19 -- Phase 18 execution started
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 18 | 4 | - | - |
 
 **Recent Trend:**
 
