@@ -663,22 +663,22 @@ No state-of-the-art shifts apply to this phase. All patterns are established Pha
 - Conversation lookup idiom (`session.query(...).filter_by(platform=..., chat_id=...)`) already used in `handler.py:56-58, 70-72` — confirmed
 - `uv run migrate` invokes `alembic upgrade head` via `src/robotina/db.py:31-34` — confirmed
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `WorkflowOutcome` (D-07) live next to `NonEmptyHouseholdId` (early in `task_types.py`, near the constraint aliases) or as a new section near the end?**
    - What we know: D-07 says "in `src/robotina/queue/task_types.py`" but doesn't pin the line.
    - What's unclear: Style-wise, the file groups "constraints / shared models / per-task models." `WorkflowOutcome` is workflow-level (not task-level), so placing it after the last per-task model with a `## WorkflowRun-related models` section header reads naturally.
-   - Recommendation: Place at end of file with a section comment header. Pure style; planner has discretion.
+   - **RESOLVED:** Place at end of file with a section comment header. Carried into Plan 17-02 Task 2.3.
 
 2. **Should the migration use inline `sa.ForeignKey()` inside `sa.Column()` or a separate `op.create_foreign_key()` call?**
    - What we know: Both work in Alembic. `0002_models.py:67-93` uses inline FK syntax via `sa.ForeignKeyConstraint` inside `op.create_table()`. There is no existing `op.add_column + FK` precedent in the migrations dir.
    - What's unclear: Inline FK on `add_column` is well-documented in Alembic but unverified in this codebase.
-   - Recommendation: Use inline `sa.ForeignKey()` (simpler, single statement). If planner wants extra defensiveness, two statements (`op.add_column` then `op.create_foreign_key`) are equivalent and explicit.
+   - **RESOLVED:** Use inline `sa.ForeignKey('conversations.id')` in `sa.Column()` (simpler, single statement). Carried into Plan 17-02 Task 2.1.
 
 3. **Does the FK need a named constraint (e.g., `fk_workflow_runs_conversation_id`)?**
    - What we know: Existing FK in 0002 (`stored_messages.conversation_id` → `conversations.id`) is unnamed (per `ForeignKeyConstraint(['conversation_id'], ['conversations.id'])` with no `name=`). Postgres generates `<table>_<column>_fkey` automatically.
    - What's unclear: Whether the project standardizes named constraints. Inspection of `0001`-`0005` shows no named FKs.
-   - Recommendation: Follow precedent — leave unnamed.
+   - **RESOLVED:** Leave unnamed — follow `0001`-`0005` precedent. Carried into Plan 17-02 Task 2.1.
 
 ## Environment Availability
 
