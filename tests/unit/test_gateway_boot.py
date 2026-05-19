@@ -15,11 +15,17 @@ import sys
 import pytest
 
 
-def _run_gateway_main(env: dict) -> subprocess.CompletedProcess:
-    """Run `python -c 'from robotina.gateway import main; main()'` with isolated env."""
+def _run_gateway_main(env: dict, cwd: str | None = None) -> subprocess.CompletedProcess:
+    """Run `python -c 'from robotina.gateway import main; main()'` with isolated env.
+
+    The ``cwd`` kwarg is critical: python-dotenv's default ``load_dotenv()``
+    walks up from CWD looking for ``.env``. Pointing CWD at an isolated tmp dir
+    prevents the project ``.env`` from leaking HOUSEHOLD_ID into the subprocess.
+    """
     return subprocess.run(
         [sys.executable, "-c", "from robotina.gateway import main; main()"],
         env=env,
+        cwd=cwd,
         capture_output=True,
         text=True,
         timeout=10,
@@ -39,25 +45,25 @@ def _base_env() -> dict:
     return env
 
 
-def test_main_exits_on_missing_household_id():
+def test_main_exits_on_missing_household_id(tmp_path):
     env = _base_env()  # HOUSEHOLD_ID absent
-    result = _run_gateway_main(env)
+    result = _run_gateway_main(env, cwd=str(tmp_path))
     assert result.returncode != 0, f"expected non-zero exit, got {result.returncode}\nstderr={result.stderr}"
     assert "HOUSEHOLD_ID" in result.stderr, f"stderr must name the env var; got: {result.stderr!r}"
 
 
-def test_main_exits_on_empty_household_id():
+def test_main_exits_on_empty_household_id(tmp_path):
     env = _base_env()
     env["HOUSEHOLD_ID"] = ""
-    result = _run_gateway_main(env)
+    result = _run_gateway_main(env, cwd=str(tmp_path))
     assert result.returncode != 0
     assert "HOUSEHOLD_ID" in result.stderr
 
 
-def test_main_exits_on_whitespace_household_id():
+def test_main_exits_on_whitespace_household_id(tmp_path):
     env = _base_env()
     env["HOUSEHOLD_ID"] = "   "
-    result = _run_gateway_main(env)
+    result = _run_gateway_main(env, cwd=str(tmp_path))
     assert result.returncode != 0
     assert "HOUSEHOLD_ID" in result.stderr
 

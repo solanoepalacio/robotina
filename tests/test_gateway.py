@@ -123,8 +123,8 @@ async def test_send_message_persists(db_session, make_update):
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "test-token", "HOUSEHOLD_ID": "hh-1"}):
             result = await send_message(chat_id="99001", text="Hello!", user_id="55001")
 
-    # Assert return value
-    assert result == "7777", f"Expected '7777', got {result!r}"
+    # Assert return value (send_message returns a SendResult dataclass)
+    assert result.message_id == "7777", f"Expected SendResult(message_id='7777'), got {result!r}"
 
     # Assert ASSISTANT StoredMessage was persisted
     db_session.expire_all()  # ensure fresh read

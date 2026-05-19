@@ -63,7 +63,7 @@ def test_skill_index_appended_to_prompt():
     mock_agent.invoke.return_value = {"messages": []}
 
     mock_job = MagicMock()
-    mock_job.meta = {"task_type": "handle-incoming-message"}
+    mock_job.meta = {"task_type": "handle-incoming-message", "invocation_id": "inv-stub-1"}
 
     mock_session = MagicMock()
     # Phase 17 / D-04: run_task's handle-incoming-message branch resolves
