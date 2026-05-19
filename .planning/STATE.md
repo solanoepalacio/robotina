@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: executing
-stopped_at: Plan 17-04 complete (Phase 17 close pending operator runbook execution)
-last_updated: "2026-05-19T01:29:33.539Z"
-last_activity: 2026-05-19 — Plan 17-04 complete (REQUIREMENTS.md + ROADMAP.md wording alignment + 17-RUNBOOK.md created)
+stopped_at: Phase 18 UI-SPEC approved
+last_updated: "2026-05-19T12:29:36.102Z"
+last_activity: 2026-05-19 -- Phase 18 execution started
 progress:
   total_phases: 9
-  completed_phases: 0
-  total_plans: 4
+  completed_phases: 1
+  total_plans: 8
   completed_plans: 4
-  percent: 0
+  percent: 11
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 17 — Conversation FK closure
+**Current focus:** Phase 18 — robotinainvocation-entity
 
 ## Current Position
 
-Phase: 17 (Conversation FK closure) — EXECUTING (awaiting operator runbook to flip ARCH-01/ARCH-05 → Complete)
-Plan: 4 of 4 (all plans shipped; phase close is gated on the operator running `.planning/phases/17-conversation-fk-closure/17-RUNBOOK.md` against the live DB)
-Status: Plan 17-04 complete; phase status not advanced per --no-transition directive
-Last activity: 2026-05-19 — Plan 17-04 complete (REQUIREMENTS.md + ROADMAP.md wording alignment + 17-RUNBOOK.md created)
+Phase: 18 (robotinainvocation-entity) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 18
+Last activity: 2026-05-19 -- Phase 18 execution started
 
 ## Performance Metrics
 
@@ -269,15 +269,16 @@ None yet.
 | 260513-lcc | Align CLAUDE.md langchain-core row to `>=1.2` (was `>=0.3`) — internal consistency cleanup flagged by Phase 10 VERIFICATION.md | 2026-05-13 | f52533a | (fast — no directory) |
 | 260514-ix8 | Remove redundant Output section from 5 recipe research prompts — schema enforced by `response_format_model` in agents.py, prompt-level section was developer-facing | 2026-05-14 | 0bd4062 | [260514-ix8-remove-redundant-output-section-from-5-r](./quick/260514-ix8-remove-redundant-output-section-from-5-r/) |
 | 260518-ksv | Tighten StartWorkflowTool schema: flatten `shared_context: dict` into top-level `recipe_query: str` and constrain `workflow_type` to `Literal["add-recipe"]` — stronger LLM-facing schema so terminal-tool validation failures (no retry under `return_direct=True`) are far less likely | 2026-05-18 | c792229 | [260518-ksv-tighten-startworkflowtool-schema-flatten](./quick/260518-ksv-tighten-startworkflowtool-schema-flatten/) |
+| 260519-kc8 | Fix all deferred tests — 4 dashboard FK tests + 3 unit/gateway contract drift tests (test-only, no production changes) | 2026-05-19 | 965d3be | [260519-kc8-fix-all-deferred-tests](./quick/260519-kc8-fix-all-deferred-tests/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-18
+Last activity: 2026-05-19 - Completed quick task 260519-kc8: fix all deferred tests
 
-Last session: 2026-05-19T01:29:26.859Z
-Stopped at: Phase 17 context gathered
+Last session: 2026-05-19T11:36:52.439Z
+Stopped at: Phase 18 UI-SPEC approved
 Resume file: 
-None
+.planning/phases/18-robotinainvocation-entity/18-UI-SPEC.md
 
 ## Operator Next Steps
 
