@@ -10,7 +10,7 @@
 ### Architecture Foundation
 
 - [ ] **ARCH-01**: `WorkflowRun` rows have a `conversation_id` FK to `Conversation`; the column lands as NOT NULL in a single Alembic revision (table is pre-cleaned before deploy per the Phase 17 runbook). Existing v1.0 rows are discarded by the deploy runbook; the post-migration `COUNT(*) WHERE conversation_id IS NULL` returns 0 trivially because no rows exist when 0006 runs.
-- [ ] **ARCH-02**: A new `RobotinaInvocation` SQLAlchemy model records every Robotina LLM turn with `trigger` (`user_message` | `workflow_completion` | `cron`), `trigger_ref_id`, `conversation_id`, `started_at`, `completed_at`, `job_id`, `wake_dispatched_at`.
+- [ ] **ARCH-02**: A new `RobotinaInvocation` SQLAlchemy model records every Robotina LLM turn with `trigger` (`user_message` | `workflow_completion` | `cron`), `trigger_ref_id`, `conversation_id`, `started_at`, `completed_at`, `rq_job_id`, `wake_dispatched_at`.
 - [ ] **ARCH-03**: `WorkflowRun` rows have a `triggered_by_invocation_id` FK to `RobotinaInvocation`; the `StartWorkflowTool` populates it; the column lands nullable in v1.1.
 - [ ] **ARCH-04**: `WorkflowRun.outcome` is a JSON column written by a deterministic terminal step; for the `add-recipe` workflow types it serializes a Pydantic `AddRecipeOutcome` model (success/failure + recipe id/name OR failure reason + `image_present` flag) targeted at < ~300 bytes per workflow.
 - [ ] **ARCH-05**: The legacy `shared_context.reply_context` JSON path remains readable through v1.1 (deprecation window); new code reads `WorkflowRun.conversation_id` instead.
