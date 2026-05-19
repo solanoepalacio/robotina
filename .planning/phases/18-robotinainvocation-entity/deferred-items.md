@@ -1,0 +1,1 @@
+- tests/test_gateway.py::test_send_message_persists — pre-existing failure on `assert result == "7777"` but actual return is `SendResult(message_id='7777')`. Confirmed unrelated to Plan 18-03 (stashed handler.py / conftest.py edits and still failed). Out-of-scope.
