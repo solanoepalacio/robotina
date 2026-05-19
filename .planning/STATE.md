@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: completed
-stopped_at: Phase 17 context gathered
-last_updated: "2026-05-18T23:39:21.368Z"
-last_activity: 2026-05-18 — Roadmap for v1.1 published (Phases 17–24; 46/46 requirements mapped)
+stopped_at: Phase 18 context gathered
+last_updated: "2026-05-18T23:55:00.000Z"
+last_activity: 2026-05-18 — Phase 18 context gathered (auto-mode discuss; 25 decisions, RobotinaInvocation entity)
 progress:
   total_phases: 9
   completed_phases: 0
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 ## Current Position
 
-Phase: 17 — Conversation FK closure (not started; first phase of v1.1)
+Phase: 18 — RobotinaInvocation entity (context gathered; auto-mode discuss)
 Plan: —
-Status: Roadmap complete; awaiting `/gsd:plan-phase 17`
-Last activity: 2026-05-18 — Roadmap for v1.1 published (Phases 17–24; 46/46 requirements mapped)
+Status: Context complete; awaiting `/gsd:plan-phase 18` (resume file: `.planning/phases/18-robotinainvocation-entity/18-CONTEXT.md`)
+Last activity: 2026-05-18 — Phase 18 context gathered via auto-mode discuss; 25 implementation decisions captured.
 
 ## Performance Metrics
 
