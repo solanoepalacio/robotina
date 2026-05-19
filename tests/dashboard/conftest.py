@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from robotina.db import SessionLocal
+from robotina.gateway.models import Conversation, Platform
 from robotina.queue.models import (
     WorkflowRun,
     WorkflowRunStep,
@@ -67,9 +68,23 @@ def make_failed_cascade_run(
     Caller is responsible for tracking the returned run.id in the
     db_session fixture's inserted_run_ids list.
     """
+    # Phase 17 closure: workflow_runs.conversation_id is NOT NULL.
+    # Create a per-run Conversation so each cascade fixture is isolated and
+    # the FK insert succeeds. Unique (platform, chat_id) is enforced — derive
+    # chat_id from the WorkflowRun uuid to keep concurrent test runs disjoint.
+    import uuid as _uuid
+
+    conv = Conversation(
+        platform=Platform.TELEGRAM,
+        chat_id=f"test-{_uuid.uuid4()}",
+        household_id=household_id,
+    )
+    session.add(conv)
+    session.flush()
     run = WorkflowRun(
         workflow_type="add-recipe",
         household_id=household_id,
+        conversation_id=conv.id,
         status=WorkflowStatus.FAILED,
         shared_context={"reply_context": {"chat_id": 42}},
     )
