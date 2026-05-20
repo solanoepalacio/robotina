@@ -304,6 +304,13 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     query_mock.filter_by.return_value = query_mock
     query_mock.one.return_value = fake_conversation
     mock_session.query.return_value = query_mock
+    # Phase 20 / D-07: run_task now session.get(RobotinaInvocation, id) and
+    # branches on inv.trigger. Stub a USER_MESSAGE invocation so the existing
+    # tool-injection assertions exercise the existing branch.
+    from robotina.queue.models import InvocationTrigger
+    _stub_inv = MagicMock()
+    _stub_inv.trigger = InvocationTrigger.USER_MESSAGE
+    mock_session.get.return_value = _stub_inv
 
     # Task input with all fields needed for tool construction
     task_input = MagicMock()
@@ -468,6 +475,11 @@ def test_run_task_resolves_and_injects_conversation_id():
     query_mock.filter_by.return_value = query_mock
     query_mock.one.return_value = fake_conversation
     mock_session.query.return_value = query_mock
+    # Phase 20 / D-07: stub USER_MESSAGE invocation for the dispatch branch.
+    from robotina.queue.models import InvocationTrigger
+    _stub_inv = MagicMock()
+    _stub_inv.trigger = InvocationTrigger.USER_MESSAGE
+    mock_session.get.return_value = _stub_inv
 
     task_input = MagicMock()
     task_input.chat_id = "chat-1"
@@ -530,6 +542,12 @@ def test_run_task_raises_when_conversation_missing():
     query_mock.filter_by.return_value = query_mock
     query_mock.one.side_effect = NoResultFound("no Conversation matches")
     mock_session.query.return_value = query_mock
+    # Phase 20 / D-07: stub USER_MESSAGE invocation so the dispatch reaches
+    # the Conversation .one() call (which is the assertion target here).
+    from robotina.queue.models import InvocationTrigger
+    _stub_inv = MagicMock()
+    _stub_inv.trigger = InvocationTrigger.USER_MESSAGE
+    mock_session.get.return_value = _stub_inv
 
     task_input = MagicMock()
     task_input.chat_id = "chat-missing"

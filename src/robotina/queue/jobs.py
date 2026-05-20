@@ -185,52 +185,107 @@ def run_task(task_input) -> object:
         # send-notification is handled by the deterministic branch above (Phase 07.1)
         # and never reaches this point.
         if task_type == "handle-incoming-message":
+            from datetime import datetime as _datetime
+            import os as _os
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
             from robotina.agent.tools.queue import QueueTool
             from robotina.agent.tools.start_workflow import StartWorkflowTool
             from robotina.gateway.models import Conversation, Platform
-
-            # Phase 17 / ARCH-01 / D-04: resolve the Conversation row that
-            # originated this message. The gateway always upserts a
-            # Conversation BEFORE enqueuing (handler.py:55-72, then commit at
-            # :110, then enqueue at :125-132), so by the time run_task is
-            # invoked the row IS guaranteed present. ``.one()`` raises
-            # sqlalchemy.exc.NoResultFound on miss = invariant violation =
-            # fail loud (the existing try/except calls on_step_failed and
-            # re-raises). Phase 18 will also use this lookup site to insert
-            # the RobotinaInvocation row.
-            conversation = (
-                _session.query(Conversation)
-                .filter_by(
-                    platform=Platform(task_input.platform),
-                    chat_id=task_input.chat_id,
-                )
-                .one()
+            from robotina.queue.models import (
+                InvocationStatus,
+                InvocationTrigger,
+                RobotinaInvocation,
             )
 
-            # Phase 18 / ARCH-02 / D-15: invocation_id flows through
-            # ``job.meta["invocation_id"]`` (D-12). Bracket read — not
-            # ``.get()`` — because this branch is reached only for
-            # ``handle-incoming-message`` jobs, where the gateway ALWAYS
-            # sets the meta key (handler.py step 4). A missing key is an
-            # invariant violation; fail loud (KeyError) is the contract.
-            # ``job`` is in scope from get_current_job() higher in run_task.
+            # Phase 20 / D-07: invocation_id flows through ``job.meta`` for
+            # BOTH USER_MESSAGE (gateway-enqueued) and WORKFLOW_COMPLETION
+            # (wake-enqueued) jobs. Bracket read — missing key is an invariant
+            # violation; fail loud (KeyError) is the contract.
             invocation_id = job.meta["invocation_id"]
+            inv = _session.get(RobotinaInvocation, invocation_id)
+            if inv is None:
+                raise RuntimeError(
+                    f"RobotinaInvocation {invocation_id!r} not found in DB"
+                )
 
-            tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
-            tools.append(QueueTool(
-                chat_id=task_input.chat_id,
-                user_id=task_input.user_id,
-                platform=task_input.platform,
-            ))
-            tools.append(StartWorkflowTool(
-                chat_id=task_input.chat_id,
-                user_id=task_input.user_id,
-                platform=task_input.platform,
-                household_id=task_input.household_id,
-                conversation_id=conversation.id,
-                invocation_id=invocation_id,
-            ))
+            # Phase 20 / D-10: PENDING → RUNNING transition. Commit so the
+            # dashboard reflects state even if the agent run is long. DONE /
+            # FAILED + completed_at writes happen in the outer try/except/else
+            # at the bottom of run_task — no inner flag needed.
+            inv.status = InvocationStatus.RUNNING
+            inv.started_at = _datetime.utcnow()
+            _session.commit()
+
+            if inv.trigger == InvocationTrigger.USER_MESSAGE:
+                # Phase 17 / ARCH-01 / D-04: USER_MESSAGE path — task_input is
+                # IncomingMessageInput. Resolve the Conversation row via the
+                # message's (platform, chat_id) pair. The gateway upserts the
+                # Conversation BEFORE enqueuing so the row IS guaranteed
+                # present; ``.one()`` raises on miss = fail loud.
+                conversation = (
+                    _session.query(Conversation)
+                    .filter_by(
+                        platform=Platform(task_input.platform),
+                        chat_id=task_input.chat_id,
+                    )
+                    .one()
+                )
+                tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
+                tools.append(QueueTool(
+                    chat_id=task_input.chat_id,
+                    user_id=task_input.user_id,
+                    platform=task_input.platform,
+                ))
+                tools.append(StartWorkflowTool(
+                    chat_id=task_input.chat_id,
+                    user_id=task_input.user_id,
+                    platform=task_input.platform,
+                    household_id=task_input.household_id,
+                    conversation_id=conversation.id,
+                    invocation_id=invocation_id,
+                ))
+            elif inv.trigger == InvocationTrigger.WORKFLOW_COMPLETION:
+                # Phase 20 / WAKE-04 / D-07: wake path. task_input is
+                # WakeInvocationInput; conversation / platform identifiers are
+                # resolved from the invocation row's conversation_id (PK
+                # lookup, not the .filter_by(platform, chat_id).one() form
+                # because the wake input doesn't carry those redundantly).
+                conversation = _session.get(Conversation, inv.conversation_id)
+                if conversation is None:
+                    raise RuntimeError(
+                        f"Conversation {inv.conversation_id!r} missing for wake "
+                        f"invocation {inv.id!r}"
+                    )
+                # Bracket form — fail loud (Phase 16 dual-guard pattern).
+                household_id = _os.environ["HOUSEHOLD_ID"]
+                platform_value = conversation.platform.value
+                # Conversation does not store a user_id (group chats can have
+                # many users; the originating user lives transiently on
+                # IncomingMessageInput, not on the Conversation row). The wake
+                # path has no originating user — it is a follow-up to a workflow.
+                # Tools are wired with chat_id as the user_id placeholder so the
+                # constructors validate; V004 instructs the agent NOT to call
+                # queue/start-workflow on wake turns, so these placeholders
+                # remain decorative until Phase 21 replaces this tool surface.
+                wake_user_id = conversation.chat_id
+                tools.append(HouseholdManagerApiTool(household_id=household_id))
+                tools.append(QueueTool(
+                    chat_id=conversation.chat_id,
+                    user_id=wake_user_id,
+                    platform=platform_value,
+                ))
+                tools.append(StartWorkflowTool(
+                    chat_id=conversation.chat_id,
+                    user_id=wake_user_id,
+                    platform=platform_value,
+                    household_id=household_id,
+                    conversation_id=conversation.id,
+                    invocation_id=inv.id,
+                ))
+            else:
+                raise RuntimeError(
+                    f"unsupported invocation trigger: {inv.trigger!r}"
+                )
         elif task_type == "recipe-research-gather":
             from robotina.agent.tools.web_search import WebSearchTool
             tools.append(WebSearchTool())
@@ -311,14 +366,61 @@ def run_task(task_input) -> object:
 
         # Workflow hook: persist artifact + advance to next step or mark WorkflowRun DONE
         workflow_runner.on_step_complete(job.id, result, _session, _queue)
+        # Phase 20 / D-10: invocation lifecycle DONE transition for
+        # handle-incoming-message jobs (both USER_MESSAGE and WORKFLOW_COMPLETION
+        # triggers). Other task types have no invocation row.
+        if task_type == "handle-incoming-message":
+            _write_invocation_terminal_status(
+                _session, job, terminal="done"
+            )
         return result
 
     except Exception as exc:  # DASH-03 / Phase 13
         # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
         workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
+        # Phase 20 / D-10: invocation lifecycle FAILED transition.
+        if task_type == "handle-incoming-message":
+            _write_invocation_terminal_status(
+                _session, job, terminal="failed"
+            )
         raise  # re-raise so RQ moves the job to FailedJobRegistry
 
     finally:
         _session.close()
+
+
+def _write_invocation_terminal_status(session, job, *, terminal: str) -> None:
+    """Phase 20 / D-10: write DONE/FAILED + completed_at on the
+    RobotinaInvocation row that owns this handle-incoming-message job.
+
+    Defensive — never raises. The terminal status writes are best-effort:
+    a failure here must not mask the real job exception (in the FAILED
+    branch) nor convert a happy return into a failure (in the DONE branch).
+    """
+    from datetime import datetime as _datetime
+    from robotina.queue.models import (
+        InvocationStatus,
+        RobotinaInvocation,
+    )
+
+    try:
+        invocation_id = job.meta.get("invocation_id") if job else None
+        if not invocation_id:
+            return
+        inv = session.get(RobotinaInvocation, invocation_id)
+        if inv is None:
+            return
+        inv.status = (
+            InvocationStatus.DONE
+            if terminal == "done"
+            else InvocationStatus.FAILED
+        )
+        inv.completed_at = _datetime.utcnow()
+        session.commit()
+    except Exception:
+        logger.exception(
+            "Failed to write invocation %s status",
+            terminal,
+        )
 
 
