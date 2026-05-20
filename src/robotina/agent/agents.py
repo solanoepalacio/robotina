@@ -81,7 +81,7 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/robotina/V005.md",
+        prompt_path="src/robotina/agent/prompts/robotina/V006.md",
         skills=["household-manager"],
         tools=[],  # HouseholdManagerApiTool, RespondTool, TerminateTool, StartWorkflowTool injected per-job in run_task() — per Phase 21 D-01/D-02/D-10
     ),
