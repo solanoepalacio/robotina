@@ -398,3 +398,207 @@ def test_on_step_complete_dispatches_wake_end_to_end(db_session):
     assert len(fake_queue.enqueued) == 1
     enqueued_kwargs = fake_queue.enqueued[0][1]
     assert enqueued_kwargs["job_id"] == new_inv.rq_job_id
+
+
+# ---------------------------------------------------------------------------
+# Backlog A — FAILED-side outcome stamp
+# ---------------------------------------------------------------------------
+
+
+def test_compose_failure_outcome_plain():
+    """Plain failure_reason → 'step_key: reason' shape."""
+    from robotina.queue.workflow_runner import _compose_failure_outcome
+
+    class _Step:
+        step_key = "gather"
+        failure_reason = "ValueError: source not reachable"
+
+    out = _compose_failure_outcome(_Step())
+    assert out["status"] == "failure"
+    assert out["failure_reason"] == "gather: ValueError: source not reachable"
+
+
+def test_compose_failure_outcome_empty():
+    """None / empty failure_reason → 'step_key: failed' fallback."""
+    from robotina.queue.workflow_runner import _compose_failure_outcome
+
+    class _StepNone:
+        step_key = "ingredients"
+        failure_reason = None
+
+    class _StepEmpty:
+        step_key = "ingredients"
+        failure_reason = "   "
+
+    assert _compose_failure_outcome(_StepNone())["failure_reason"] == "ingredients: failed"
+    assert _compose_failure_outcome(_StepEmpty())["failure_reason"] == "ingredients: failed"
+
+
+def test_compose_failure_outcome_strips_pydantic_url():
+    """Pydantic 'For further information visit https://...' trailers are stripped."""
+    from robotina.queue.workflow_runner import _compose_failure_outcome
+
+    class _Step:
+        step_key = "ingredients"
+        failure_reason = (
+            "ValidationError: 1 validation error for RecipeData\n"
+            "ingredients.0.quantity\n"
+            "  Input should be a valid number [type=dict_type, input_value={'x':1}, input_type=dict]\n"
+            "    For further information visit https://errors.pydantic.dev/2.12/v/dict_type"
+        )
+
+    out = _compose_failure_outcome(_Step())
+    reason = out["failure_reason"]
+    assert reason.startswith("ingredients: ")
+    assert "https://" not in reason
+    assert "For further information" not in reason
+    # Diagnostic itself is preserved up to the URL trailer.
+    assert "dict_type" in reason
+
+
+def test_compose_failure_outcome_truncates_long_reason():
+    """failure_reason > 150 chars → truncated with single trailing '…'."""
+    from robotina.queue.workflow_runner import _compose_failure_outcome
+
+    long_reason = "ValidationError: " + ("x" * 500)
+
+    class _Step:
+        step_key = "load"
+        failure_reason = long_reason
+
+    out = _compose_failure_outcome(_Step())
+    reason = out["failure_reason"]
+    assert reason.startswith("load: ")
+    assert reason.endswith("…")
+    # Soft cap is 150 on the inner short string; +len("load: ") + 1 for ellipsis.
+    # Allow a small envelope but assert << raw length.
+    assert len(reason) < 200
+    assert len(reason) > 100  # sanity: actually truncated, not collapsed away
+
+
+def test_compose_failure_outcome_collapses_newlines():
+    """Embedded newlines / runs of whitespace collapse to single spaces."""
+    from robotina.queue.workflow_runner import _compose_failure_outcome
+
+    class _Step:
+        step_key = "metadata"
+        failure_reason = "line one\n\n  line\ttwo\n\nline three"
+
+    out = _compose_failure_outcome(_Step())
+    reason = out["failure_reason"]
+    assert "\n" not in reason
+    assert "\t" not in reason
+    # No double spaces.
+    assert "  " not in reason
+    assert reason == "metadata: line one line two line three"
+
+
+def test_on_step_failed_stamps_failure_outcome(db_session):
+    """Backlog A — on_step_failed writes AddRecipeOutcome(status='failure', ...)
+    to WorkflowRun.outcome so the wake-context Robotina turn can reference it.
+    The Phase 20 D-08 single-commit invariant still holds (verified separately
+    via the existing wake tests that share the same code path).
+    """
+    from robotina.queue.workflow_runner import on_step_failed
+
+    session = db_session
+    conv = _make_conversation(session)
+    parent = _make_parent_invocation(session, conv.id)
+
+    run = WorkflowRun(
+        workflow_type="add-recipe",
+        household_id="test-household",
+        conversation_id=conv.id,
+        triggered_by_invocation_id=parent.id,
+        status=WorkflowStatus.RUNNING,
+        shared_context={},
+    )
+    session.add(run)
+    session.flush()
+
+    step = WorkflowRunStep(
+        workflow_run_id=run.id,
+        step_key="gather",
+        step_order=0,
+        task_type="recipe-research-gather",
+        status=WorkflowStepStatus.RUNNING,
+        task_job_id="job-fail-1",
+    )
+    session.add(step)
+    session.commit()
+
+    exc = ValueError(
+        "validation error\n\nFor further information visit "
+        "https://errors.pydantic.dev/2.12/v/dict_type."
+    )
+
+    fake_queue = FakeQueue()
+    on_step_failed("job-fail-1", session, queue=fake_queue, exc=exc)
+
+    session.expire_all()
+    run_after = session.get(WorkflowRun, run.id)
+    parent_after = session.get(RobotinaInvocation, parent.id)
+
+    # 1. WorkflowRun is FAILED.
+    assert run_after.status == WorkflowStatus.FAILED
+    # 2-3. outcome is non-null and shape is failure.
+    assert run_after.outcome is not None
+    assert run_after.outcome["status"] == "failure"
+    # 4. failure_reason references the failed step_key.
+    assert run_after.outcome["failure_reason"].startswith("gather: ")
+    # 5-6. Pydantic URL noise stripped.
+    assert "https://" not in run_after.outcome["failure_reason"]
+    assert "For further information" not in run_after.outcome["failure_reason"]
+    # 7. Bounded length (well under the 200-char envelope).
+    assert len(run_after.outcome["failure_reason"]) <= 200
+    # 8-9. Wake still fires.
+    assert parent_after.wake_dispatched_at is not None
+    assert len(fake_queue.enqueued) == 1
+
+
+def test_on_step_failed_preserves_existing_outcome(db_session):
+    """Defensive: if run.outcome was already stamped (race / finalize-outcome),
+    on_step_failed does NOT overwrite it.
+    """
+    from robotina.queue.workflow_runner import on_step_failed
+
+    session = db_session
+    conv = _make_conversation(session)
+    parent = _make_parent_invocation(session, conv.id)
+
+    preexisting = {
+        "status": "success",
+        "recipe_id": "abc",
+        "recipe_name": "Lentejas",
+        "recipe_slug": "lentejas",
+        "image_present": False,
+    }
+    run = WorkflowRun(
+        workflow_type="add-recipe",
+        household_id="test-household",
+        conversation_id=conv.id,
+        triggered_by_invocation_id=parent.id,
+        status=WorkflowStatus.RUNNING,
+        shared_context={},
+        outcome=preexisting,
+    )
+    session.add(run)
+    session.flush()
+
+    step = WorkflowRunStep(
+        workflow_run_id=run.id,
+        step_key="gather",
+        step_order=0,
+        task_type="recipe-research-gather",
+        status=WorkflowStepStatus.RUNNING,
+        task_job_id="job-fail-keep",
+    )
+    session.add(step)
+    session.commit()
+
+    on_step_failed("job-fail-keep", session, queue=FakeQueue(),
+                   exc=ValueError("boom"))
+
+    session.expire_all()
+    run_after = session.get(WorkflowRun, run.id)
+    assert run_after.outcome == preexisting
