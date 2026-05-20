@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 
 from robotina.queue.task_types import (
     AcknowledgeAddRecipeInput,
+    FinalizeOutcomeInput,
     RecipeData,
     RecipeLoadInput,
     RecipeResearchGatherInput,
@@ -158,6 +159,19 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 build_input=lambda ctx, artifacts: SendNotificationInput(
                     **ctx["reply_context"],
                     text=_build_notify_text(artifacts["metadata"], artifacts["load"]),
+                ),
+            ),
+            # WAKE-04 / D-02: deterministic terminal step that composes the
+            # AddRecipeOutcome JSON. APPENDED after `notify` (not replacing it) so
+            # users keep getting the legacy reply through this milestone; the next
+            # milestone deletes `notify` and moves this step accordingly.
+            # Agent-less — run_task has a dedicated branch (D-01).
+            WorkflowStepDef(
+                step_key="finalize-outcome",
+                task_type="finalize-outcome",
+                build_input=lambda ctx, artifacts: FinalizeOutcomeInput(
+                    metadata=artifacts.get("metadata"),
+                    load=artifacts.get("load"),
                 ),
             ),
         ],
