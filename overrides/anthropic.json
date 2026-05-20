@@ -6,13 +6,6 @@
       "api_key_env": "API_TOKEN_ANTHROPIC"
     }
   },
-  "acknowledge-add-recipe": {
-    "model_config": {
-      "provider": "anthropic",
-      "model": "claude-haiku-4-5-20251001",
-      "api_key_env": "API_TOKEN_ANTHROPIC"
-    }
-  },
   "recipe-research-gather": {
     "model_config": {
       "provider": "anthropic",

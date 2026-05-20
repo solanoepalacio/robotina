@@ -6,13 +6,6 @@
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
-  "acknowledge-add-recipe": {
-    "model_config": {
-      "provider": "openai",
-      "model": "gpt-4.1-mini",
-      "api_key_env": "API_TOKEN_OPENAI"
-    }
-  },
   "recipe-research-gather": {
     "model_config": {
       "provider": "openai",
