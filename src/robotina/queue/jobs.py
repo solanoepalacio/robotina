@@ -301,6 +301,13 @@ def run_task(task_input) -> object:
         elif task_type == "recipe-research-gather":
             from robotina.agent.tools.web_search import WebSearchTool
             tools.append(WebSearchTool())
+        elif task_type == "gather-from-url":
+            # Phase 23 D-03: gather-from-url is the URL-variant analog of
+            # recipe-research-gather. FetchAndScrapeTool wraps safe_fetch +
+            # recipe-scrapers + trafilatura; the agent calls it exactly once
+            # per V001 prompt. No constructor args (mirrors WebSearchTool).
+            from robotina.agent.tools.fetch_and_scrape import FetchAndScrapeTool
+            tools.append(FetchAndScrapeTool())
         elif task_type == "recipe-research-ingredients":
             # Phase 15: ingredients agent gets the two validation tools so it
             # can resolve Spanish food/unit names to household-manager catalog

@@ -99,6 +99,25 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         tools=[],  # WebSearchTool injected per-job in run_task()
         response_format_model=RecipeData,
     ),
+    # Phase 23 D-03 / D-23: gather-from-url is the first step of the
+    # add-recipe-from-url workflow variant. response_format=RecipeData
+    # mirrors recipe-research-gather; FetchAndScrapeTool is injected
+    # per-job in run_task() (see queue/jobs.py). Atomic AGENT_REGISTRY +
+    # overrides/*.json sync per feedback_overrides_in_sync (Phase 21 D-12).
+    "gather-from-url": AgentConfig(
+        task_type="gather-from-url",
+        model_config={
+            "provider": "ollama",
+            "url": "http://localhost:11434",
+            "model": "gpt-oss:20b",
+            "api_key_env": "GATHER_FROM_URL_API_TOKEN",
+            "reasoning": True,
+        },
+        prompt_path="src/robotina/agent/prompts/gather-from-url/V001.md",
+        skills=[],
+        tools=[],  # FetchAndScrapeTool injected per-job in run_task()
+        response_format_model=RecipeData,
+    ),
     "recipe-research-instructions": AgentConfig(
         task_type="recipe-research-instructions",
         model_config={

@@ -13,6 +13,13 @@
       "api_key_env": "API_TOKEN_OPENAI"
     }
   },
+  "gather-from-url": {
+    "model_config": {
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
+      "api_key_env": "API_TOKEN_OPENAI"
+    }
+  },
   "recipe-research-instructions": {
     "model_config": {
       "provider": "openai",
