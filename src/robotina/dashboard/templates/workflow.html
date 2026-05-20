@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_status_badge.html" import status_badge %}
+{% from "_macros.html" import task_type_label %}
 {% block title %}Workflow {{ run.id[:8] }} · Robotina Dashboard{% endblock %}
 {% block content %}
   <p class="back-link"><a href="/">← All workflows</a></p>
