@@ -1,7 +1,7 @@
 """respond tool for the Robotina routing agent.
 
 Per D-01: non-terminal Spanish-replier; enqueues send-notification at_front=True
-(mirrors the retired QueueTool). Replaces QueueTool — RespondTool is the new
+(mirrors the retired legacy queue tool). Replaces legacy queue tool — RespondTool is the new
 agent surface for direct replies.
 
 Non-terminal (``return_direct=False``) so Robotina can chain calls within the
@@ -42,7 +42,7 @@ class RespondArgs(BaseModel):
 class RespondTool(BaseTool):
     """Non-terminal tool that enqueues a Spanish reply via send-notification.
 
-    Mirrors QueueTool's enqueue contract exactly:
+    Mirrors legacy queue tool's enqueue contract exactly:
       - target function:  robotina.queue.jobs.run_task
       - payload:          SendNotificationInput(platform, chat_id, user_id, text)
       - at_front:         True (notification replies take priority — load-bearing
@@ -51,7 +51,7 @@ class RespondTool(BaseTool):
       - failure_ttl:      -1
       - meta:             {"task_type": "send-notification"}
 
-    Difference vs QueueTool: ``return_direct=False`` (non-terminal). Robotina
+    Difference vs legacy queue tool: ``return_direct=False`` (non-terminal). Robotina
     can call respond → start-workflow → terminate in the same turn.
     """
 
