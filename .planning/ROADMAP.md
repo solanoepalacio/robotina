@@ -111,7 +111,15 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   4. `notify` workflow step is removed from the add-recipe definition; dashboard task-type label map updated (Spanish labels for new types, removed labels for retired ones); no template regression.
   5. `experiments/acknowledge_add_recipe.py` and its `[project.scripts]` entry are removed; documentation updated.
   6. **Manual multi-call smoke checkpoint**: 5–8 hand-curated Spanish utterances (single-recipe, multi-recipe 2–3 items, compound dish, ambiguous, over-cap) are run once on Ollama `gpt-oss:20b` (local) and once on OpenAI (staging), with the resulting tool-call traces eyeballed and recorded in `.planning/phases/21-*/SMOKE.md` (utterance, backend, expected N, observed N, pass/fail, LangWatch trace link). The file ends with an explicit go/no-go line. If OpenAI staging shows unacceptable reliability, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[{workflow_type, input}, ...])` before merge; Ollama-only failures are noted but do not block merge (dev-only backend).
-**Plans**: TBD
+**Plans**: 8 plans
+- [ ] 21-01-PLAN.md — Add RespondTool (non-terminal send-notification enqueue at_front=True) + unit tests
+- [ ] 21-02-PLAN.md — Add TerminateTool (return_direct=True, no-arg) + unit tests
+- [ ] 21-03-PLAN.md — Refactor StartWorkflowTool to multi-call surface ({workflow_type, input}, return_direct=False) + AddRecipeQueryInput + tests
+- [ ] 21-04-PLAN.md — Coupled deletion: jobs.py tool swap, agents.py V004→V005, workflows.py 6-step list, dead-letter block, QueueTool/acknowledge-add-recipe/AcknowledgeAddRecipeInput, overrides entries (D-06 single PR) + repo grep gate
+- [ ] 21-05-PLAN.md — V005 Robotina prompt (new tool surface, strict output rule, single-recipe examples; V004 retained)
+- [ ] 21-06-PLAN.md — CI guard test: AGENT_REGISTRY ↔ overrides/*.json bidirectional sync + AGENT_REGISTRY content tests
+- [ ] 21-07-PLAN.md — Dashboard task-type label map (DASH-11, Jinja-side _macros.html, Spanish labels) + template tests
+- [ ] 21-08-PLAN.md — Manual multi-call smoke checkpoint (21-SMOKE.md, Ollama+OpenAI) + REQUIREMENTS.md ticks + doc updates (autonomous=false)
 **UI hint**: yes
 
 ### Phase 22: Multi-recipe per message (Topic 1)
