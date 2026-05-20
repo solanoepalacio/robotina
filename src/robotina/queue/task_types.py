@@ -336,26 +336,6 @@ class AcknowledgeAddRecipeInput(BaseModel):
 # Target serialized size: < ~300 bytes per workflow (ARCH-04 / DASH-12).
 
 
-class FinalizeOutcomeInput(BaseModel):
-    """Input for the deterministic ``finalize-outcome`` step (Phase 20 / D-03).
-
-    Populated by the workflow's ``build_input`` lambda from accumulated
-    artifacts. Carries only what the deterministic composer needs to build an
-    ``AddRecipeOutcome``: the metadata snapshot (for any future fields), the
-    load artifact (for recipe_id / recipe_name / recipe_slug), and an optional
-    failure_reason for future Phase 21 failure-path invocations.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    metadata: dict | None = None
-    load: dict | None = None
-    failure_reason: str | None = None
-
-    def to_user_message(self) -> str:  # pragma: no cover — agent-less branch never invokes this
-        return ""
-
-
 class AddRecipeOutcome(BaseModel):
     """Per-workflow outcome summary for the ``add-recipe`` workflow type.
 
