@@ -195,6 +195,7 @@ def _check_and_dispatch_wake(
     sibling_runs = (
         session.query(WorkflowRun)
         .filter(WorkflowRun.triggered_by_invocation_id == invocation_id)
+        .order_by(WorkflowRun.created_at.asc())  # D-06: best-available proxy for user-utterance order under provider parallel tool calls
         .all()
     )
     if not sibling_runs:
@@ -249,6 +250,7 @@ def _check_and_dispatch_wake(
                 workflow_type=r.workflow_type,
                 status="done" if r.status == WorkflowStatus.DONE else "failed",
                 outcome=run_outcome,
+                recipe_query=(r.shared_context or {}).get("recipe_query"),  # D-08
             )
         )
 
