@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
-status: planning
-stopped_at: Phase 20 context gathered
-last_updated: "2026-05-20T00:10:24.815Z"
-last_activity: 2026-05-19
+status: executing
+stopped_at: Phase 21 verified (human_needed for operator smoke)
+last_updated: "2026-05-20T02:56:07.304Z"
+last_activity: 2026-05-20 -- Phase 20 execution started
 progress:
   total_phases: 9
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
-  percent: 22
+  completed_phases: 4
+  total_plans: 22
+  completed_plans: 22
+  percent: 44
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 999.1 — custom state schemas for reply context and household id
+**Current focus:** Phase 20 — wake-rule-outcome-plumbing
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-19
+Phase: 20 (wake-rule-outcome-plumbing) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 20
+Last activity: 2026-05-20 -- Phase 20 execution started
 
 ## Performance Metrics
 
@@ -275,10 +275,10 @@ None yet.
 
 Last activity: 2026-05-19 - Completed quick task 260519-kc8: fix all deferred tests
 
-Last session: 2026-05-20T00:10:24.807Z
-Stopped at: Phase 20 context gathered
+Last session: 2026-05-20T02:56:07.296Z
+Stopped at: Phase 21 verified (human_needed for operator smoke)
 Resume file: 
-.planning/phases/20-wake-rule-outcome-plumbing/20-CONTEXT.md
+.planning/phases/21-tool-surface-flip-remove-acknowledge-notify/21-VERIFICATION.md
 
 ## Operator Next Steps
 
