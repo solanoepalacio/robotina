@@ -31,15 +31,15 @@ def test_start_workflow_tool_is_non_terminal():
 
 
 def test_start_workflow_tool_args_schema_uses_typed_input():
-    """args_schema: {workflow_type: Literal['add-recipe'], input: AddRecipeQueryInput}."""
+    """args_schema: {workflow_type: Literal['add-recipe-from-query'], input: AddRecipeQueryInput}."""
     from robotina.agent.tools.start_workflow import StartWorkflowArgs
     from robotina.queue.task_types import AddRecipeQueryInput
 
     args = StartWorkflowArgs(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         input={"value": "lentejas"},
     )
-    assert args.workflow_type == "add-recipe"
+    assert args.workflow_type == "add-recipe-from-query"
     assert isinstance(args.input, AddRecipeQueryInput)
     assert args.input.value == "lentejas"
 
@@ -58,7 +58,7 @@ def test_start_workflow_tool_rejects_flat_recipe_query():
         invocation_id=_TEST_INV_ID,
     )
     with pytest.raises(ValidationError) as exc_info:
-        tool.invoke({"workflow_type": "add-recipe", "recipe_query": "lentejas"})
+        tool.invoke({"workflow_type": "add-recipe-from-query", "recipe_query": "lentejas"})
     msg = str(exc_info.value)
     # Either the missing 'input' field or the unknown 'recipe_query' field
     # (or both) must be flagged. Both indicate the flat schema is gone.
@@ -80,7 +80,7 @@ def test_start_workflow_tool_rejects_extra_fields():
     with pytest.raises(ValidationError) as exc_info:
         tool.invoke(
             {
-                "workflow_type": "add-recipe",
+                "workflow_type": "add-recipe-from-query",
                 "input": {"value": "lentejas"},
                 "response": "200",  # hallucinated
             }
@@ -128,7 +128,7 @@ def test_start_workflow_tool_run_unwraps_input():
         ),
     ):
         result = tool._run(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             input=AddRecipeQueryInput(value="lentejas"),
         )
 
@@ -166,8 +166,8 @@ def test_start_workflow_tool_multi_call_independent():
             side_effect=capture_queue_workflow,
         ),
     ):
-        r1 = tool._run(workflow_type="add-recipe", input=AddRecipeQueryInput(value="lentejas"))
-        r2 = tool._run(workflow_type="add-recipe", input=AddRecipeQueryInput(value="canelones"))
+        r1 = tool._run(workflow_type="add-recipe-from-query", input=AddRecipeQueryInput(value="lentejas"))
+        r2 = tool._run(workflow_type="add-recipe-from-query", input=AddRecipeQueryInput(value="canelones"))
 
     assert "run-1" in r1
     assert "run-2" in r2
@@ -223,7 +223,7 @@ def test_start_workflow_tool_returns_workflow_run_id_on_success():
         patch("robotina.queue.workflow_runner.queue_workflow", return_value=expected_run_id),
     ):
         result = tool._run(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             input=AddRecipeQueryInput(value="carbonara"),
         )
 
@@ -257,7 +257,7 @@ def test_start_workflow_tool_error_path_returns_string():
         ),
     ):
         result = tool._run(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             input=AddRecipeQueryInput(value="anything"),
         )
 
@@ -292,7 +292,7 @@ def test_start_workflow_tool_auto_injects_reply_context():
         patch("robotina.queue.workflow_runner.queue_workflow", side_effect=capture_queue_workflow),
     ):
         tool._run(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             input=AddRecipeQueryInput(value="pasta"),
         )
 
@@ -352,7 +352,7 @@ def test_args_schema_forbids_unknown_field():
     )
 
     bad_args = {
-        "workflow_type": "add-recipe",
+        "workflow_type": "add-recipe-from-query",
         "input": {"value": "carbonara"},
         "response": "200",  # hallucinated extra field
     }
@@ -389,7 +389,7 @@ def test_args_schema_allows_required_only():
     ):
         result = tool.invoke(
             {
-                "workflow_type": "add-recipe",
+                "workflow_type": "add-recipe-from-query",
                 "input": {"value": "carbonara"},
             }
         )
@@ -477,7 +477,7 @@ def test_args_schema_rejects_top_level_household_id():
         ("reply_context", {"platform": "telegram", "chat_id": "evil", "user_id": "evil"}),
     ]:
         bad_args = {
-            "workflow_type": "add-recipe",
+            "workflow_type": "add-recipe-from-query",
             "input": {"value": "carbonara"},
             hostile_field: hostile_value,
         }
@@ -487,7 +487,7 @@ def test_args_schema_rejects_top_level_household_id():
 
 
 def test_args_schema_rejects_unknown_workflow_type():
-    """workflow_type is Literal['add-recipe']; any other value must fail at
+    """workflow_type is Literal['add-recipe-from-query']; any other value must fail at
     args validation, not at WORKFLOW_REGISTRY lookup."""
     import pytest
     from pydantic import ValidationError
@@ -557,7 +557,7 @@ def test_run_passes_conversation_id_to_queue_workflow():
     with patch("robotina.queue.workflow_runner.queue_workflow", return_value="wf-1") as mock_qw:
         with patch("robotina.db.SessionLocal", return_value=MagicMock()):
             with patch("rq.Queue"), patch("redis.Redis"):
-                tool._run(workflow_type="add-recipe", input=AddRecipeQueryInput(value="lentejas"))
+                tool._run(workflow_type="add-recipe-from-query", input=AddRecipeQueryInput(value="lentejas"))
 
     assert mock_qw.called
     _, kwargs = mock_qw.call_args
@@ -621,7 +621,133 @@ def test_start_workflow_tool_propagates_invocation_id():
             side_effect=capture_queue_workflow,
         ),
     ):
-        tool._run(workflow_type="add-recipe", input=AddRecipeQueryInput(value="lentejas"))
+        tool._run(workflow_type="add-recipe-from-query", input=AddRecipeQueryInput(value="lentejas"))
 
     assert captured.get("triggered_by_invocation_id") == "inv-abc"
     assert captured.get("conversation_id") == "conv-1"  # Phase 17 rail still wired
+
+
+# ---------------------------------------------------------------------------
+# Phase 23 D-01 / D-02 / D-22 — workflow_type ↔ input pairing + URL variant
+# ---------------------------------------------------------------------------
+
+
+def test_pair_query_passes():
+    """D-22: workflow_type='add-recipe-from-query' + AddRecipeQueryInput passes."""
+    from robotina.agent.tools.start_workflow import StartWorkflowArgs
+
+    args = StartWorkflowArgs(
+        workflow_type="add-recipe-from-query",
+        input={"value": "lentejas"},
+    )
+    from robotina.queue.task_types import AddRecipeQueryInput
+
+    assert isinstance(args.input, AddRecipeQueryInput)
+    assert args.input.value == "lentejas"
+
+
+def test_pair_url_passes():
+    """D-22: workflow_type='add-recipe-from-url' + AddRecipeUrlInput passes."""
+    from robotina.agent.tools.start_workflow import StartWorkflowArgs
+    from robotina.queue.task_types import AddRecipeUrlInput
+
+    args = StartWorkflowArgs(
+        workflow_type="add-recipe-from-url",
+        input={"url": "https://example.com/recipe"},
+    )
+    assert isinstance(args.input, AddRecipeUrlInput)
+    assert args.input.url == "https://example.com/recipe"
+
+
+def test_pair_query_with_url_input_raises():
+    """D-22: mismatched pairing fails via @model_validator."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowArgs
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowArgs(
+            workflow_type="add-recipe-from-query",
+            input={"url": "https://example.com/recipe"},
+        )
+    msg = str(exc_info.value)
+    # Pydantic resolves dict→AddRecipeUrlInput by shape; pairing validator
+    # then rejects it. Either the variant ID or "AddRecipeQueryInput" should
+    # appear in the message.
+    assert "add-recipe-from-query" in msg or "AddRecipeQueryInput" in msg
+
+
+def test_pair_url_with_query_input_raises():
+    """D-22: mismatched pairing the other direction also fails."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowArgs
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowArgs(
+            workflow_type="add-recipe-from-url",
+            input={"value": "lentejas"},
+        )
+    msg = str(exc_info.value)
+    assert "add-recipe-from-url" in msg or "AddRecipeUrlInput" in msg
+
+
+def test_old_add_recipe_literal_raises():
+    """D-22: legacy 'add-recipe' literal is gone — Literal mismatch raises."""
+    import pytest
+    from pydantic import ValidationError
+
+    from robotina.agent.tools.start_workflow import StartWorkflowArgs
+
+    with pytest.raises(ValidationError) as exc_info:
+        StartWorkflowArgs(
+            workflow_type="add-recipe",  # legacy name removed
+            input={"value": "lentejas"},
+        )
+    assert "workflow_type" in str(exc_info.value) or "add-recipe" in str(exc_info.value)
+
+
+def test_start_workflow_tool_url_variant_writes_recipe_url_to_shared_context():
+    """Phase 23 D-08: URL variant populates shared_context['recipe_url']."""
+    from unittest.mock import MagicMock, patch
+
+    from robotina.agent.tools.start_workflow import StartWorkflowTool
+    from robotina.queue.task_types import AddRecipeUrlInput
+
+    tool = StartWorkflowTool(
+        chat_id="c1",
+        user_id="u1",
+        platform="telegram",
+        household_id="h1",
+        conversation_id="conv-1",
+        invocation_id="inv-test",
+    )
+
+    captured: dict = {}
+
+    def capture_queue_workflow(**kwargs):
+        captured.update(kwargs)
+        return "run-url-1"
+
+    with (
+        patch("robotina.db.SessionLocal", return_value=MagicMock()),
+        patch("rq.Queue", return_value=MagicMock()),
+        patch("redis.Redis"),
+        patch(
+            "robotina.queue.workflow_runner.queue_workflow",
+            side_effect=capture_queue_workflow,
+        ),
+    ):
+        tool._run(
+            workflow_type="add-recipe-from-url",
+            input=AddRecipeUrlInput(url="https://example.com/r"),
+        )
+
+    shared = captured["shared_context"]
+    assert shared["recipe_url"] == "https://example.com/r"
+    assert "recipe_query" not in shared  # URL variant must not stash a query
+    assert shared["household_id"] == "h1"
+    assert shared["reply_context"]["chat_id"] == "c1"
+
