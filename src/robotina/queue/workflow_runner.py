@@ -34,6 +34,50 @@ logger = logging.getLogger(__name__)
 # the dashboard cell render legible.
 _FAILURE_REASON_MAX_CHARS = 500
 
+# Backlog A — outcome.failure_reason is rendered by the wake-context Robotina
+# turn (V005 prompt); keep it short and reference-friendly. ~150 chars is the
+# soft cap before truncation with an ellipsis.
+_OUTCOME_FAILURE_REASON_MAX_CHARS = 150
+
+# Pydantic-style "For further information visit https://..." trailers are
+# internal noise (links to errors.pydantic.dev), not user-facing content.
+# Stripped before truncation so the surfaced reason is the actual validation
+# diagnostic.
+import re as _re
+_PYDANTIC_URL_NOISE_RE = _re.compile(
+    r"\s*For further information visit https?://\S+", _re.IGNORECASE
+)
+
+
+def _compose_failure_outcome(step) -> dict:
+    """Compose an AddRecipeOutcome(status='failure', ...) dict for a failed step.
+
+    Backlog A — the wake-context Robotina turn renders ``outcome.failure_reason``
+    when present; without it the agent fallback is "no tengo más información".
+    Keep the reason short and reference-friendly; V005 prompt does the
+    user-facing humanization on top.
+
+    The shape is ``"<step_key>: <short reason>"`` so the wake-context agent
+    can reference the step that failed (e.g. "gather: validation error" or
+    "ingredients: dict_type validation error").
+    """
+    from robotina.queue.task_types import AddRecipeOutcome
+
+    raw = (step.failure_reason or "").strip()
+    # Strip Pydantic doc URL noise (single-line and multi-line forms).
+    raw = _PYDANTIC_URL_NOISE_RE.sub("", raw)
+    # Collapse whitespace / newlines to single spaces.
+    raw = _re.sub(r"\s+", " ", raw).strip()
+    if raw:
+        if len(raw) > _OUTCOME_FAILURE_REASON_MAX_CHARS:
+            short = raw[:_OUTCOME_FAILURE_REASON_MAX_CHARS].rstrip() + "…"
+        else:
+            short = raw
+        reason = f"{step.step_key}: {short}"
+    else:
+        reason = f"{step.step_key}: failed"
+    return AddRecipeOutcome(status="failure", failure_reason=reason).model_dump()
+
 
 def _extract_task_output(result: dict, *, expects_structured: bool = False) -> dict:
     """Extract a JSON-serializable artifact from a langchain.agents.create_agent result.
@@ -644,6 +688,14 @@ def on_step_failed(
     # against it so the worker doesn't crash on the failure path (CR-01).
     run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
     if run is not None:
+        # Backlog A — wire failure context into WorkflowRun.outcome so the
+        # wake-context Robotina turn can reference a concrete reason instead
+        # of "no tengo más información". finalize-outcome step is cancelled
+        # here (Phase 20 D-03), so this is the only producer of outcome on
+        # the FAILED side. Defensive ``is None`` guard preserves any outcome
+        # finalize-outcome may have stamped on a race.
+        if run.outcome is None:
+            run.outcome = _compose_failure_outcome(step)
         run.status = WorkflowStatus.FAILED
 
     # WAKE-01..03 / D-04 / Pitfall 2: wake check inside the SAME
@@ -698,6 +750,11 @@ def on_step_failed(
             .first()
         )
         if run_refetch is not None:
+            # Backlog A — re-stamp outcome.failure_reason after rollback so
+            # the wake-context Robotina turn can still reference the reason
+            # on the rollback path. Mirrors the happy-path write above.
+            if run_refetch.outcome is None and step_refetch is not None:
+                run_refetch.outcome = _compose_failure_outcome(step_refetch)
             run_refetch.status = WorkflowStatus.FAILED
         session.commit()
 
