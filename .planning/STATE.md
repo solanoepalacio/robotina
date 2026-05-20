@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: executing
 stopped_at: Phase 23 context gathered
-last_updated: "2026-05-20T23:10:07.985Z"
-last_activity: 2026-05-20 -- Phase 23 planning complete
+last_updated: "2026-05-20T23:10:41.061Z"
+last_activity: 2026-05-20 -- Phase 23 execution started
 progress:
   total_phases: 9
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 
 **Core value:** Families can delegate household tasks to Robotina in natural language and trust that they get done — even complex multi-step tasks that span multiple agent runs.
-**Current focus:** Phase 20 — wake-rule-outcome-plumbing
+**Current focus:** Phase 23 — URL ingestion (Topic 2)
 
 ## Current Position
 
-Phase: 20 (wake-rule-outcome-plumbing) — EXECUTING
-Plan: 2 of 6
-Status: Ready to execute
-Last activity: 2026-05-20 -- Phase 23 planning complete
+Phase: 23 (URL ingestion (Topic 2)) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 23
+Last activity: 2026-05-20 -- Phase 23 execution started
 
 ## Performance Metrics
 
