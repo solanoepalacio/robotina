@@ -540,6 +540,11 @@ def on_step_complete(
     else:
         # Final step — mark WorkflowRun DONE
         run.status = WorkflowStatus.DONE
+        # WAKE-01..03 / D-04 / Pitfall 2: wake check inside the same session
+        # so the run.status=DONE flush is visible to the helper's sibling
+        # SELECT, and the helper's insert + the status flip commit together
+        # (atomic).
+        _check_and_dispatch_wake(run.triggered_by_invocation_id, session, queue)
         session.commit()
         logger.info(
             "Workflow complete | run_id=%s final_step=%s",
@@ -640,7 +645,61 @@ def on_step_failed(
     run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
     if run is not None:
         run.status = WorkflowStatus.FAILED
-    session.commit()
+
+    # WAKE-01..03 / D-04 / D-05 / Pitfall 2: wake check inside the SAME
+    # transaction as the FAILED status write. Single commit covers both.
+    # The dead-letter send-notification block below is gated on the wake
+    # helper raising — otherwise Robotina will compose a reply on wake.
+    wake_branch_ok = False
+    try:
+        _check_and_dispatch_wake(
+            run.triggered_by_invocation_id if run is not None else None,
+            session,
+            queue,
+        )
+        session.commit()  # SINGLE commit: FAILED + wake-row atomic (Pitfall 2)
+        wake_branch_ok = True
+    except Exception:
+        logger.exception(
+            "Wake dispatch failed; falling back to dead-letter notify | run_id=%s",
+            step.workflow_run_id,
+        )
+        session.rollback()
+        # Rollback discarded the FAILED status + cancelled-step writes.
+        # Re-mark in a fresh transaction so the workflow visibly fails
+        # even if wake didn't dispatch.
+        step_refetch = (
+            session.query(WorkflowRunStep)
+            .filter(WorkflowRunStep.id == step.id)
+            .first()
+        )
+        if step_refetch is not None:
+            step_refetch.status = WorkflowStepStatus.FAILED
+            if exc is not None:
+                reason = f"{type(exc).__name__}: {exc}".replace("\n", " ").strip()
+                if len(reason) > _FAILURE_REASON_MAX_CHARS:
+                    reason = reason[: _FAILURE_REASON_MAX_CHARS - 1] + "…"
+                step_refetch.failure_reason = reason
+        # Re-cancel pending steps.
+        pending_refetch = (
+            session.query(WorkflowRunStep)
+            .filter(
+                WorkflowRunStep.workflow_run_id == step.workflow_run_id,
+                WorkflowRunStep.status == WorkflowStepStatus.PENDING,
+            )
+            .all()
+        )
+        for pending in pending_refetch:
+            pending.status = WorkflowStepStatus.CANCELLED
+        run_refetch = (
+            session.query(WorkflowRun)
+            .filter(WorkflowRun.id == step.workflow_run_id)
+            .first()
+        )
+        if run_refetch is not None:
+            run_refetch.status = WorkflowStatus.FAILED
+        session.commit()  # second commit ONLY on the except path
+        run = run_refetch  # use refetched row for the dead-letter block below
 
     logger.error(
         "Step failed | run_id=%s step_key=%s job_id=%s cancelled_steps=%d",
@@ -650,8 +709,10 @@ def on_step_failed(
         len(pending_steps),
     )
 
-    # Dead-letter: best-effort apology so terminal failures don't go silent.
-    # Never raise from this block — the workflow is already FAILED.
+    # Dead-letter notify runs ONLY on wake-helper exception. When wake
+    # dispatched, Phase 21+ will speak via the wake invocation.
+    if wake_branch_ok:
+        return
     if queue is None:
         return
     try:

@@ -439,11 +439,17 @@ def test_recipe_load_input_has_reply_context():
 # ---------------------------------------------------------------------------
 
 
-def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
-    """When reply_context is present in shared_context, on_step_failed
-    enqueues a send-notification at the front of the queue with the locked
-    Spanish apology text and the workflow_type in parens.
+def test_on_step_failed_enqueues_dead_letter_when_reply_context_present(monkeypatch):
+    """When reply_context is present in shared_context AND the wake helper
+    raises (D-05), on_step_failed enqueues a send-notification at the front
+    of the queue with the locked Spanish apology text and the workflow_type
+    in parens.
+
+    Phase 20 / D-05: the dead-letter block is now a FALLBACK only — it runs
+    when _check_and_dispatch_wake raises an exception. The happy-path wake
+    dispatch is exercised by tests in tests/queue/test_wake_dispatch.py.
     """
+    from robotina.queue import workflow_runner
     from robotina.queue.workflow_runner import on_step_failed
     from robotina.queue.task_types import SendNotificationInput
 
@@ -463,11 +469,19 @@ def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
     session = MagicMock()
     query_mock = MagicMock()
     query_mock.filter.return_value = query_mock
-    query_mock.first.side_effect = [step, run]
+    # Two pre-commit lookups (step + run); then the except branch re-fetches
+    # step, pending list (all()), and run again — provide enough side_effect
+    # entries.
+    query_mock.first.side_effect = [step, run, step, run]
     query_mock.all.return_value = []
     session.query.return_value = query_mock
 
     queue = MagicMock()
+
+    # Force the wake helper to raise so the dead-letter fallback runs (D-05).
+    def _raise(*a, **kw):
+        raise RuntimeError("simulated wake failure")
+    monkeypatch.setattr(workflow_runner, "_check_and_dispatch_wake", _raise)
 
     on_step_failed("test-job-id", session, queue)
 
@@ -487,11 +501,15 @@ def test_on_step_failed_enqueues_dead_letter_when_reply_context_present():
     assert call.kwargs.get("meta") == {"task_type": "send-notification"}
 
 
-def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog):
+def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog, monkeypatch):
     """When shared_context has no reply_context (e.g. workflow initiated by a
-    scheduled task), on_step_failed logs a WARN and does NOT enqueue.
+    scheduled task) AND the wake helper raises (D-05), on_step_failed logs a
+    WARN and does NOT enqueue.
+
+    Phase 20 / D-05: dead-letter only runs on wake-helper exception.
     """
     import logging
+    from robotina.queue import workflow_runner
     from robotina.queue.workflow_runner import on_step_failed
 
     step = make_step(status=WorkflowStepStatus.RUNNING, workflow_run_id="run-abc")
@@ -504,11 +522,15 @@ def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog):
     session = MagicMock()
     query_mock = MagicMock()
     query_mock.filter.return_value = query_mock
-    query_mock.first.side_effect = [step, run]
+    query_mock.first.side_effect = [step, run, step, run]
     query_mock.all.return_value = []
     session.query.return_value = query_mock
 
     queue = MagicMock()
+
+    def _raise(*a, **kw):
+        raise RuntimeError("simulated wake failure")
+    monkeypatch.setattr(workflow_runner, "_check_and_dispatch_wake", _raise)
 
     with caplog.at_level(logging.WARNING, logger="robotina.queue.workflow_runner"):
         on_step_failed("test-job-id", session, queue)
