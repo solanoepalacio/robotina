@@ -111,6 +111,59 @@ def run_task(task_input) -> object:
         finally:
             _session.close()
 
+    # WAKE-04 / D-01: deterministic agent-less branch for `finalize-outcome`.
+    # Mirrors the send-notification branch shape (no LLM, no skills, no prompt).
+    # Composes the AddRecipeOutcome from accumulated artifacts (passed in via
+    # FinalizeOutcomeInput by the workflow's build_input lambda) and writes it to
+    # WorkflowRun.outcome before the step-complete hook commits.
+    if task_type == "finalize-outcome":
+        from robotina.queue.task_types import AddRecipeOutcome
+        from robotina.queue.models import WorkflowRun, WorkflowRunStep
+        try:
+            load = task_input.load or {}
+            recipe_id = load.get("recipe_id") if isinstance(load, dict) else None
+            if recipe_id:
+                outcome = AddRecipeOutcome(
+                    status="success",
+                    recipe_id=recipe_id,
+                    recipe_name=load.get("recipe_name"),
+                    recipe_slug=load.get("recipe_slug") or None,
+                    image_present=False,  # the recipe-image milestone flips this
+                )
+            else:
+                outcome = AddRecipeOutcome(
+                    status="failure",
+                    failure_reason=(
+                        task_input.failure_reason
+                        or "finalize-outcome called without a load artifact"
+                    ),
+                )
+
+            # Locate the WorkflowRun via the step's task_job_id and stamp outcome.
+            step = (
+                _session.query(WorkflowRunStep)
+                .filter(WorkflowRunStep.task_job_id == job.id)
+                .first()
+            )
+            if step is not None:
+                run = (
+                    _session.query(WorkflowRun)
+                    .filter(WorkflowRun.id == step.workflow_run_id)
+                    .first()
+                )
+                if run is not None:
+                    run.outcome = outcome.model_dump(mode="json")
+                    _session.flush()
+
+            artifact = outcome.model_dump(mode="json")
+            workflow_runner.on_step_complete(job.id, artifact, _session, _queue)
+            return artifact
+        except Exception as exc:
+            workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
+            raise
+        finally:
+            _session.close()
+
     try:
         # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
         from robotina.agent.agents import get_agent_config
