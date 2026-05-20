@@ -270,10 +270,11 @@ None yet.
 | 260514-ix8 | Remove redundant Output section from 5 recipe research prompts — schema enforced by `response_format_model` in agents.py, prompt-level section was developer-facing | 2026-05-14 | 0bd4062 | [260514-ix8-remove-redundant-output-section-from-5-r](./quick/260514-ix8-remove-redundant-output-section-from-5-r/) |
 | 260518-ksv | Tighten StartWorkflowTool schema: flatten `shared_context: dict` into top-level `recipe_query: str` and constrain `workflow_type` to `Literal["add-recipe"]` — stronger LLM-facing schema so terminal-tool validation failures (no retry under `return_direct=True`) are far less likely | 2026-05-18 | c792229 | [260518-ksv-tighten-startworkflowtool-schema-flatten](./quick/260518-ksv-tighten-startworkflowtool-schema-flatten/) |
 | 260519-kc8 | Fix all deferred tests — 4 dashboard FK tests + 3 unit/gateway contract drift tests (test-only, no production changes) | 2026-05-19 | 965d3be | [260519-kc8-fix-all-deferred-tests](./quick/260519-kc8-fix-all-deferred-tests/) |
+| 260520-kot | Wire failure_reason to WorkflowRun.outcome on FAILED workflows — Backlog A from Phase 20/21 manual verification (wake-context Robotina now has concrete failure context to render) | 2026-05-20 | bc95aa3 | [260520-kot-wire-failure-reason-to-workflowrun-outco](./quick/260520-kot-wire-failure-reason-to-workflowrun-outco/) |
 
 ## Session Continuity
 
-Last activity: 2026-05-19 - Completed quick task 260519-kc8: fix all deferred tests
+Last activity: 2026-05-20 - Completed quick task 260520-kot: wire failure_reason to WorkflowRun.outcome on FAILED workflows
 
 Last session: 2026-05-20T02:56:07.296Z
 Stopped at: Phase 21 verified (human_needed for operator smoke)
