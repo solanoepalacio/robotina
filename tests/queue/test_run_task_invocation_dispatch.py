@@ -84,7 +84,7 @@ def _make_wake_input() -> WakeInvocationInput:
         outcomes=[
             WorkflowOutcomeSummary(
                 workflow_run_id="run-1",
-                workflow_type="add-recipe",
+                workflow_type="add-recipe-from-query",
                 status="done",
                 outcome=None,
             )

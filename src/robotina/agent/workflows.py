@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from robotina.queue.task_types import (
     FinalizeOutcomeInput,
+    GatherFromUrlInput,
     RecipeData,
     RecipeLoadInput,
     RecipeResearchGatherInput,
@@ -65,8 +66,14 @@ class WorkflowDefinition(BaseModel):
 # WorkflowRun outcome.
 
 WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
-    "add-recipe": WorkflowDefinition(
-        workflow_type="add-recipe",
+    # Phase 23 D-01: hard rename "add-recipe" → "add-recipe-from-query".
+    # Paired with the new "add-recipe-from-url" entry below; both variants are
+    # equally first-class. The 5 tail steps (instructions, ingredients,
+    # metadata, load, finalize-outcome) are inline-duplicated between the two
+    # variants per feedback_avoid_premature_abstraction; shared-tail helper
+    # extraction is deferred to Phase 24.
+    "add-recipe-from-query": WorkflowDefinition(
+        workflow_type="add-recipe-from-query",
         steps=[
             WorkflowStepDef(
                 step_key="gather",
@@ -120,6 +127,75 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
             # this plan — user-facing completion announcement happens on the
             # wake invocation via RespondTool after this step writes the outcome.
             # Agent-less — run_task has a dedicated branch (D-01).
+            WorkflowStepDef(
+                step_key="finalize-outcome",
+                task_type="finalize-outcome",
+                build_input=lambda ctx, artifacts: FinalizeOutcomeInput(
+                    metadata=artifacts.get("metadata"),
+                    load=artifacts.get("load"),
+                ),
+            ),
+        ],
+    ),
+    # Phase 23 D-01: URL-pointed variant. First step (gather-from-url) consumes
+    # shared_context["recipe_url"]; tail 5 steps inline-duplicate the
+    # add-recipe-from-query tail with one structural diff in the instructions
+    # step (reads artifacts["gather-from-url"] instead of artifacts["gather"]).
+    # The downstream step_keys ("instructions", "ingredients", "metadata",
+    # "load", "finalize-outcome") are unchanged because they reference their
+    # OWN keys for subsequent artifact reads. The gather-from-url task type
+    # ships in plan 23-04; this plan only wires the registry entry.
+    "add-recipe-from-url": WorkflowDefinition(
+        workflow_type="add-recipe-from-url",
+        steps=[
+            WorkflowStepDef(
+                step_key="gather-from-url",
+                task_type="gather-from-url",
+                build_input=lambda ctx, _: GatherFromUrlInput(
+                    url=ctx["recipe_url"],
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="instructions",
+                task_type="recipe-research-instructions",
+                # Phase 23: read artifacts["gather-from-url"] (this variant's
+                # first-step key) — the only structural diff vs the
+                # add-recipe-from-query tail.
+                build_input=lambda ctx, artifacts: RecipeResearchInstructionsInput(
+                    recipe=RecipeData(**artifacts["gather-from-url"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="ingredients",
+                task_type="recipe-research-ingredients",
+                build_input=lambda ctx, artifacts: RecipeResearchIngredientsInput(
+                    recipe=RecipeData(**artifacts["instructions"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="metadata",
+                task_type="recipe-research-metadata",
+                build_input=lambda ctx, artifacts: RecipeResearchMetadataInput(
+                    recipe=RecipeData(**artifacts["ingredients"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+            ),
+            WorkflowStepDef(
+                step_key="load",
+                task_type="recipe-load",
+                build_input=lambda ctx, artifacts: RecipeLoadInput(
+                    recipe=RecipeData(**artifacts["metadata"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+            ),
             WorkflowStepDef(
                 step_key="finalize-outcome",
                 task_type="finalize-outcome",

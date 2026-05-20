@@ -250,7 +250,12 @@ def _check_and_dispatch_wake(
                 workflow_type=r.workflow_type,
                 status="done" if r.status == WorkflowStatus.DONE else "failed",
                 outcome=run_outcome,
-                recipe_query=(r.shared_context or {}).get("recipe_query"),  # D-08
+                # D-08 (Phase 22) + D-08 (Phase 23): fallback to recipe_url
+                # for URL workflows so the wake reply can surface either kind.
+                recipe_query=(
+                    (r.shared_context or {}).get("recipe_query")
+                    or (r.shared_context or {}).get("recipe_url")
+                ),
             )
         )
 
@@ -311,7 +316,8 @@ def queue_workflow(
     when the worker begins executing the first step (on_step_start).
 
     Args:
-        workflow_type: Key in WORKFLOW_REGISTRY (e.g. "add-recipe").
+        workflow_type: Key in WORKFLOW_REGISTRY (e.g. "add-recipe-from-query"
+            or "add-recipe-from-url").
         shared_context: Frozen context dict set once at creation — stored in
                         WorkflowRun.shared_context. Contains reply_context,
                         household_id, recipe_query, etc.

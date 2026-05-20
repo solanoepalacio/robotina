@@ -91,7 +91,7 @@ async def test_list_view_renders_rows_newest_first(client, db_session):
         session.add(conv)
         session.flush()
         r = WorkflowRun(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             household_id=f"h-{i}",
             conversation_id=conv.id,
             status=WorkflowStatus.DONE,
@@ -130,7 +130,7 @@ async def test_list_row_links_to_detail(client, db_session):
     session.add(conv)
     session.flush()
     r = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="h-link",
         conversation_id=conv.id,
         status=WorkflowStatus.RUNNING,

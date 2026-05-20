@@ -27,7 +27,7 @@ async def test_detail_fragment_terminal_has_no_hx_trigger(client, db_session):
     session.add(conv)
     session.flush()
     r = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="h-done",
         conversation_id=conv.id,
         status=WorkflowStatus.DONE,
@@ -58,7 +58,7 @@ async def test_detail_fragment_running_has_hx_trigger(client, db_session):
     session.add(conv)
     session.flush()
     r = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="h-running",
         conversation_id=conv.id,
         status=WorkflowStatus.RUNNING,

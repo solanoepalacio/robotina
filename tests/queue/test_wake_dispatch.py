@@ -92,7 +92,7 @@ def _make_run(
     parent_inv_id: str,
     status: WorkflowStatus = WorkflowStatus.DONE,
     outcome: dict | None = None,
-    workflow_type: str = "add-recipe",
+    workflow_type: str = "add-recipe-from-query",
 ) -> WorkflowRun:
     run = WorkflowRun(
         workflow_type=workflow_type,
@@ -344,7 +344,7 @@ def test_on_step_complete_dispatches_wake_end_to_end(db_session):
     parent = _make_parent_invocation(session, conv.id)
 
     run = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="test-household",
         conversation_id=conv.id,
         triggered_by_invocation_id=parent.id,
@@ -506,7 +506,7 @@ def test_on_step_failed_stamps_failure_outcome(db_session):
     parent = _make_parent_invocation(session, conv.id)
 
     run = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="test-household",
         conversation_id=conv.id,
         triggered_by_invocation_id=parent.id,
@@ -574,7 +574,7 @@ def test_on_step_failed_preserves_existing_outcome(db_session):
         "image_present": False,
     }
     run = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id="test-household",
         conversation_id=conv.id,
         triggered_by_invocation_id=parent.id,
