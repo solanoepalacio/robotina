@@ -185,11 +185,18 @@ def run_task(task_input) -> object:
         # send-notification is handled by the deterministic branch above (Phase 07.1)
         # and never reaches this point.
         if task_type == "handle-incoming-message":
+            # Per Phase 21 D-01/D-02/D-05/D-06: legacy queue tool retired; RespondTool +
+            # TerminateTool replace it. RespondTool is non-terminal (return_direct=False)
+            # so Robotina can chain respond → start-workflow → terminate in one turn.
+            # TerminateTool (return_direct=True) is the engine-enforced turn boundary
+            # (PITFALL 4). The send-notification branch at the top of run_task is
+            # RespondTool's delivery mechanism — D-07, do NOT delete.
             from datetime import datetime as _datetime
             import os as _os
             from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
-            from robotina.agent.tools.queue import QueueTool
+            from robotina.agent.tools.respond import RespondTool
             from robotina.agent.tools.start_workflow import StartWorkflowTool
+            from robotina.agent.tools.terminate import TerminateTool
             from robotina.gateway.models import Conversation, Platform
             from robotina.queue.models import (
                 InvocationStatus,
@@ -231,11 +238,13 @@ def run_task(task_input) -> object:
                     .one()
                 )
                 tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
-                tools.append(QueueTool(
+                tools.append(RespondTool(
                     chat_id=task_input.chat_id,
                     user_id=task_input.user_id,
                     platform=task_input.platform,
+                    household_id=task_input.household_id,
                 ))
+                tools.append(TerminateTool())
                 tools.append(StartWorkflowTool(
                     chat_id=task_input.chat_id,
                     user_id=task_input.user_id,
@@ -264,16 +273,19 @@ def run_task(task_input) -> object:
                 # IncomingMessageInput, not on the Conversation row). The wake
                 # path has no originating user — it is a follow-up to a workflow.
                 # Tools are wired with chat_id as the user_id placeholder so the
-                # constructors validate; V004 instructs the agent NOT to call
-                # queue/start-workflow on wake turns, so these placeholders
-                # remain decorative until Phase 21 replaces this tool surface.
+                # constructors validate. Phase 21 D-01/D-02: RespondTool replaces
+                # the retired legacy queue tool; V005 prompt teaches Robotina to use
+                # respond() + terminate() on wake turns and to skip start-workflow
+                # there.
                 wake_user_id = conversation.chat_id
                 tools.append(HouseholdManagerApiTool(household_id=household_id))
-                tools.append(QueueTool(
+                tools.append(RespondTool(
                     chat_id=conversation.chat_id,
                     user_id=wake_user_id,
                     platform=platform_value,
+                    household_id=household_id,
                 ))
+                tools.append(TerminateTool())
                 tools.append(StartWorkflowTool(
                     chat_id=conversation.chat_id,
                     user_id=wake_user_id,
@@ -312,14 +324,6 @@ def run_task(task_input) -> object:
             tools.append(HouseholdManagerApiTool(household_id=task_input.household_id))
             tools.append(ValidateFoodsTool())
             tools.append(ValidateUnitsTool())
-        elif task_type == "acknowledge-add-recipe":
-            from robotina.agent.tools.queue import QueueTool
-            tools.append(QueueTool(
-                chat_id=task_input.chat_id,
-                user_id=task_input.user_id,
-                platform=task_input.platform,
-            ))
-
         # Step 5 + 6: Load versioned prompt and append skill index
         prompt_text = Path(config.prompt_path).read_text()
         if skill_index:
@@ -331,9 +335,9 @@ def run_task(task_input) -> object:
         # This is the approach documented at langwatch.ai/docs/integration/python/integrations/langchain
         #
         # Phase 11: thread response_format through. For agents with
-        # config.response_format_model = None (handle-incoming-message,
-        # acknowledge-add-recipe), the adapter omits the kwarg entirely (see
-        # LLMBackend Protocol implementations in src/robotina/llm/__init__.py).
+        # config.response_format_model = None (handle-incoming-message), the
+        # adapter omits the kwarg entirely (see LLMBackend Protocol
+        # implementations in src/robotina/llm/__init__.py).
         agent = backend.create_agent(
             system_prompt=prompt_text,
             tools=tools,
