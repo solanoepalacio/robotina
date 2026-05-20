@@ -148,7 +148,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   4. A 20-URL Spanish-recipe-blog eval set runs and achieves ≥85% field-level success at v1.1 ship; results documented.
   5. `uv run experiments.gather_from_url` exercises the pipeline end-to-end with LangWatch traces tagged to the experiment.
 **Plans**: 7 plans
-- [ ] 23-01-PLAN.md — safe_fetch utility (FIRST commit) + comprehensive SSRF defense test suite (URL-01)
+- [x] 23-01-PLAN.md — safe_fetch utility (FIRST commit) + comprehensive SSRF defense test suite (URL-01)
 - [ ] 23-02-PLAN.md — Schema + workflow registry rename (add-recipe → add-recipe-from-query) + add-recipe-from-url peer + StartWorkflowArgs union + dashboard label + wake-helper fallback (URL-03, URL-05)
 - [ ] 23-03-PLAN.md — FetchAndScrapeTool (deterministic recipe-scrapers + trafilatura fallback) + tests (URL-02)
 - [ ] 23-04-PLAN.md — gather-from-url agent registration (V001 prompt + AGENT_REGISTRY + overrides/*.json sync + run_task tool injection + tests) (URL-02, URL-04)
@@ -195,7 +195,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 | 20. Wake rule + outcome plumbing                     | v1.1      | 0/6   | Planned     | —          |
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
 | 22. Multi-recipe per message                         | v1.1      | 3/4 | In Progress|  |
-| 23. URL ingestion                                    | v1.1      | 0/7   | Planned     | —          |
+| 23. URL ingestion                                    | v1.1      | 1/7 | In Progress|  |
 | 24. Recipe images                                    | v1.1      | 0/0   | Not started | —          |
 
 ## Backlog
