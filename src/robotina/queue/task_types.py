@@ -355,3 +355,75 @@ class AddRecipeOutcome(BaseModel):
     recipe_slug: str | None = None      # success only
     failure_reason: str | None = None   # failure only
     image_present: bool = False         # always False in v1.1 until Phase 24 lands recipe-image
+
+
+# ---------------------------------------------------------------------------
+# WAKE-04 — wake-input + finalize-outcome contracts
+# ---------------------------------------------------------------------------
+# WorkflowOutcomeSummary is the thin envelope used by WakeInvocationInput.outcomes
+# (per D-06). It carries the WorkflowRun's id, type, and terminal status alongside
+# the optional AddRecipeOutcome payload (None for FAILED workflows, since
+# finalize-outcome only runs on DONE workflows — see D-03).
+#
+# FinalizeOutcomeInput is the input to the deterministic agent-less
+# `finalize-outcome` task branch in run_task (per D-01 / D-03).
+
+
+class WorkflowOutcomeSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_run_id: str
+    workflow_type: str
+    status: Literal["done", "failed"]
+    outcome: AddRecipeOutcome | None = None
+
+
+class WakeInvocationInput(BaseModel):
+    """Task input for a wake-context Robotina turn (trigger=workflow_completion).
+
+    Built by `_check_and_dispatch_wake` in workflow_runner.py from the terminal
+    WorkflowRun rows linked to a parent RobotinaInvocation. `run_task` dispatches
+    this shape to the Robotina agent when `RobotinaInvocation.trigger ==
+    WORKFLOW_COMPLETION` (per D-07).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    previous_invocation_id: str
+    conversation_id: str
+    outcomes: list[WorkflowOutcomeSummary]
+
+    def to_user_message(self) -> str:
+        # D-09: Spanish synthetic user message. The V004 prompt interprets this
+        # preamble; no respond() tool exists yet, so the parenthetical reminds
+        # the agent the user has already been notified by the legacy `notify`
+        # step (kept intact through this phase per D-02).
+        lines = ["Los siguientes flujos terminaron:"]
+        for o in self.outcomes:
+            if o.status == "done" and o.outcome is not None and o.outcome.status == "success":
+                name = o.outcome.recipe_name or "(receta sin nombre)"
+                lines.append(f"- ✓ {o.workflow_type}: {name} (run {o.workflow_run_id})")
+            elif o.status == "done":
+                lines.append(f"- ✓ {o.workflow_type} terminó (run {o.workflow_run_id})")
+            else:
+                reason = (o.outcome.failure_reason if o.outcome else None) or "(sin detalle)"
+                lines.append(f"- ✗ {o.workflow_type} falló: {reason} (run {o.workflow_run_id})")
+        lines.append("(Wake-trigger; el usuario ya fue notificado.)")
+        return "\n".join(lines)
+
+
+class FinalizeOutcomeInput(BaseModel):
+    """Input to the deterministic `finalize-outcome` task branch in run_task.
+
+    Built by the `finalize-outcome` step's `build_input` lambda in
+    WORKFLOW_REGISTRY['add-recipe']. The accumulated artifacts at this point
+    in the chain include the `metadata` step's RecipeData dump and the `load`
+    step's RecipeLoadOutput dump. The composer in run_task derives an
+    AddRecipeOutcome from these per D-03.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    metadata: dict | None = None
+    load: dict | None = None
+    failure_reason: str | None = None
