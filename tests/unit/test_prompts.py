@@ -76,6 +76,11 @@ def test_skill_index_appended_to_prompt():
     query_mock.filter_by.return_value = query_mock
     query_mock.one.return_value = fake_conversation
     mock_session.query.return_value = query_mock
+    # Phase 20 / D-07: stub USER_MESSAGE invocation for the dispatch branch.
+    from robotina.queue.models import InvocationTrigger
+    _stub_inv = MagicMock()
+    _stub_inv.trigger = InvocationTrigger.USER_MESSAGE
+    mock_session.get.return_value = _stub_inv
     mock_session_factory = MagicMock(return_value=mock_session)
 
     with (
