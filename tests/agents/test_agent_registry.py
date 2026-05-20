@@ -16,11 +16,11 @@ def test_no_acknowledge_add_recipe():
     assert "acknowledge-add-recipe" not in AGENT_REGISTRY
 
 
-def test_handle_incoming_message_uses_v005():
-    """Per D-10: handle-incoming-message bumped from V004.md to V005.md."""
+def test_handle_incoming_message_uses_v006():
+    """Per Phase 22: handle-incoming-message bumped from V005.md to V006.md."""
     cfg = AGENT_REGISTRY["handle-incoming-message"]
-    assert cfg.prompt_path.endswith("V005.md"), (
-        f"handle-incoming-message prompt_path is {cfg.prompt_path!r}, expected to end with V005.md"
+    assert cfg.prompt_path.endswith("V006.md"), (
+        f"handle-incoming-message prompt_path is {cfg.prompt_path!r}, expected to end with V006.md"
     )
 
 
