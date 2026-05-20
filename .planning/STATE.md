@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: executing
-stopped_at: Phase 22 context gathered
-last_updated: "2026-05-20T18:07:58.252Z"
+stopped_at: Phase 23 context gathered
+last_updated: "2026-05-20T18:58:04.914Z"
 last_activity: 2026-05-20 -- Phase 20 execution started
 progress:
   total_phases: 9
@@ -276,10 +276,10 @@ None yet.
 
 Last activity: 2026-05-20 - Completed quick task 260520-kot: wire failure_reason to WorkflowRun.outcome on FAILED workflows
 
-Last session: 2026-05-20T18:07:58.244Z
-Stopped at: Phase 22 context gathered
+Last session: 2026-05-20T18:58:04.907Z
+Stopped at: Phase 23 context gathered
 Resume file: 
-.planning/phases/22-multi-recipe-per-message-topic-1/22-CONTEXT.md
+.planning/phases/23-url-ingestion-topic-2/23-CONTEXT.md
 
 ## Operator Next Steps
 
