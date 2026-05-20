@@ -90,7 +90,7 @@ def _extract_task_output(result: dict, *, expects_structured: bool = False) -> d
         )
 
     # No response_format on this agent — preserve the return_direct tool-message path
-    # (Phase 07.1: QueueTool / StartWorkflowTool short-circuit the graph).
+    # (Phase 21: TerminateTool / StartWorkflowTool short-circuit the graph).
     last = result["messages"][-1]
     if getattr(last, "type", None) == "tool":
         return {"tool_message": str(last.content)}
@@ -565,12 +565,13 @@ def on_step_failed(
     The failed RQ job is retained in RQ's FailedJobRegistry by the caller
     (run_task re-raises the exception after calling this function).
 
-    When ``queue`` is provided AND the WorkflowRun's
-    ``shared_context.reply_context`` is populated, also enqueue a single
-    ``send-notification`` job at the front of the queue with a Spanish apology
-    so terminal failures don't go silent. This is best-effort — any error in
-    the dead-letter block is logged and swallowed (the workflow is already
-    FAILED; we don't cascade).
+    Phase 21 D-08: the Phase-20 best-effort apology fallback was
+    removed. ``_check_and_dispatch_wake`` still fires inside the same
+    transaction as the FAILED status write so the wake-respond path
+    delivers the user-facing apology on the wake invocation (via V005 +
+    RespondTool on outcome.status="failure"). The Phase-20 reconciler
+    (D-11) handles structural wake-enqueue failures. Wake-helper
+    exceptions are now logged and swallowed — no fallback enqueue.
 
     When ``exc`` is provided (DASH-03 / Phase 13), persist a one-line
     ``failure_reason`` on the step using the format
@@ -584,8 +585,9 @@ def on_step_failed(
         job_id: RQ job ID of the failing job.
         session: SQLAlchemy session.
         queue: RQ Queue instance connected to "agent-tasks". Optional; when
-               omitted, the dead-letter hook is skipped (preserves
-               backward-compatibility for tests that don't pass a queue).
+               omitted, the wake-helper enqueue is skipped (the helper
+               inserts the wake-invocation row and the reconciler picks it
+               up).
         exc: The live exception that caused the failure. Optional, keyword-only.
              When provided, drives the ``failure_reason`` column write.
     """
@@ -637,20 +639,20 @@ def on_step_failed(
     for pending in pending_steps:
         pending.status = WorkflowStepStatus.CANCELLED
 
-    # Mark WorkflowRun FAILED. The next dead-letter block defensively
-    # treats `run` as possibly None (e.g., the parent row was deleted or
-    # archived between the step write and this fetch), so we mirror that
-    # nil-check here — otherwise the assignment crashes the worker on
-    # the failure path (CR-01).
+    # Mark WorkflowRun FAILED. ``run`` may be None if the parent row was
+    # deleted or archived between the step write and this fetch — guard
+    # against it so the worker doesn't crash on the failure path (CR-01).
     run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
     if run is not None:
         run.status = WorkflowStatus.FAILED
 
-    # WAKE-01..03 / D-04 / D-05 / Pitfall 2: wake check inside the SAME
+    # WAKE-01..03 / D-04 / Pitfall 2: wake check inside the SAME
     # transaction as the FAILED status write. Single commit covers both.
-    # The dead-letter send-notification block below is gated on the wake
-    # helper raising — otherwise Robotina will compose a reply on wake.
-    wake_branch_ok = False
+    # Phase 21 D-08: the Phase-20 fallback apology enqueue is gone — the
+    # wake-respond path (V005 + RespondTool on outcome.status="failure")
+    # delivers the user-facing apology. A wake-helper exception is logged
+    # and swallowed; the reconciler (Phase 20 D-11) re-enqueues
+    # structurally-failed wake invocations.
     try:
         _check_and_dispatch_wake(
             run.triggered_by_invocation_id if run is not None else None,
@@ -658,16 +660,16 @@ def on_step_failed(
             queue,
         )
         session.commit()  # SINGLE commit: FAILED + wake-row atomic (Pitfall 2)
-        wake_branch_ok = True
     except Exception:
         logger.exception(
-            "Wake dispatch failed; falling back to dead-letter notify | run_id=%s",
+            "Wake dispatch failed in on_step_failed | run_id=%s",
             step.workflow_run_id,
         )
+        # Phase 21 D-08: no fallback enqueue. Roll back the wake-row
+        # write (if any) and re-mark the workflow FAILED in a fresh
+        # transaction so the failure is still visible on the dashboard
+        # / next reconciler sweep.
         session.rollback()
-        # Rollback discarded the FAILED status + cancelled-step writes.
-        # Re-mark in a fresh transaction so the workflow visibly fails
-        # even if wake didn't dispatch.
         step_refetch = (
             session.query(WorkflowRunStep)
             .filter(WorkflowRunStep.id == step.id)
@@ -680,7 +682,6 @@ def on_step_failed(
                 if len(reason) > _FAILURE_REASON_MAX_CHARS:
                     reason = reason[: _FAILURE_REASON_MAX_CHARS - 1] + "…"
                 step_refetch.failure_reason = reason
-        # Re-cancel pending steps.
         pending_refetch = (
             session.query(WorkflowRunStep)
             .filter(
@@ -698,8 +699,7 @@ def on_step_failed(
         )
         if run_refetch is not None:
             run_refetch.status = WorkflowStatus.FAILED
-        session.commit()  # second commit ONLY on the except path
-        run = run_refetch  # use refetched row for the dead-letter block below
+        session.commit()
 
     logger.error(
         "Step failed | run_id=%s step_key=%s job_id=%s cancelled_steps=%d",
@@ -708,50 +708,3 @@ def on_step_failed(
         job_id,
         len(pending_steps),
     )
-
-    # Dead-letter notify runs ONLY on wake-helper exception. When wake
-    # dispatched, Phase 21+ will speak via the wake invocation.
-    if wake_branch_ok:
-        return
-    if queue is None:
-        return
-    try:
-        reply_context = (run.shared_context or {}).get("reply_context") if run is not None else None
-        required = ("platform", "chat_id", "user_id")
-        if not isinstance(reply_context, dict) or not all(k in reply_context and reply_context[k] for k in required):
-            logger.warning(
-                "Workflow failed without reply_context; skipping dead-letter | run_id=%s workflow_type=%s",
-                step.workflow_run_id,
-                run.workflow_type if run is not None else "<unknown>",
-            )
-            return
-
-        from robotina.queue.task_types import SendNotificationInput
-
-        apology_text = (
-            f"Algo falló procesando tu pedido ({run.workflow_type}). Disculpá las molestias."
-        )
-        task_input = SendNotificationInput(
-            platform=reply_context["platform"],
-            chat_id=reply_context["chat_id"],
-            user_id=reply_context["user_id"],
-            text=apology_text,
-        )
-        queue.enqueue(
-            "robotina.queue.jobs.run_task",
-            task_input,
-            result_ttl=-1,
-            failure_ttl=-1,
-            meta={"task_type": "send-notification"},
-            at_front=True,
-        )
-        logger.info(
-            "Dead-letter notification enqueued | run_id=%s workflow_type=%s",
-            step.workflow_run_id,
-            run.workflow_type,
-        )
-    except Exception:
-        logger.exception(
-            "Dead-letter enqueue failed; swallowing | run_id=%s",
-            step.workflow_run_id,
-        )
