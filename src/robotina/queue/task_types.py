@@ -301,10 +301,10 @@ class SendNotificationOutput(BaseModel):
     message_id: str       # platform-assigned ID
 
 
-# Phase 21 D-06: AcknowledgeAddRecipeInput removed. The per-workflow
-# acknowledge-add-recipe agent it served was deleted along with the
-# legacy ``acknowledge`` workflow step. User-facing acknowledgment now
-# happens directly in Robotina's V005 routing turn via RespondTool.
+# Phase 21 D-06: legacy ack-input model removed. The per-workflow ack
+# agent it served was deleted along with the legacy ``acknowledge``
+# workflow step. User-facing acknowledgment now happens directly in
+# Robotina's V005 routing turn via RespondTool.
 
 
 # ---------------------------------------------------------------------------

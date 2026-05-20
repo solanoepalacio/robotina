@@ -58,12 +58,11 @@ class WorkflowDefinition(BaseModel):
 # ---------------------------------------------------------------------------
 # Workflow Registry
 # ---------------------------------------------------------------------------
-# Phase 21 D-06: legacy ``acknowledge`` (acknowledge-add-recipe) and
-# ``notify`` (send-notification) steps removed. User-facing acknowledgment
-# now happens directly in Robotina's V005 routing turn via RespondTool;
-# user-facing completion announcement happens on the wake invocation
-# (also via RespondTool) after ``finalize-outcome`` writes the WorkflowRun
-# outcome.
+# Phase 21 D-06: legacy ack and notify steps were removed. User-facing
+# acknowledgment now happens directly in Robotina's V005 routing turn via
+# RespondTool; user-facing completion announcement happens on the wake
+# invocation (also via RespondTool) after ``finalize-outcome`` writes the
+# WorkflowRun outcome.
 
 WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
     "add-recipe": WorkflowDefinition(

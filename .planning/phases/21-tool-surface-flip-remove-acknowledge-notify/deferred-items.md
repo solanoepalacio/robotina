@@ -1,0 +1,1 @@
+- overrides/anthropic.json missing `recipe-load` model_config — pre-existing drift, not introduced by plan 21-04. Phase 21-06 CI guard will catch this going forward.
