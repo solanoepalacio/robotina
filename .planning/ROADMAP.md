@@ -131,7 +131,11 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   2. After all 3 workflows reach terminal status, the wake-invocation reply summarizes each (success: name+slug; failure: brief reason) in user-input order, in one Telegram message.
   3. A partial-failure batch ("2 listos, canelones falló: …") reports cleanly — no silent drops, no all-or-nothing.
   4. A request with > 5 recipes is handled per the prompt's soft cap (asks the user to split, or proceeds with first 5 and notes the cap).
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 22-01-PLAN.md — Wave 1: WorkflowOutcomeSummary.recipe_query + ORDER BY + to_user_message rewrite (BATCH-03/04)
+- [ ] 22-02-PLAN.md — Wave 1: V006 prompt fork (multi-recipe + ambiguity + over-cap + wake-reply examples) + agents.py bump (BATCH-01/02/05)
+- [ ] 22-03-PLAN.md — Wave 2: 30-utterance eval set + per-backend harness + result templates
+- [ ] 22-04-PLAN.md — Wave 3: Operator smoke checkpoint + conditional REQUIREMENTS.md ticks
 
 ### Phase 23: URL ingestion (Topic 2)
 **Goal**: A user can paste a recipe URL and have Robotina save that exact recipe, with SSRF/abuse defenses around every URL fetch.
@@ -183,7 +187,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 | 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
 | 20. Wake rule + outcome plumbing                     | v1.1      | 0/6   | Planned     | —          |
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
-| 22. Multi-recipe per message                         | v1.1      | 0/0   | Not started | —          |
+| 22. Multi-recipe per message                         | v1.1      | 0/4   | Planned     | —          |
 | 23. URL ingestion                                    | v1.1      | 0/0   | Not started | —          |
 | 24. Recipe images                                    | v1.1      | 0/0   | Not started | —          |
 
