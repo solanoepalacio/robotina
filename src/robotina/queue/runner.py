@@ -97,6 +97,21 @@ def main() -> None:
         redis_conn.ping()
         queue = Queue("agent-tasks", connection=redis_conn)
         worker = LoggingWorker([queue], connection=redis_conn)
+
+        # WAKE-05 / D-11: startup reconciler — re-enqueue wake invocations
+        # stranded by worker-crash between commit and queue.enqueue
+        # (Pitfall 11). Best-effort: a reconciler failure should not block boot.
+        try:
+            from robotina.db import SessionLocal
+            from robotina.queue.reconcile import reconcile_invocations
+            _recon_session = SessionLocal()
+            try:
+                reconcile_invocations(_recon_session, queue)
+            finally:
+                _recon_session.close()
+        except Exception:
+            logger.exception("Reconciler failed at boot; continuing to worker.work()")
+
         logger.info("Starting task runner worker (concurrency=1)...")
         logger.info(
             "NOTE: This process handles job execution only. "
