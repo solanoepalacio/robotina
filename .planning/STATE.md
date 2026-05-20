@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
-status: ready_to_plan
-stopped_at: Phase 18 complete (4/4) — ready to discuss Phase 999.1
-last_updated: 2026-05-19T18:34:46.200Z
-last_activity: 2026-05-19 -- Phase 18 execution started
+status: planning
+stopped_at: Phase 20 context gathered
+last_updated: "2026-05-20T00:10:24.815Z"
+last_activity: 2026-05-19
 progress:
   total_phases: 9
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 73
-  percent: 11
+  completed_plans: 8
+  percent: 22
 ---
 
 # Project State
@@ -121,9 +121,9 @@ Last activity: 2026-05-19
 - v1.1 roadmap published 2026-05-18: Phases 17–24 (8 phases, 46 requirements). Numbering continues from v1.0 close (Phase 16). Decimal 07.1 + backlog 999.1 preserved.
 - Phase 17 (Conversation FK closure): foundation — three-step Alembic for `WorkflowRun.conversation_id`. ARCH-01, ARCH-05.
 - Phase 18 (RobotinaInvocation entity): additive entity + FK + dashboard surfacing. ARCH-02/03/04, DASH-13, DASH-14.
-- Phase 19 (LLM multi-call smoke test): LOAD-BEARING standalone experiment; gates Phases 20–24. EVAL-01/02/03.
-- Phase 20 (Wake rule + outcome plumbing): new control loop + `AddRecipeOutcome` + reconciler. WAKE-01..05, DASH-10, DASH-12.
-- Phase 21 (Tool-surface flip): respond/terminate/multi-call start-workflow; deletes acknowledge-add-recipe + notify step. TOOLS-01..05, DASH-11, EXP-05.
+- Phase 19: _removed 2026-05-19_ — a standalone pre-21 smoke test against `return_direct=True` cannot measure N-calls-per-turn (engine terminates after first tool call). EVAL-01/02/03 reframed as a manual smoke checkpoint inside Phase 21. Phase number left vacant.
+- Phase 20 (Wake rule + outcome plumbing): new control loop + `AddRecipeOutcome` + reconciler. Depends on Phase 18. WAKE-01..05, DASH-10, DASH-12.
+- Phase 21 (Tool-surface flip + manual multi-call smoke): respond/terminate/multi-call start-workflow; deletes acknowledge-add-recipe + notify step; embedded manual smoke (Ollama local + OpenAI staging, 5–8 utterances) gates a list-form pivot. TOOLS-01..05, DASH-11, EXP-05, EVAL-01..03.
 - Phase 22 (Multi-recipe per message): prompt-only after Phase 21. BATCH-01..05.
 - Phase 23 (URL ingestion): safe_fetch FIRST commit; recipe-scrapers + LLM fallback. URL-01..06, EXP-02.
 - Phase 24 (Recipe images): non-fatal-step runner capability; Tavily image search. IMG-01..06, EXP-01/03/04/06.
@@ -275,13 +275,13 @@ None yet.
 
 Last activity: 2026-05-19 - Completed quick task 260519-kc8: fix all deferred tests
 
-Last session: 2026-05-19T11:36:52.439Z
-Stopped at: Phase 18 UI-SPEC approved
+Last session: 2026-05-20T00:10:24.807Z
+Stopped at: Phase 20 context gathered
 Resume file: 
-.planning/phases/18-robotinainvocation-entity/18-UI-SPEC.md
+.planning/phases/20-wake-rule-outcome-plumbing/20-CONTEXT.md
 
 ## Operator Next Steps
 
 - Plan Phase 17 with `/gsd:plan-phase 17`
 - Phase 17 is the three-step Alembic for `WorkflowRun.conversation_id` — staging soak before prod
-- Note: Phase 19 (LLM multi-call smoke test) is load-bearing; its evidence gates Phases 20–24
+- Note: Phase 19 was removed 2026-05-19; its multi-call evidence gate now lives inside Phase 21 as a manual smoke checkpoint (Ollama local + OpenAI staging, 5–8 utterances) — see Phase 21 success criterion 6.
