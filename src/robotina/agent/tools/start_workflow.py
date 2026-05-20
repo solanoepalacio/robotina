@@ -9,13 +9,12 @@ workflow intent.
 Pattern: BaseTool subclass (same pattern as ReadSkillTool from Phase 4).
 Session management: creates and closes its own session via SessionLocal() (D-10).
 
-Phase 07.1: ``return_direct=True`` makes this a TERMINAL tool — the
-``langchain.agents.create_agent`` graph terminates immediately after the tool
-runs (both happy and error paths). This is engine-enforced termination, not a
-prompt-level request. (Note: returning ``Command(goto=END)`` from a tool does
-NOT short-circuit the prebuilt graph — verified empirically for both the
-legacy prebuilt ReAct-agent path and the LangChain 1.x ``create_agent`` factory
-— hence this ``return_direct=True`` approach.)
+D-03 (Phase 21 tool-surface flip): ``return_direct=False`` — the tool is
+NON-TERMINAL. Robotina's loop continues after each call so the LLM can chain
+multiple start-workflow calls in a single turn and then call ``terminate()``.
+The engine-enforced termination point moves to TerminateTool (separate tool,
+terminal flag set). The previous Phase 07.1 terminal-tool decision is
+superseded for this tool.
 """
 from __future__ import annotations
 
@@ -26,7 +25,7 @@ from typing import Literal
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
-from robotina.queue.task_types import NonEmptyHouseholdId
+from robotina.queue.task_types import AddRecipeQueryInput, NonEmptyHouseholdId
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +35,23 @@ class StartWorkflowArgs(BaseModel):
 
     Two structural guardrails enforced at args-validation time (before
     _run is called), so misuse surfaces as a ToolMessage(status='error')
-    the engine terminates on (return_direct=True), not as a downstream
-    KeyError or registry miss:
+    the engine reports back to the LLM (the tool is non-terminal —
+    return_direct=False per D-03), not as a downstream KeyError or
+    registry miss:
 
     1. workflow_type is a Literal — only 'add-recipe' validates. A
        hallucinated name fails here, not at WORKFLOW_REGISTRY lookup.
-    2. recipe_query is a required top-level string. The old
-       shared_context dict surface — which let the LLM (a) omit
-       recipe_query entirely and (b) attempt to shadow the trusted
-       household_id / reply_context via WR-02 — is gone.
+       (A future plan extends this to a discriminated union with the
+       URL ingestion variant.)
+    2. input is a required typed AddRecipeQueryInput {value: str}. The
+       old flat top-level recipe_query string field is gone; the old shared_context
+       dict surface — which let the LLM (a) omit recipe_query entirely
+       and (b) attempt to shadow the trusted household_id /
+       reply_context via WR-02 — was already gone, and stays gone.
 
-    ``extra='forbid'`` keeps any unknown LLM-emitted field at the top
-    level as a ValidationError (e.g. an LLM cannot now inject
-    household_id at the top level either).
+    ``extra='forbid'`` on both the outer schema AND the inner
+    AddRecipeQueryInput keeps any unknown LLM-emitted field as a
+    ValidationError at validation time.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -58,10 +61,10 @@ class StartWorkflowArgs(BaseModel):
             "Workflow identifier. Currently only 'add-recipe' is supported."
         ),
     )
-    recipe_query: str = Field(
+    input: AddRecipeQueryInput = Field(
         description=(
-            "User's recipe request in natural language (e.g. 'lentil soup', "
-            "'carbonara'). Forwarded to the add-recipe workflow."
+            "Typed input for the workflow. For 'add-recipe', shape is "
+            "{value: <recipe query string>} — e.g. {\"value\": \"lentil soup\"}."
         ),
     )
 
@@ -81,39 +84,42 @@ class StartWorkflowTool(BaseTool):
     Args (via _run):
         workflow_type: Workflow identifier. Constrained to the Literal
                        ``"add-recipe"`` at args-validation time.
-        recipe_query: User's recipe request in natural language. Required
-                      top-level string; the old ``shared_context`` dict
-                      surface is gone.
+        input: AddRecipeQueryInput {value: str} (D-03). The tool unwraps
+               ``input.value`` to obtain the recipe query. The old flat
+               top-level recipe_query string arg is gone.
 
         The shared_context dict that downstream ``workflow_runner.queue_workflow``
-        consumes is built internally from ``recipe_query`` plus the
+        consumes is built internally from ``input.value`` plus the
         constructor-injected identity fields (chat_id/user_id/platform/
         household_id). The agent never sees or supplies it.
 
     Returns:
         Confirmation string with the workflow_run_id (or error string on
-        failure). ``return_direct=True`` causes the LangGraph agent to
-        terminate immediately after — no further model invocation. Both happy
-        and error paths terminate; the agent must not loop on workflow-start
-        failures.
+        failure). D-03: ``return_direct=False`` — the tool is non-terminal;
+        Robotina's loop continues after the call. The LLM is expected to
+        call ``terminate()`` (separate tool) to end the turn.
     """
 
     name: str = "start-workflow"
     description: str = (
-        "Initiate a multi-step workflow. Creates a WorkflowRun and enqueues "
-        "the first step.\n"
+        "Inicia un flujo de tipo workflow_type con el input dado. "
+        "Podes llamarme varias veces en un mismo turno para iniciar N flujos. "
+        "No termino el turno — usa terminate() cuando hayas terminado.\n"
         "Args:\n"
         "  workflow_type (str): Workflow name. Only 'add-recipe' is supported.\n"
-        "  recipe_query (str): User's recipe request in natural language "
-        "(e.g. 'lentil soup').\n"
+        "  input (object): Typed input for the workflow. For 'add-recipe', "
+        "shape is {value: <recipe query string>}.\n"
         "reply_context and household_id are injected automatically by the "
         "runtime — do not pass them.\n"
         "Arguments are passed as JSON. Use JSON literals: null (not None or "
         "none), true/false (not True/False). Strings must use double quotes. "
-        "Example: {\"workflow_type\": \"add-recipe\", \"recipe_query\": "
-        "\"lentil soup\"}."
+        "Example: {\"workflow_type\": \"add-recipe\", \"input\": "
+        "{\"value\": \"lentil soup\"}}."
     )
-    return_direct: bool = True
+    # D-03: tool is non-terminal — Robotina's loop continues after each call
+    # so the LLM can chain start-workflow → start-workflow → terminate().
+    # Engine-enforced termination moves to TerminateTool (which sets the flag).
+    return_direct: bool = False
 
     # Strict input schema: rejects unknown LLM-emitted fields with ValidationError
     # rather than letting them flow into _run() as kwargs. See StartWorkflowArgs docstring.
@@ -129,18 +135,29 @@ class StartWorkflowTool(BaseTool):
     platform: str = ""
     household_id: NonEmptyHouseholdId
 
-    def _run(self, workflow_type: str, recipe_query: str) -> str:
+    def _run(self, workflow_type: str, input: AddRecipeQueryInput) -> str:
         from redis import Redis
         from rq import Queue
 
         from robotina.db import SessionLocal
         from robotina.queue import workflow_runner
 
+        # D-03: unwrap the typed input on entry. The args_schema guarantees
+        # `input` is an AddRecipeQueryInput (pydantic coerces dict → model
+        # at validation time), but some test paths may pass a dict directly
+        # via _run; accept both for robustness.
+        if isinstance(input, dict):
+            input = AddRecipeQueryInput.model_validate(input)
+        recipe_query = input.value
+
         # Build shared_context internally from the LLM-supplied recipe_query
         # plus the constructor-injected identity fields. The LLM no longer
         # supplies a free-form dict, so the WR-02 shadowing attack surface
         # (LLM-supplied household_id / reply_context) is eliminated
         # structurally — there is nothing for the LLM to overwrite.
+        # Constructor injection of invocation_id (Phase 18 D-13),
+        # conversation_id (Phase 17 D-03/04), household_id (Phase 16
+        # NonEmptyHouseholdId) is unchanged by D-03.
         shared_context: dict = {
             "recipe_query": recipe_query,
             "reply_context": {
@@ -186,5 +203,5 @@ class StartWorkflowTool(BaseTool):
         finally:
             session.close()
 
-    async def _arun(self, workflow_type: str, recipe_query: str) -> str:
-        return self._run(workflow_type, recipe_query)
+    async def _arun(self, workflow_type: str, input: AddRecipeQueryInput) -> str:
+        return self._run(workflow_type, input)
