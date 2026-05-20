@@ -359,6 +359,7 @@ class WorkflowOutcomeSummary(BaseModel):
     workflow_type: str
     status: Literal["done", "failed"]
     outcome: AddRecipeOutcome | None = None
+    recipe_query: str | None = None  # D-08: surfaced from WorkflowRun.shared_context["recipe_query"]
 
 
 class WakeInvocationInput(BaseModel):
@@ -377,21 +378,28 @@ class WakeInvocationInput(BaseModel):
     outcomes: list[WorkflowOutcomeSummary]
 
     def to_user_message(self) -> str:
-        # D-09: Spanish synthetic user message. The V004 prompt interprets this
-        # preamble; no respond() tool exists yet, so the parenthetical reminds
-        # the agent the user has already been notified by the legacy `notify`
-        # step (kept intact through this phase per D-02).
+        # D-07: Spanish synthetic user message. Phase 21 removed the `notify`
+        # step (no pre-notification anymore); legacy "(usuario ya fue
+        # notificado.)" parenthetical replaced with "espera el resumen final"
+        # so the wake-turn LLM understands the user is awaiting the
+        # consolidated reply. Success lines include recipe_slug (BATCH-03);
+        # failure lines surface the original recipe_query (BATCH-04).
         lines = ["Los siguientes flujos terminaron:"]
         for o in self.outcomes:
             if o.status == "done" and o.outcome is not None and o.outcome.status == "success":
-                name = o.outcome.recipe_name or "(receta sin nombre)"
-                lines.append(f"- ✓ {o.workflow_type}: {name} (run {o.workflow_run_id})")
+                name = o.outcome.recipe_name or o.recipe_query or "(receta sin nombre)"
+                slug = o.outcome.recipe_slug  # BATCH-03 name+slug
+                if slug:
+                    lines.append(f"- ✓ {o.workflow_type}: {name} (slug: {slug}, run {o.workflow_run_id})")
+                else:
+                    lines.append(f"- ✓ {o.workflow_type}: {name} (run {o.workflow_run_id})")
             elif o.status == "done":
                 lines.append(f"- ✓ {o.workflow_type} terminó (run {o.workflow_run_id})")
             else:
+                query = o.recipe_query or "(receta sin nombre)"  # BATCH-04 readable failures
                 reason = (o.outcome.failure_reason if o.outcome else None) or "(sin detalle)"
-                lines.append(f"- ✗ {o.workflow_type} falló: {reason} (run {o.workflow_run_id})")
-        lines.append("(Wake-trigger; el usuario ya fue notificado.)")
+                lines.append(f"- ✗ {o.workflow_type}: {query} falló: {reason} (run {o.workflow_run_id})")
+        lines.append("(Wake-trigger; el usuario espera el resumen final.)")
         return "\n".join(lines)
 
 
