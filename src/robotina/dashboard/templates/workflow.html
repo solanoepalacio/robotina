@@ -17,6 +17,23 @@
       <dd class="mono">{{ run.id }}</dd>
       <dt>Triggered by invocation</dt>
       <dd class="mono">{{ run.triggered_by_invocation_id or "—" }}</dd>
+      {# DASH-10 / D-12: conversation FK surfaced. Always set for new rows (Phase 17 NOT NULL). #}
+      <dt>Conversation</dt>
+      <dd class="mono">{{ run.conversation_id or "—" }}</dd>
+      {# DASH-12 / D-13: compact outcome summary. Reads run.outcome dict directly
+         (no Pydantic deserialization — keeps dashboard import surface narrow per Phase 13 D-01). #}
+      <dt>Outcome</dt>
+      <dd>
+        {% if run.outcome %}
+          {% if run.outcome.status == "success" %}
+            ✓ {{ run.outcome.recipe_name or "(sin nombre)" }}
+            {% if run.outcome.recipe_id %}<span class="mono small">({{ run.outcome.recipe_id }})</span>{% endif %}
+            {% if not run.outcome.image_present %}<span class="badge">sin imagen</span>{% endif %}
+          {% else %}
+            ✗ Falló: {{ run.outcome.failure_reason or "(sin detalle)" }}
+          {% endif %}
+        {% else %}—{% endif %}
+      </dd>
     </dl>
     {% if run.shared_context %}
     <details>
