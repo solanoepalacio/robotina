@@ -5,6 +5,7 @@
    HTMX's outerHTML swap installs a trigger-less wrapper and polling
    halts naturally (RESEARCH Pitfall 3). #}
 {% from "_status_badge.html" import status_badge %}
+{% from "_macros.html" import task_type_label %}
 <div id="workflow-body"
 {%- if not is_terminal %}
      hx-get="/fragments/workflows/{{ run.id }}"
@@ -21,6 +22,7 @@
     <article class="step-row" data-status="{{ step.status.value }}">
       <header class="step-row__header">
         <span class="step-key mono">{{ step.step_key }}</span>
+        <span class="step-task-type">{{ task_type_label(step.task_type) }}</span>
         {{ status_badge(step.status.value.upper()) }}
         {% if step.started_at %}
           <span class="muted mono">Started: {{ step.started_at.strftime("%Y-%m-%d %H:%M:%S") }}</span>

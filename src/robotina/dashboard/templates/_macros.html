@@ -1,0 +1,24 @@
+{# Phase 21 D-11 / DASH-11 — dashboard task-type label map.
+
+   Per Phase 13 D-01 (dashboard module isolation), this map lives Jinja-side
+   only. No Python module outside `robotina.dashboard` is imported, and the
+   dashboard package does not need to import any new symbol.
+
+   Entries cover the live task surface only. Retired task types
+   (acknowledge-add-recipe, notify) are intentionally absent so legacy data
+   surfaces via the raw-enum fallback path (proves the retirement is real).
+
+   Future phases (23 gather-from-url, 24 recipe-image) will extend the dict.
+#}
+{% set TASK_TYPE_LABELS = {
+    "gather": "Búsqueda",
+    "instructions": "Instrucciones",
+    "ingredients": "Ingredientes",
+    "metadata": "Metadatos",
+    "load": "Guardar",
+    "finalize-outcome": "Cierre del flujo",
+    "handle-incoming-message": "Robotina (mensaje)",
+    "send-notification": "Notificación"
+} %}
+
+{% macro task_type_label(t) -%}{{ TASK_TYPE_LABELS[t] if t in TASK_TYPE_LABELS else t }}{%- endmacro %}
