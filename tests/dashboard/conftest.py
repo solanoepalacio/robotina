@@ -82,7 +82,7 @@ def make_failed_cascade_run(
     session.add(conv)
     session.flush()
     run = WorkflowRun(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         household_id=household_id,
         conversation_id=conv.id,
         status=WorkflowStatus.FAILED,

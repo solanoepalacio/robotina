@@ -107,7 +107,7 @@ def _make_run(
     parent_inv_id: str,
     status: WorkflowStatus = WorkflowStatus.DONE,
     outcome: dict | None = None,
-    workflow_type: str = "add-recipe",
+    workflow_type: str = "add-recipe-from-query",
 ) -> WorkflowRun:
     run = WorkflowRun(
         workflow_type=workflow_type,

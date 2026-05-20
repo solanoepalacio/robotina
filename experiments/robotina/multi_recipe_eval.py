@@ -210,12 +210,12 @@ class _StubStartWorkflowArgs(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    workflow_type: Literal["add-recipe"] = Field(
-        description="Workflow identifier. Currently only 'add-recipe' is supported."
+    workflow_type: Literal["add-recipe-from-query", "add-recipe-from-url"] = Field(
+        description="Workflow identifier. Currently only 'add-recipe-from-query' is supported."
     )
     input: dict = Field(
         description=(
-            "Typed input for the workflow. For 'add-recipe', shape is "
+            "Typed input for the workflow. For 'add-recipe-from-query', shape is "
             "{value: <recipe query string>}."
         ),
     )
@@ -269,14 +269,14 @@ class StubStartWorkflowTool(BaseTool):
         "Podes llamarme varias veces en un mismo turno para iniciar N flujos. "
         "No termino el turno — usa terminate() cuando hayas terminado.\n"
         "Args:\n"
-        "  workflow_type (str): Workflow name. Only 'add-recipe' is supported.\n"
-        "  input (object): Typed input for the workflow. For 'add-recipe', "
+        "  workflow_type (str): Workflow name. Only 'add-recipe-from-query' is supported.\n"
+        "  input (object): Typed input for the workflow. For 'add-recipe-from-query', "
         "shape is {value: <recipe query string>}.\n"
         "reply_context and household_id are injected automatically by the "
         "runtime — do not pass them.\n"
         "Arguments are passed as JSON. Use JSON literals: null (not None or "
         "none), true/false (not True/False). Strings must use double quotes. "
-        "Example: {\"workflow_type\": \"add-recipe\", \"input\": "
+        "Example: {\"workflow_type\": \"add-recipe-from-query\", \"input\": "
         "{\"value\": \"lentil soup\"}}."
     )
     return_direct: bool = False

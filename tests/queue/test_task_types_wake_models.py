@@ -17,7 +17,7 @@ from robotina.queue.task_types import (
 def test_workflow_outcome_summary_round_trip():
     s = WorkflowOutcomeSummary(
         workflow_run_id="r1",
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         status="done",
         outcome=AddRecipeOutcome(
             status="success",
@@ -35,7 +35,7 @@ def test_workflow_outcome_summary_round_trip():
 def test_workflow_outcome_summary_failed_with_no_outcome():
     s = WorkflowOutcomeSummary(
         workflow_run_id="r2",
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         status="failed",
         outcome=None,
     )
@@ -48,7 +48,7 @@ def test_workflow_outcome_summary_rejects_extra():
     with pytest.raises(ValidationError):
         WorkflowOutcomeSummary(
             workflow_run_id="r3",
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             status="done",
             foo=1,
         )
@@ -61,7 +61,7 @@ def _make_wake_with(status, outcome, recipe_query=None):
         outcomes=[
             WorkflowOutcomeSummary(
                 workflow_run_id="run-1",
-                workflow_type="add-recipe",
+                workflow_type="add-recipe-from-query",
                 status=status,
                 outcome=outcome,
                 recipe_query=recipe_query,
@@ -142,10 +142,10 @@ def test_to_user_message_drops_legacy_parenthetical():
 
 def test_workflow_outcome_summary_accepts_recipe_query_none_and_str():
     WorkflowOutcomeSummary(
-        workflow_run_id="r", workflow_type="add-recipe", status="failed", recipe_query=None
+        workflow_run_id="r", workflow_type="add-recipe-from-query", status="failed", recipe_query=None
     )
     WorkflowOutcomeSummary(
-        workflow_run_id="r", workflow_type="add-recipe", status="failed", recipe_query="canelones"
+        workflow_run_id="r", workflow_type="add-recipe-from-query", status="failed", recipe_query="canelones"
     )
 
 

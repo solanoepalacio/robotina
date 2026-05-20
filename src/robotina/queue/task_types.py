@@ -173,14 +173,44 @@ class RecipeResearchInput(BaseModel):
 
 
 class AddRecipeQueryInput(BaseModel):
-    """Per D-03: typed input for StartWorkflowTool when workflow_type='add-recipe'.
+    """Per D-03: typed input for StartWorkflowTool when workflow_type='add-recipe-from-query'.
 
     Replaces the legacy flat `recipe_query: str` arg on StartWorkflowTool's
     args_schema. The tool's _run unwraps `input.value` to get the recipe query.
-    A future plan will make this part of a discriminated union with URL input.
+    Phase 23 D-01: paired with AddRecipeUrlInput via a plain union on
+    StartWorkflowArgs; @model_validator enforces workflow_type ↔ input shape.
     """
     model_config = ConfigDict(extra="forbid")
     value: str
+
+
+class AddRecipeUrlInput(BaseModel):
+    """Phase 23 D-01 / D-02: typed input for StartWorkflowTool when
+    workflow_type='add-recipe-from-url'.
+
+    Mirrors AddRecipeQueryInput shape exactly (single string field). No
+    ``hint`` field per D-02 — kept minimal in v1.1; revisit if real users
+    surface the need. ``extra="forbid"`` rejects LLM-smuggled extras (e.g.
+    ``hint``, ``language``).
+    """
+    model_config = ConfigDict(extra="forbid")
+    url: str
+
+
+class GatherFromUrlInput(BaseModel):
+    """Phase 23 URL-03: input for the ``gather-from-url`` task type.
+
+    Mirrors ``RecipeResearchGatherInput`` with ``url`` in place of ``query``.
+    First step of the ``add-recipe-from-url`` workflow variant; built by the
+    workflow registry's build_input lambda from ``shared_context["recipe_url"]``.
+    """
+    model_config = ConfigDict(extra="forbid")
+    url: str
+    reply_context: ReplyContext
+    household_id: NonEmptyHouseholdId
+
+    def to_user_message(self) -> str:
+        return self.url
 
 
 class RecipeResearchOutput(BaseModel):
@@ -359,7 +389,12 @@ class WorkflowOutcomeSummary(BaseModel):
     workflow_type: str
     status: Literal["done", "failed"]
     outcome: AddRecipeOutcome | None = None
-    recipe_query: str | None = None  # D-08: surfaced from WorkflowRun.shared_context["recipe_query"]
+    # D-08 (Phase 22): surfaced from WorkflowRun.shared_context["recipe_query"].
+    # Phase 23 D-08: now holds the query string for add-recipe-from-query
+    # workflows OR the URL for add-recipe-from-url workflows. Rename to
+    # `recipe_source` deferred per feedback_avoid_premature_abstraction —
+    # revisit when a third workflow source kind lands.
+    recipe_query: str | None = None
 
 
 class WakeInvocationInput(BaseModel):
@@ -407,7 +442,7 @@ class FinalizeOutcomeInput(BaseModel):
     """Input to the deterministic `finalize-outcome` task branch in run_task.
 
     Built by the `finalize-outcome` step's `build_input` lambda in
-    WORKFLOW_REGISTRY['add-recipe']. The accumulated artifacts at this point
+    WORKFLOW_REGISTRY['add-recipe-from-query']. The accumulated artifacts at this point
     in the chain include the `metadata` step's RecipeData dump and the `load`
     step's RecipeLoadOutput dump. The composer in run_task derives an
     AddRecipeOutcome from these per D-03.

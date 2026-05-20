@@ -41,7 +41,7 @@ class _StubRun:
     """Stand-in for WorkflowRun — only the attributes workflow.html reads."""
 
     id: str = "00000000-0000-0000-0000-000000000001"
-    workflow_type: str = "add-recipe"
+    workflow_type: str = "add-recipe-from-query"
     household_id: str = "h-test"
     status: _StubStatus = field(default_factory=_StubStatus)
     created_at: datetime | None = field(default_factory=datetime.utcnow)

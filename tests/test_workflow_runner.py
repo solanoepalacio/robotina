@@ -47,7 +47,7 @@ def make_step(
     return step
 
 
-def make_run(workflow_type="add-recipe", status=WorkflowStatus.PENDING, shared_context=None):
+def make_run(workflow_type="add-recipe-from-query", status=WorkflowStatus.PENDING, shared_context=None):
     run = MagicMock()
     run.workflow_type = workflow_type
     run.status = status
@@ -151,7 +151,7 @@ def test_on_step_complete_enqueues_next_step():
         task_job_id=None,
     )
     run = make_run(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         shared_context={
             "household_id": "hh-1",
             "recipe_query": "spaghetti",
@@ -195,7 +195,7 @@ def test_on_step_complete_marks_workflow_done_when_final_step():
     from robotina.queue.workflow_runner import on_step_complete
 
     step = make_step(step_key="finalize-outcome", status=WorkflowStepStatus.RUNNING)
-    run = make_run(workflow_type="add-recipe", shared_context={})
+    run = make_run(workflow_type="add-recipe-from-query", shared_context={})
 
     session = MagicMock()
     query_mock = MagicMock()
@@ -375,7 +375,7 @@ def test_on_step_complete_advances_after_return_direct_tool():
 
     step = make_step(step_key="finalize-outcome", task_type="finalize-outcome",
                      status=WorkflowStepStatus.RUNNING)
-    run = make_run(workflow_type="add-recipe", shared_context={})
+    run = make_run(workflow_type="add-recipe-from-query", shared_context={})
 
     session = MagicMock()
     query_mock = MagicMock()
@@ -458,7 +458,7 @@ def test_on_step_failed_logs_and_swallows_wake_helper_exception(caplog, monkeypa
 
     step = make_step(status=WorkflowStepStatus.RUNNING, workflow_run_id="run-xyz")
     run = make_run(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         status=WorkflowStatus.RUNNING,
         shared_context={
             "reply_context": {
@@ -668,7 +668,7 @@ def test_step_input_persisted_on_first_enqueue():
     }
 
     queue_workflow(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         shared_context=shared_context,
         household_id="hh-1",
         conversation_id="conv-1",
@@ -713,7 +713,7 @@ def test_step_input_persisted_on_subsequent_enqueue():
     next_step.step_input = None
 
     run = make_run(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         shared_context={
             "household_id": "hh-1",
             "recipe_query": "spaghetti",
@@ -826,7 +826,7 @@ def test_queue_workflow_rejects_empty_household_id():
 
     with pytest.raises(ValueError) as exc_info:
         queue_workflow(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
             household_id="",
             conversation_id="conv-1",
@@ -855,7 +855,7 @@ def test_queue_workflow_rejects_whitespace_household_id():
 
     with pytest.raises(ValueError) as exc_info:
         queue_workflow(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
             household_id="   ",
             conversation_id="conv-1",
@@ -997,7 +997,7 @@ def test_queue_workflow_persists_conversation_id():
     }
 
     queue_workflow(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         shared_context=shared_context,
         household_id="hh-1",
         conversation_id="conv-1",
@@ -1026,7 +1026,7 @@ def test_queue_workflow_requires_conversation_id():
 
     with pytest.raises(TypeError) as exc_info:
         queue_workflow(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             shared_context={"reply_context": {"platform": "telegram", "chat_id": "c1", "user_id": "u1"}},
             household_id="hh-1",
             queue=mock_queue,
@@ -1068,7 +1068,7 @@ def test_shared_context_reply_context_still_written():
         with patch("robotina.db.SessionLocal", return_value=MagicMock()):
             with patch("rq.Queue"), patch("redis.Redis"):
                 tool._run(
-                    workflow_type="add-recipe",
+                    workflow_type="add-recipe-from-query",
                     input=AddRecipeQueryInput(value="carbonara"),
                 )
 
@@ -1099,7 +1099,7 @@ def test_queue_workflow_requires_triggered_by_invocation_id():
     }
     with pytest.raises(TypeError):
         queue_workflow(
-            workflow_type="add-recipe",
+            workflow_type="add-recipe-from-query",
             shared_context=shared_context,
             household_id="hh-1",
             conversation_id="conv-1",
@@ -1136,7 +1136,7 @@ def test_queue_workflow_persists_triggered_by_invocation_id():
     }
 
     queue_workflow(
-        workflow_type="add-recipe",
+        workflow_type="add-recipe-from-query",
         shared_context=shared_context,
         household_id="hh-1",
         conversation_id="conv-1",
