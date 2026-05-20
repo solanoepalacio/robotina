@@ -33,11 +33,11 @@
 
 ### Multi-Recipe per Message (Topic 1)
 
-- [ ] **BATCH-01**: A single user message naming N recipes (1 ≤ N ≤ 5) results in N `add-recipe` workflows enqueued, all linked to the same `RobotinaInvocation`.
-- [ ] **BATCH-02**: Robotina's pre-batch reply (via `respond()`) acknowledges all N recipes in one message ("voy con canelones, pollo y arroz, te aviso"); no per-recipe ack during drain.
+- [x] **BATCH-01**: A single user message naming N recipes (1 ≤ N ≤ 5) results in N `add-recipe` workflows enqueued, all linked to the same `RobotinaInvocation`.
+- [x] **BATCH-02**: Robotina's pre-batch reply (via `respond()`) acknowledges all N recipes in one message ("voy con canelones, pollo y arroz, te aviso"); no per-recipe ack during drain.
 - [ ] **BATCH-03**: After all N workflows reach terminal status, Robotina's wake invocation composes ONE consolidated final reply summarizing each recipe's outcome (success: name+slug; failure: brief reason); order preserved from user input.
 - [ ] **BATCH-04**: Partial failures are reported cleanly — "2 listos, canelones falló: …" rather than silent failure or all-or-nothing.
-- [ ] **BATCH-05**: If the user names more than 5 recipes in one message, Robotina asks the user to split or proceeds with the first 5 and notes the cap (decided at prompt level, not enforced by code).
+- [x] **BATCH-05**: If the user names more than 5 recipes in one message, Robotina asks the user to split or proceeds with the first 5 and notes the cap (decided at prompt level, not enforced by code).
 
 ### URL-Pointed Recipe (Topic 2)
 
@@ -143,11 +143,11 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | TOOLS-03 | Phase 21 | Complete |
 | TOOLS-04 | Phase 21 | Complete |
 | TOOLS-05 | Phase 21 | Complete |
-| BATCH-01 | Phase 22 | Pending |
-| BATCH-02 | Phase 22 | Pending |
+| BATCH-01 | Phase 22 | Complete |
+| BATCH-02 | Phase 22 | Complete |
 | BATCH-03 | Phase 22 | Pending |
 | BATCH-04 | Phase 22 | Pending |
-| BATCH-05 | Phase 22 | Pending |
+| BATCH-05 | Phase 22 | Complete |
 | URL-01 | Phase 23 | Pending |
 | URL-02 | Phase 23 | Pending |
 | URL-03 | Phase 23 | Pending |

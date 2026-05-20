@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: Workflows Abstraction Refinement
 status: executing
 stopped_at: Phase 23 context gathered
-last_updated: "2026-05-20T18:58:04.914Z"
-last_activity: 2026-05-20 -- Phase 20 execution started
+last_updated: "2026-05-20T19:52:19.936Z"
+last_activity: 2026-05-20
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 22
-  completed_plans: 22
+  total_plans: 26
+  completed_plans: 25
   percent: 44
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-18 after starting milestone v1.1)
 ## Current Position
 
 Phase: 20 (wake-rule-outcome-plumbing) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 20
-Last activity: 2026-05-20 -- Phase 20 execution started
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-05-20
 
 ## Performance Metrics
 
@@ -103,6 +103,7 @@ Last activity: 2026-05-20 -- Phase 20 execution started
 | Phase 16 P05 | 326 | 2 tasks | 2 files |
 | Phase 16 P03 | 158 | 2 tasks | 4 files |
 | Phase 17 P04 | 3min | 2 tasks | 4 files |
+| Phase 22 P03 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -236,6 +237,8 @@ Recent decisions affecting current work:
 - [Phase 16]: 16-06: HOUSEHOLD_ID block placed between Telegram and Tavily in .env.example with explicit `sys.exit(1)` failure-mode note; send.py stale docstring HOUSEHOLD_ID line removed (file never read the env var); PROJECT.md Key Decisions row recorded the four-layer contract (gateway sys.exit, NonEmptyHouseholdId on 7 models, tool constructors, queue_workflow).
 - [Phase ?]: Phase 16-05: HOUSEHOLD_ID dual-guard adopted — sys.exit(1) at gateway entrypoint (RESEARCH Pattern 2) + bracket-form os.environ['HOUSEHOLD_ID'] in handler.py (RESEARCH Pattern 4). Module-import RuntimeError rejected per Open Q1 (would break pytest collection).
 - [Phase 16]: Plan 16-03: NonEmptyHouseholdId (from 16-02) applied to HouseholdManagerApiTool.household_id and StartWorkflowTool.household_id — third defensive layer for REQ-HID-3. StartWorkflowTool's literal `""` default REMOVED (Pitfall 5) and `shared_context.get("household_id", "")` REPLACED with bracket form `shared_context["household_id"]` (Pitfall 4). chat_id/user_id/platform defaults intentionally LEFT as `""` — out of Phase 16 scope. Pydantic-native ValidationError preferred over bespoke ValueError (ValidationError is a ValueError subclass anyway).
+- [Phase ?]: 22-03: Stub-tool eval harness avoids robotina.queue coupling — minimal BaseTool subclasses with .calls list; no DB/Redis/Telegram I/O
+- [Phase ?]: 22-03: Tolerant name matching uses accent-stripped lowercase + difflib ratio ≥ 0.75 (no LLM-judge — Levenshtein floor per Deferred Ideas)
 
 ### Pending Todos
 
@@ -276,10 +279,10 @@ None yet.
 
 Last activity: 2026-05-20 - Completed quick task 260520-kot: wire failure_reason to WorkflowRun.outcome on FAILED workflows
 
-Last session: 2026-05-20T18:58:04.907Z
+Last session: 2026-05-20T19:52:06.753Z
 Stopped at: Phase 23 context gathered
 Resume file: 
-.planning/phases/23-url-ingestion-topic-2/23-CONTEXT.md
+None
 
 ## Operator Next Steps
 
