@@ -45,18 +45,21 @@ def _is_blocked_ip(ip_str: str) -> tuple[bool, str | None]:
     # IPv4-mapped IPv6 → unwrap to v4 and re-check
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
+    # Order matters: ipaddress.is_private is a superset of is_loopback /
+    # is_link_local / is_reserved, so the more-specific predicates run first
+    # to produce precise reason strings (callers and tests match on them).
     if ip in _BLOCKED_EXTRA_IPS:
         return True, f"IP {ip} is explicitly blocked"
-    if ip.is_private:
-        return True, f"IP {ip} is private (RFC1918)"
+    if ip.is_unspecified:
+        return True, f"IP {ip} is unspecified (0.0.0.0 / ::)"
     if ip.is_loopback:
         return True, f"IP {ip} is loopback"
     if ip.is_link_local:
         return True, f"IP {ip} is link-local"
     if ip.is_multicast:
         return True, f"IP {ip} is multicast"
-    if ip.is_unspecified:
-        return True, f"IP {ip} is unspecified (0.0.0.0 / ::)"
+    if ip.is_private:
+        return True, f"IP {ip} is private (RFC1918)"
     if ip.is_reserved:
         return True, f"IP {ip} is reserved"
     return False, None
