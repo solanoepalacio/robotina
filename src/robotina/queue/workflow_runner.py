@@ -103,6 +103,153 @@ def _extract_task_output(result: dict, *, expects_structured: bool = False) -> d
     )
 
 
+def _check_and_dispatch_wake(
+    invocation_id: str | None,
+    session: Session,
+    queue,
+) -> None:
+    """WAKE-01..03 / D-04: single wake-rule helper.
+
+    Called from BOTH on_step_complete (final-step DONE branch) AND
+    on_step_failed (FAILED branch). The helper:
+      1. Returns if invocation_id is None (legacy rows).
+      2. Counts sibling WorkflowRuns; returns if any are non-terminal.
+      3. UPDATE-RETURNING on wake_dispatched_at IS NULL — single-fire guard
+         (Pitfall 1). If 0 rows affected, wake already fired; return.
+      4. Inserts a new RobotinaInvocation(trigger=WORKFLOW_COMPLETION) with
+         pre-assigned rq_job_id (D-07 transactional advancement; Pitfall 11).
+      5. Enqueues the wake job IF queue is provided; otherwise leaves the
+         row for the startup reconciler (D-11) to re-enqueue.
+      6. Does NOT call session.commit() — the caller (on_step_complete /
+         on_step_failed) commits the outer transaction. The status flip on
+         the WorkflowRun AND the new invocation row land in one commit
+         (Pitfall 2).
+
+    Args:
+        invocation_id: WorkflowRun.triggered_by_invocation_id — the parent
+            RobotinaInvocation whose siblings just went terminal.
+        session: SQLAlchemy session shared with the caller.
+        queue: RQ Queue instance (may be None for tests / queue-less paths).
+    """
+    if invocation_id is None:
+        return
+
+    from sqlalchemy import text as _sa_text
+    from robotina.queue.models import (
+        InvocationStatus,
+        InvocationTrigger,
+        RobotinaInvocation,
+        WorkflowRun,
+        WorkflowStatus,
+    )
+    from robotina.queue.task_types import (
+        AddRecipeOutcome,
+        WakeInvocationInput,
+        WorkflowOutcomeSummary,
+    )
+
+    sibling_runs = (
+        session.query(WorkflowRun)
+        .filter(WorkflowRun.triggered_by_invocation_id == invocation_id)
+        .all()
+    )
+    if not sibling_runs:
+        return
+    terminal = {WorkflowStatus.DONE, WorkflowStatus.FAILED}
+    if any(r.status not in terminal for r in sibling_runs):
+        return
+
+    # UPDATE-RETURNING idempotency guard (Pitfall 1). 0 rows affected ==
+    # wake already fired by a concurrent / prior caller.
+    affected = session.execute(
+        _sa_text(
+            "UPDATE robotina_invocations "
+            "SET wake_dispatched_at = :now "
+            "WHERE id = :iid AND wake_dispatched_at IS NULL "
+            "RETURNING id"
+        ),
+        {"now": datetime.now(timezone.utc), "iid": invocation_id},
+    ).fetchall()
+    if not affected:
+        logger.info(
+            "Wake skipped (already dispatched) | parent_invocation_id=%s",
+            invocation_id,
+        )
+        return
+
+    parent = session.get(RobotinaInvocation, invocation_id)
+    if parent is None:
+        # Belt: parent vanished between sibling SELECT and UPDATE — extremely
+        # unlikely (FK NOT NULL on triggered_by_invocation_id from the
+        # WorkflowRun side). Log and bail.
+        logger.error(
+            "Wake aborted: parent RobotinaInvocation missing | id=%s",
+            invocation_id,
+        )
+        return
+
+    outcomes: list[WorkflowOutcomeSummary] = []
+    for r in sibling_runs:
+        run_outcome = None
+        if r.outcome is not None:
+            try:
+                run_outcome = AddRecipeOutcome.model_validate(r.outcome)
+            except Exception:
+                logger.warning(
+                    "Wake: could not validate outcome | run_id=%s outcome=%r",
+                    r.id, r.outcome,
+                )
+        outcomes.append(
+            WorkflowOutcomeSummary(
+                workflow_run_id=r.id,
+                workflow_type=r.workflow_type,
+                status="done" if r.status == WorkflowStatus.DONE else "failed",
+                outcome=run_outcome,
+            )
+        )
+
+    new_rq_job_id = str(uuid.uuid4())
+    new_inv = RobotinaInvocation(
+        trigger=InvocationTrigger.WORKFLOW_COMPLETION,
+        trigger_ref_id=parent.id,
+        conversation_id=parent.conversation_id,
+        rq_job_id=new_rq_job_id,
+        status=InvocationStatus.PENDING,
+    )
+    session.add(new_inv)
+    session.flush()  # materialize new_inv.id for enqueue meta
+
+    wake_input = WakeInvocationInput(
+        previous_invocation_id=parent.id,
+        conversation_id=parent.conversation_id,
+        outcomes=outcomes,
+    )
+
+    if queue is None:
+        logger.info(
+            "Wake row inserted, enqueue skipped (queue=None) | new_invocation_id=%s rq_job_id=%s",
+            new_inv.id, new_rq_job_id,
+        )
+        return
+
+    queue.enqueue(
+        "robotina.queue.jobs.run_task",
+        wake_input,
+        job_id=new_rq_job_id,
+        meta={
+            "task_type": "handle-incoming-message",
+            "invocation_id": new_inv.id,
+            "queue_name": queue.name,
+        },
+        result_ttl=-1,
+        failure_ttl=-1,
+    )
+    logger.info(
+        "Wake dispatched | parent_invocation_id=%s new_invocation_id=%s rq_job_id=%s outcome_count=%d",
+        parent.id, new_inv.id, new_rq_job_id, len(outcomes),
+    )
+
+
 def queue_workflow(
     workflow_type: str,
     shared_context: dict,
