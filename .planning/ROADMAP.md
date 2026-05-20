@@ -37,9 +37,9 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 
 - [x] **Phase 17: Conversation FK closure** — Single Alembic revision 0006 adds `WorkflowRun.conversation_id` NOT NULL FK (table pre-cleaned via runbook) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable. Code/migration shipped 2026-05-19; runbook executed and Telegram smoke test + integration migration test confirmed green against live DB (2026-05-19).
 - [x] **Phase 18: RobotinaInvocation entity** — New `robotina_invocations` table + `InvocationTrigger` enum + idempotency `UniqueConstraint`; gateway inserts invocation on user_message; `WorkflowRun.triggered_by_invocation_id` FK populated by `StartWorkflowTool`; dashboard surfaces the new FK on detail view. (completed 2026-05-19)
-- [ ] **Phase 19: LLM multi-call smoke test** — Standalone load-bearing experiment in `experiments/robotina/` verifying that target backends emit N `start-workflow` tool calls per turn; committed pass-rate evidence gates downstream phases.
+- [ ] **Phase 19**: _removed 2026-05-19_ — original "LLM multi-call smoke test" was infeasible against the current `return_direct=True` tool surface, which terminates the turn after one `start-workflow` call. The empirical gate is folded into Phase 21 as a manual smoke checkpoint after the surface is flipped. Phase number left vacant to avoid renumbering churn on downstream phases.
 - [ ] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell.
-- [ ] **Phase 21: Tool-surface flip + remove acknowledge/notify** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides.
+- [ ] **Phase 21: Tool-surface flip + remove acknowledge/notify (+ manual multi-call smoke)** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides. Includes a manual smoke checkpoint on Ollama (`gpt-oss:20b` local) + OpenAI (staging) with 5–8 hand-curated Spanish utterances; results committed as `.planning/phases/21-.../SMOKE.md`; if reliability is unacceptable on the staging backend, pivot to list-form `start-workflow(actions=[...])` before merging the phase.
 - [ ] **Phase 22: Multi-recipe per message** — Robotina prompt V006 teaches multi-recipe extraction + consolidated post-batch reply + soft cap at 5; eval set committed; partial-failure reporting verified end-to-end.
 - [ ] **Phase 23: URL ingestion** — `safe_fetch` helper (six SSRF defenses, lands FIRST commit); `gather-from-url` task type with `recipe-scrapers` + LLM fallback; `add-recipe-from-url` workflow variant; Robotina URL detection + routing; experiment script; 20-URL eval ≥85% field-level success.
 - [ ] **Phase 24: Recipe images** — `recipe-image` task type with Tavily image search + source-page fallback; new per-step non-fatal-failure runner capability; `safe_fetch` reused for image URL validation; `image_url` persisted via household-manager API; `AddRecipeOutcome.image_present` flag; experiment script.
@@ -77,19 +77,13 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 - [x] 18-04-PLAN.md — Wave 3 dashboard row (DASH-13) + REQUIREMENTS.md ARCH-02 wording (rq_job_id) + deploy runbook + manual smoke checkpoint
 **UI hint**: yes
 
-### Phase 19: LLM multi-call smoke test
-**Goal**: Empirical evidence — committed to the repo — that the production LLM backends emit N `start-workflow` tool calls per turn before any tool-surface code change lands.
-**Depends on**: Phase 18 (so the test can stamp `invocation_id`)
-**Requirements**: EVAL-01, EVAL-02, EVAL-03
-**Success Criteria** (what must be TRUE):
-  1. `uv run experiments.robotina.multi_recipe_eval` runs end-to-end on three backends (Ollama `gpt-oss:20b`, Anthropic, OpenAI) and outputs per-backend pass-rate.
-  2. A 30–50-utterance Spanish multi-recipe eval set is committed to the repo with ground-truth recipe counts/names.
-  3. A per-backend evidence summary is committed BEFORE Phase 21 lands; if reliability is unacceptable on production backends, this phase's outcome triggers a schema pivot to list-form `start-workflow(actions=[...])` before Phase 21 starts.
-**Plans**: TBD
+### Phase 19: _removed_
+
+Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 because the current `StartWorkflowTool` has `return_direct=True` — the LangGraph engine terminates the turn after the first `start-workflow` call, so no smoke test against the current tool surface could measure N-calls-per-turn reliability. The empirical gate is preserved as a manual smoke checkpoint inside Phase 21 (after `return_direct=False` and the prompt rewrite land in the same branch). EVAL-01/02/03 were reframed and reassigned to Phase 21. Phase number left vacant to keep downstream phase numbers stable.
 
 ### Phase 20: Wake rule + outcome plumbing
 **Goal**: When all workflows linked to one invocation reach terminal status, exactly one wake invocation is enqueued — with structured outcomes the next Robotina turn can consume.
-**Depends on**: Phase 19 (load-bearing smoke-test must have passed)
+**Depends on**: Phase 18
 **Requirements**: WAKE-01, WAKE-02, WAKE-03, WAKE-04, WAKE-05, DASH-10, DASH-12
 **Success Criteria** (what must be TRUE):
   1. A single add-recipe workflow that completes triggers exactly one new `RobotinaInvocation(trigger=workflow_completion)` row whose `trigger_ref_id` is the prior invocation's id.
@@ -97,19 +91,26 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
   3. A `kill -9` of the worker between the wake-enqueue's commit and RQ enqueue is recovered on startup — the reconciler re-enqueues the pre-assigned `job_id`.
   4. Each terminal workflow has a non-null `WorkflowRun.outcome` (`AddRecipeOutcome` JSON, < 300 bytes) written by the deterministic `finalize-outcome` step; the dashboard renders a compact outcome summary.
   5. The wake agent receives a `WakeInvocationInput` with the previous invocation id and list of `WorkflowOutcome` summaries.
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 20-01-PLAN.md — Wave 1: Pydantic models (WakeInvocationInput, WorkflowOutcomeSummary, FinalizeOutcomeInput)
+- [ ] 20-02-PLAN.md — Wave 1: finalize-outcome task type + agent-less run_task branch + workflow step append
+- [ ] 20-03-PLAN.md — Wave 2: _check_and_dispatch_wake helper + wiring in on_step_complete / on_step_failed (UPDATE-RETURNING + pre-assigned rq_job_id + dead-letter fallback)
+- [ ] 20-04-PLAN.md — Wave 2: run_task trigger dispatch + invocation lifecycle + V004 prompt with wake-context section
+- [ ] 20-05-PLAN.md — Wave 3: startup reconciler module + runner.py boot wiring
+- [ ] 20-06-PLAN.md — Wave 3: dashboard Conversation + Outcome rows + REQUIREMENTS.md ticks + manual smoke checkpoint
 **UI hint**: yes
 
 ### Phase 21: Tool-surface flip + remove acknowledge/notify
 **Goal**: Robotina speaks via explicit `respond()`/`terminate()` tools and dispatches N workflows per turn; the legacy `acknowledge-add-recipe` agent and `notify` workflow step are gone.
 **Depends on**: Phase 20
-**Requirements**: TOOLS-01, TOOLS-02, TOOLS-03, TOOLS-04, TOOLS-05, DASH-11, EXP-05
+**Requirements**: TOOLS-01, TOOLS-02, TOOLS-03, TOOLS-04, TOOLS-05, DASH-11, EXP-05, EVAL-01, EVAL-02, EVAL-03
 **Success Criteria** (what must be TRUE):
   1. Single-recipe happy path: "agregá lentejas" → Robotina `respond()`s pre-batch → workflow drains → wake invocation `respond()`s post-batch with recipe link → `terminate()`s. No final-AI-message-content leakage to the user.
   2. `StartWorkflowTool` accepts N calls per turn with `{workflow_type, input}` schema; `return_direct=False`; `invocation_id` is constructor-injected (not mutable state).
   3. `grep -r "acknowledge-add-recipe" src/ tests/ overrides/ experiments/` returns zero hits; AGENT_REGISTRY ↔ `overrides/*.json` CI guard fails the build if they drift.
   4. `notify` workflow step is removed from the add-recipe definition; dashboard task-type label map updated (Spanish labels for new types, removed labels for retired ones); no template regression.
   5. `experiments/acknowledge_add_recipe.py` and its `[project.scripts]` entry are removed; documentation updated.
+  6. **Manual multi-call smoke checkpoint**: 5–8 hand-curated Spanish utterances (single-recipe, multi-recipe 2–3 items, compound dish, ambiguous, over-cap) are run once on Ollama `gpt-oss:20b` (local) and once on OpenAI (staging), with the resulting tool-call traces eyeballed and recorded in `.planning/phases/21-*/SMOKE.md` (utterance, backend, expected N, observed N, pass/fail, LangWatch trace link). The file ends with an explicit go/no-go line. If OpenAI staging shows unacceptable reliability, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[{workflow_type, input}, ...])` before merge; Ollama-only failures are noted but do not block merge (dev-only backend).
 **Plans**: TBD
 **UI hint**: yes
 
@@ -172,7 +173,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 | 17. Conversation FK closure                          | v1.1      | 4/4 | Complete   | 2026-05-19 |
 | 18. RobotinaInvocation entity                        | v1.1      | 4/4 | Complete    | 2026-05-19 |
 | 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
-| 20. Wake rule + outcome plumbing                     | v1.1      | 0/0   | Not started | —          |
+| 20. Wake rule + outcome plumbing                     | v1.1      | 0/6   | Planned     | —          |
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
 | 22. Multi-recipe per message                         | v1.1      | 0/0   | Not started | —          |
 | 23. URL ingestion                                    | v1.1      | 0/0   | Not started | —          |
