@@ -32,7 +32,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +170,17 @@ class RecipeResearchInput(BaseModel):
 
     def to_user_message(self) -> str:
         return self.query
+
+
+class AddRecipeQueryInput(BaseModel):
+    """Per D-03: typed input for StartWorkflowTool when workflow_type='add-recipe'.
+
+    Replaces the legacy flat `recipe_query: str` arg on StartWorkflowTool's
+    args_schema. The tool's _run unwraps `input.value` to get the recipe query.
+    A future plan will make this part of a discriminated union with URL input.
+    """
+    model_config = ConfigDict(extra="forbid")
+    value: str
 
 
 class RecipeResearchOutput(BaseModel):
