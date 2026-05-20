@@ -17,11 +17,11 @@
 
 ### Wake Rule & Control Loop
 
-- [ ] **WAKE-01**: When all `WorkflowRun` rows sharing a `triggered_by_invocation_id` reach terminal status (`done` OR `failed`), the runtime enqueues a new `RobotinaInvocation` with `trigger=workflow_completion` and `trigger_ref_id` set to the parent invocation's id.
-- [ ] **WAKE-02**: The wake check is idempotent — if invoked twice (e.g. manual retry from RQ failed registry), exactly one wake invocation is enqueued; enforced by an atomic `UPDATE ... WHERE wake_dispatched_at IS NULL RETURNING id` guard.
-- [ ] **WAKE-03**: The wake-invocation job id is pre-assigned before commit (D-07 transactional advancement pattern, mirroring existing workflow-step enqueue).
-- [ ] **WAKE-04**: A `WakeInvocationInput` Pydantic model carries the previous invocation id and a list of `WorkflowOutcome` summaries; `run_task` dispatches it to the Robotina agent with a wake-context prompt prefix.
-- [ ] **WAKE-05**: A startup reconciler scans `RobotinaInvocation` rows where the linked workflows are terminal but `wake_dispatched_at IS NULL` and dispatches the wake (covers worker-crash recovery alongside AOF).
+- [x] **WAKE-01**: When all `WorkflowRun` rows sharing a `triggered_by_invocation_id` reach terminal status (`done` OR `failed`), the runtime enqueues a new `RobotinaInvocation` with `trigger=workflow_completion` and `trigger_ref_id` set to the parent invocation's id.
+- [x] **WAKE-02**: The wake check is idempotent — if invoked twice (e.g. manual retry from RQ failed registry), exactly one wake invocation is enqueued; enforced by an atomic `UPDATE ... WHERE wake_dispatched_at IS NULL RETURNING id` guard.
+- [x] **WAKE-03**: The wake-invocation job id is pre-assigned before commit (D-07 transactional advancement pattern, mirroring existing workflow-step enqueue).
+- [x] **WAKE-04**: A `WakeInvocationInput` Pydantic model carries the previous invocation id and a list of `WorkflowOutcome` summaries; `run_task` dispatches it to the Robotina agent with a wake-context prompt prefix.
+- [x] **WAKE-05**: A startup reconciler scans `RobotinaInvocation` rows where the linked workflows are terminal but `wake_dispatched_at IS NULL` and dispatches the wake (covers worker-crash recovery alongside AOF).
 
 ### Robotina Tool Surface
 
@@ -57,19 +57,21 @@
 - [ ] **IMG-05**: The image URL persists with the recipe via the household-manager API; storage strategy (URL pin vs. backend re-host) is decided during Phase H planning based on the household-manager image-field surface.
 - [ ] **IMG-06**: The workflow runner supports per-step non-fatal-failure semantics (new runner capability) — declared at step definition level; non-fatal-on-failure steps write a structured "unavailable" artifact and advance instead of cancelling the workflow.
 
-### LLM Multi-Call Evaluation (Phase C)
+### LLM Multi-Call Evaluation (manual smoke, embedded in Phase 21)
 
-- [ ] **EVAL-01**: A standalone experiment script in `experiments/robotina/` exercises multi-`start-workflow`-per-turn behavior across the three LLM backends (Ollama `gpt-oss:20b` dev, Anthropic prod, OpenAI prod) and reports per-backend reliability.
-- [ ] **EVAL-02**: A multi-recipe eval set (30–50 Spanish-language utterances covering single + multi + compound-dish + ambiguous inputs) is committed to the repo and runnable via `uv run experiments.robotina.multi_recipe_eval`.
-- [ ] **EVAL-03**: The smoke test runs and an evidence summary (per-backend pass rate) is committed BEFORE the tool-surface flip (TOOLS-01..05) lands — if reliability is unacceptable on the production backends, the design pivots to list-form `start-workflow(actions=[...])` before downstream phases rebase.
+These were originally framed as a standalone heavyweight eval phase (the removed Phase 19). They are reframed as a manual smoke checkpoint embedded in Phase 21, since the tool surface that enables multi-call (`return_direct=False`) only exists inside that phase's branch.
+
+- [ ] **EVAL-01**: A manual smoke run exercises multi-`start-workflow`-per-turn behavior against the in-use LLM backends — Ollama `gpt-oss:20b` (local dev) and OpenAI (staging). No automated harness is required; running the agent against hand-curated utterances and inspecting tool-call traces in LangWatch / the dashboard is sufficient.
+- [ ] **EVAL-02**: A 5–8 utterance hand-curated Spanish set is committed alongside the smoke results, covering at minimum: 1 single-recipe, 2 multi-recipe (2–3 items), 1 compound dish, 1 ambiguous, 1 over-cap (>5). Ground-truth expected N per utterance is documented inline.
+- [ ] **EVAL-03**: The smoke results table is committed as `.planning/phases/21-*/SMOKE.md` before Phase 21 merges, ending in an explicit go/no-go line. If OpenAI staging is unreliable, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[...])` before merge; Ollama-only failures are noted and do not block merge.
 
 ### Dashboard Compatibility
 
 The Phase 13 queue-visibility dashboard must continue to function through the schema and pipeline changes. v1.0 DASH-01..09 are archived; this milestone extends with v1.1-specific dashboard work.
 
-- [ ] **DASH-10**: Dashboard renders WorkflowRun rows with the new `conversation_id`, `triggered_by_invocation_id`, and `outcome` columns surfaced in the detail view; no template / query regression on the existing list view.
+- [x] **DASH-10**: Dashboard renders WorkflowRun rows with the new `conversation_id`, `triggered_by_invocation_id`, and `outcome` columns surfaced in the detail view; no template / query regression on the existing list view.
 - [ ] **DASH-11**: Dashboard's task-type label map is updated — `gather-from-url`, `recipe-image`, and `finalize-outcome` get Spanish labels; `acknowledge-add-recipe` and the standalone `notify` step are removed; CI / template tests guard against unknown task-type fallbacks producing raw enum values.
-- [ ] **DASH-12**: Dashboard surfaces a compact `outcome` summary on the WorkflowRun row (renders the structured `AddRecipeOutcome` JSON — success/failure + recipe name + image_present flag — without dumping raw JSON).
+- [x] **DASH-12**: Dashboard surfaces a compact `outcome` summary on the WorkflowRun row (renders the structured `AddRecipeOutcome` JSON — success/failure + recipe name + image_present flag — without dumping raw JSON).
 - [x] **DASH-13**: Dashboard surfaces RobotinaInvocation rows linked to a WorkflowRun (at minimum: `triggered_by_invocation_id` appears on the detail page; a dedicated invocation view is a nice-to-have).
 - [x] **DASH-14**: Dashboard module-isolation grep gate (Phase 13 D-01) still passes after model imports change — `RobotinaInvocation` is imported from `robotina.queue.models` like `WorkflowRun`, not via a cross-module shortcut.
 
@@ -113,7 +115,7 @@ Each LLM task type has a standalone experiment in `experiments/` (OBS-03 require
 | Mid-batch user-visible progress messages from one Robotina turn | Solved by workflow chunking (Robotina dispatches Workflow 1, gets a turn, dispatches Workflow 2) — not a wake-policy knob in v1.1 |
 | Per-workflow wake-policy choice (every-completion vs only-when-all-siblings-done) | Single hardcoded rule chosen for simplicity; revisit only when a real use case pushes |
 | First-class "Interaction" entity above Conversation | Implicit chain via `triggered_by_invocation_id` is sufficient until cron-driven scope lands |
-| Multi-call vs list-form `start-workflow` decision before EVAL-01 lands | The Phase C smoke test gates the schema choice empirically |
+| Multi-call vs list-form `start-workflow` decision before Phase 21 lands | The Phase 21 embedded manual smoke (EVAL-01..03) gates the schema choice empirically |
 | Recipe image AI generation | Real images via Tavily are V1; generation is deferred to v1.2+ if quality is poor |
 | User-driven workflow cancellation | New user message during in-flight workflow queues and is handled apologetically post-completion |
 | Vision-LLM image validation | Top-result accepted in V1; quality gate deferred to v1.2 |
@@ -131,11 +133,11 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | ARCH-03 | Phase 18 | Complete |
 | ARCH-04 | Phase 18 | Complete |
 | ARCH-05 | Phase 17 | Completed |
-| WAKE-01 | Phase 20 | Pending |
-| WAKE-02 | Phase 20 | Pending |
-| WAKE-03 | Phase 20 | Pending |
-| WAKE-04 | Phase 20 | Pending |
-| WAKE-05 | Phase 20 | Pending |
+| WAKE-01 | Phase 20 | Complete |
+| WAKE-02 | Phase 20 | Complete |
+| WAKE-03 | Phase 20 | Complete |
+| WAKE-04 | Phase 20 | Complete |
+| WAKE-05 | Phase 20 | Complete |
 | TOOLS-01 | Phase 21 | Pending |
 | TOOLS-02 | Phase 21 | Pending |
 | TOOLS-03 | Phase 21 | Pending |
@@ -158,12 +160,12 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | IMG-04 | Phase 24 | Pending |
 | IMG-05 | Phase 24 | Pending |
 | IMG-06 | Phase 24 | Pending |
-| EVAL-01 | Phase 19 | Pending |
-| EVAL-02 | Phase 19 | Pending |
-| EVAL-03 | Phase 19 | Pending |
-| DASH-10 | Phase 20 | Pending |
+| EVAL-01 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
+| EVAL-02 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
+| EVAL-03 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
+| DASH-10 | Phase 20 | Complete |
 | DASH-11 | Phase 21 | Pending |
-| DASH-12 | Phase 20 | Pending |
+| DASH-12 | Phase 20 | Complete |
 | DASH-13 | Phase 18 | Complete |
 | DASH-14 | Phase 18 | Complete |
 | EXP-01 | Phase 24 | Pending |
@@ -181,13 +183,13 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 **Per-phase counts:**
 - Phase 17: 2 (ARCH-01, ARCH-05)
 - Phase 18: 5 (ARCH-02, ARCH-03, ARCH-04, DASH-13, DASH-14)
-- Phase 19: 3 (EVAL-01, EVAL-02, EVAL-03)
+- Phase 19: _removed 2026-05-19; EVAL-01..03 folded into Phase 21_
 - Phase 20: 7 (WAKE-01..05, DASH-10, DASH-12)
-- Phase 21: 7 (TOOLS-01..05, DASH-11, EXP-05)
+- Phase 21: 10 (TOOLS-01..05, DASH-11, EXP-05, EVAL-01, EVAL-02, EVAL-03)
 - Phase 22: 5 (BATCH-01..05)
 - Phase 23: 7 (URL-01..06, EXP-02)
 - Phase 24: 10 (IMG-01..06, EXP-01, EXP-03, EXP-04, EXP-06)
 
 ---
 *Requirements defined: 2026-05-18*
-*Last updated: 2026-05-18 — milestone v1.1 roadmap mapped (Phases 17–24)*
+*Last updated: 2026-05-19 — Phase 19 removed; EVAL-01/02/03 reframed as a manual smoke checkpoint inside Phase 21 (rationale: the multi-call surface only exists in Phase 21's branch, so a pre-21 smoke test against the current `return_direct=True` tool is meaningless)*
