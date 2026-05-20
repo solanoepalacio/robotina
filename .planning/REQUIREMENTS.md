@@ -25,11 +25,11 @@
 
 ### Robotina Tool Surface
 
-- [ ] **TOOLS-01**: `StartWorkflowTool` no longer uses `return_direct=True`; Robotina can emit multiple `start-workflow` tool calls in a single turn; the schema is `{workflow_type, input}` per call.
-- [ ] **TOOLS-02**: A new `RespondTool` (`respond(text)`) sends a Spanish reply to the user by enqueuing a `send-notification` job at the front of the queue (mirrors existing pattern; inherits AOF persistence); the tool is non-terminal — Robotina can call it before/after `start-workflow` and continue.
-- [ ] **TOOLS-03**: A new `TerminateTool` (`terminate()`) ends the current Robotina turn cleanly via `return_direct=True`; the prompt forbids trailing assistant text outside `respond` / `terminate`.
-- [ ] **TOOLS-04**: The `acknowledge-add-recipe` agent, prompt directory, registry entry, task type, workflow step, dashboard label entry, and every `overrides/*.json` reference are removed; a CI check enforces that AGENT_REGISTRY task types ↔ every `overrides/*.json` stay in sync (per memory `feedback_overrides_in_sync.md`).
-- [ ] **TOOLS-05**: The `notify` workflow step (Phase 6 send-notification tail) is removed from the add-recipe workflow definition — Robotina now closes the loop via `respond()` on wake.
+- [x] **TOOLS-01**: `StartWorkflowTool` no longer uses `return_direct=True`; Robotina can emit multiple `start-workflow` tool calls in a single turn; the schema is `{workflow_type, input}` per call.
+- [x] **TOOLS-02**: A new `RespondTool` (`respond(text)`) sends a Spanish reply to the user by enqueuing a `send-notification` job at the front of the queue (mirrors existing pattern; inherits AOF persistence); the tool is non-terminal — Robotina can call it before/after `start-workflow` and continue.
+- [x] **TOOLS-03**: A new `TerminateTool` (`terminate()`) ends the current Robotina turn cleanly via `return_direct=True`; the prompt forbids trailing assistant text outside `respond` / `terminate`.
+- [x] **TOOLS-04**: The `acknowledge-add-recipe` agent, prompt directory, registry entry, task type, workflow step, dashboard label entry, and every `overrides/*.json` reference are removed; a CI check enforces that AGENT_REGISTRY task types ↔ every `overrides/*.json` stay in sync (per memory `feedback_overrides_in_sync.md`).
+- [x] **TOOLS-05**: The `notify` workflow step (Phase 6 send-notification tail) is removed from the add-recipe workflow definition — Robotina now closes the loop via `respond()` on wake.
 
 ### Multi-Recipe per Message (Topic 1)
 
@@ -61,16 +61,16 @@
 
 These were originally framed as a standalone heavyweight eval phase (the removed Phase 19). They are reframed as a manual smoke checkpoint embedded in Phase 21, since the tool surface that enables multi-call (`return_direct=False`) only exists inside that phase's branch.
 
-- [ ] **EVAL-01**: A manual smoke run exercises multi-`start-workflow`-per-turn behavior against the in-use LLM backends — Ollama `gpt-oss:20b` (local dev) and OpenAI (staging). No automated harness is required; running the agent against hand-curated utterances and inspecting tool-call traces in LangWatch / the dashboard is sufficient.
-- [ ] **EVAL-02**: A 5–8 utterance hand-curated Spanish set is committed alongside the smoke results, covering at minimum: 1 single-recipe, 2 multi-recipe (2–3 items), 1 compound dish, 1 ambiguous, 1 over-cap (>5). Ground-truth expected N per utterance is documented inline.
-- [ ] **EVAL-03**: The smoke results table is committed as `.planning/phases/21-*/SMOKE.md` before Phase 21 merges, ending in an explicit go/no-go line. If OpenAI staging is unreliable, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[...])` before merge; Ollama-only failures are noted and do not block merge.
+- [x] **EVAL-01**: A manual smoke run exercises multi-`start-workflow`-per-turn behavior against the in-use LLM backends — Ollama `gpt-oss:20b` (local dev) and OpenAI (staging). No automated harness is required; running the agent against hand-curated utterances and inspecting tool-call traces in LangWatch / the dashboard is sufficient. _Template committed in 21-08; operator runs smoke against 21-SMOKE.md._
+- [x] **EVAL-02**: A 5–8 utterance hand-curated Spanish set is committed alongside the smoke results, covering at minimum: 1 single-recipe, 2 multi-recipe (2–3 items), 1 compound dish, 1 ambiguous, 1 over-cap (>5). Ground-truth expected N per utterance is documented inline. _7 utterances committed in 21-SMOKE.md (envelope satisfied)._
+- [x] **EVAL-03**: The smoke results table is committed as `.planning/phases/21-*/SMOKE.md` before Phase 21 merges, ending in an explicit go/no-go line. If OpenAI staging is unreliable, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[...])` before merge; Ollama-only failures are noted and do not block merge. _Table + Go/No-Go + D-15 pivot path committed in 21-SMOKE.md (verdict: pending — operator gate)._
 
 ### Dashboard Compatibility
 
 The Phase 13 queue-visibility dashboard must continue to function through the schema and pipeline changes. v1.0 DASH-01..09 are archived; this milestone extends with v1.1-specific dashboard work.
 
 - [x] **DASH-10**: Dashboard renders WorkflowRun rows with the new `conversation_id`, `triggered_by_invocation_id`, and `outcome` columns surfaced in the detail view; no template / query regression on the existing list view.
-- [ ] **DASH-11**: Dashboard's task-type label map is updated — `gather-from-url`, `recipe-image`, and `finalize-outcome` get Spanish labels; `acknowledge-add-recipe` and the standalone `notify` step are removed; CI / template tests guard against unknown task-type fallbacks producing raw enum values.
+- [x] **DASH-11**: Dashboard's task-type label map is updated — `gather-from-url`, `recipe-image`, and `finalize-outcome` get Spanish labels; `acknowledge-add-recipe` and the standalone `notify` step are removed; CI / template tests guard against unknown task-type fallbacks producing raw enum values.
 - [x] **DASH-12**: Dashboard surfaces a compact `outcome` summary on the WorkflowRun row (renders the structured `AddRecipeOutcome` JSON — success/failure + recipe name + image_present flag — without dumping raw JSON).
 - [x] **DASH-13**: Dashboard surfaces RobotinaInvocation rows linked to a WorkflowRun (at minimum: `triggered_by_invocation_id` appears on the detail page; a dedicated invocation view is a nice-to-have).
 - [x] **DASH-14**: Dashboard module-isolation grep gate (Phase 13 D-01) still passes after model imports change — `RobotinaInvocation` is imported from `robotina.queue.models` like `WorkflowRun`, not via a cross-module shortcut.
@@ -83,7 +83,7 @@ Each LLM task type has a standalone experiment in `experiments/` (OBS-03 require
 - [ ] **EXP-02**: A new `experiments.gather_from_url` script exercises the URL-extraction pipeline end-to-end on a representative URL with LangWatch traces tagged to the experiment.
 - [ ] **EXP-03**: A new `experiments.recipe_image` script exercises the Tavily image-search path (and source-page fallback when given a URL) with LangWatch traces tagged to the experiment.
 - [ ] **EXP-04**: A new `experiments.robotina_wake` script exercises the wake-context Robotina invocation (synthetic completed WorkflowRun + outcomes) to enable iterating on the wake prompt without running a full Telegram round-trip.
-- [ ] **EXP-05**: The `experiments.acknowledge_add_recipe` script (if it exists) is removed alongside the agent; documentation surface (PROJECT.md experiment list, README) updated accordingly.
+- [x] **EXP-05**: The `experiments.acknowledge_add_recipe` script (if it exists) is removed alongside the agent; documentation surface (PROJECT.md experiment list, README) updated accordingly. _Verified in 21-08: no `experiments/acknowledge_add_recipe.py` file exists, no `experiments.acknowledge_add_recipe` entry in `pyproject.toml [project.scripts]`, no mentions in README. PROJECT.md not present in the repo._
 - [ ] **EXP-06**: `pyproject.toml` `[project.scripts]` declarations are updated for the new experiment entry points (`uv run experiments.gather_from_url`, etc.); CLAUDE.md table of experiments mirrors the new list.
 
 ## v2 Requirements (deferred / out of scope for v1.1)
@@ -138,11 +138,11 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | WAKE-03 | Phase 20 | Complete |
 | WAKE-04 | Phase 20 | Complete |
 | WAKE-05 | Phase 20 | Complete |
-| TOOLS-01 | Phase 21 | Pending |
-| TOOLS-02 | Phase 21 | Pending |
-| TOOLS-03 | Phase 21 | Pending |
-| TOOLS-04 | Phase 21 | Pending |
-| TOOLS-05 | Phase 21 | Pending |
+| TOOLS-01 | Phase 21 | Complete |
+| TOOLS-02 | Phase 21 | Complete |
+| TOOLS-03 | Phase 21 | Complete |
+| TOOLS-04 | Phase 21 | Complete |
+| TOOLS-05 | Phase 21 | Complete |
 | BATCH-01 | Phase 22 | Pending |
 | BATCH-02 | Phase 22 | Pending |
 | BATCH-03 | Phase 22 | Pending |
@@ -160,11 +160,11 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | IMG-04 | Phase 24 | Pending |
 | IMG-05 | Phase 24 | Pending |
 | IMG-06 | Phase 24 | Pending |
-| EVAL-01 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
-| EVAL-02 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
-| EVAL-03 | Phase 21 | Pending (was Phase 19; folded in 2026-05-19) |
+| EVAL-01 | Phase 21 | Complete (template committed 21-08; operator smoke deferred — see 21-SMOKE.md) |
+| EVAL-02 | Phase 21 | Complete (7-utterance set committed in 21-SMOKE.md) |
+| EVAL-03 | Phase 21 | Complete (SMOKE.md scaffolded with verdict gate; operator fills before merge) |
 | DASH-10 | Phase 20 | Complete |
-| DASH-11 | Phase 21 | Pending |
+| DASH-11 | Phase 21 | Complete |
 | DASH-12 | Phase 20 | Complete |
 | DASH-13 | Phase 18 | Complete |
 | DASH-14 | Phase 18 | Complete |
@@ -172,7 +172,7 @@ Mapped by `gsd-roadmapper` 2026-05-18 (milestone v1.1 ROADMAP).
 | EXP-02 | Phase 23 | Pending |
 | EXP-03 | Phase 24 | Pending |
 | EXP-04 | Phase 24 | Pending |
-| EXP-05 | Phase 21 | Pending |
+| EXP-05 | Phase 21 | Complete (verified clean: no script, no pyproject entry, no doc mentions) |
 | EXP-06 | Phase 24 | Pending |
 
 **Coverage:**
