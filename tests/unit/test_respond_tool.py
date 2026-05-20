@@ -3,7 +3,7 @@
 Covers TOOLS-02: RespondTool is a non-terminal LangChain tool that enqueues a
 send-notification job at the front of the queue with the Spanish reply text.
 
-Per D-01: RespondTool replaces the retired QueueTool. Non-terminal
+Per D-01: RespondTool replaces the retired legacy queue tool. Non-terminal
 (return_direct=False) so Robotina can call it before start-workflow / terminate
 in the same turn.
 
@@ -69,7 +69,7 @@ def test_respond_tool_args_schema_rejects_extra_fields():
 
 def test_respond_tool_enqueues_send_notification_at_front():
     """_run(text=...) enqueues a send-notification job at_front=True,
-    with result_ttl=-1, failure_ttl=-1, meta task_type, mirroring QueueTool."""
+    with result_ttl=-1, failure_ttl=-1, meta task_type, mirroring legacy queue tool."""
     from robotina.agent.tools.respond import RespondTool
 
     tool = RespondTool(

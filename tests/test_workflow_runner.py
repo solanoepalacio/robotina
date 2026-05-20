@@ -141,12 +141,14 @@ def test_on_step_complete_enqueues_next_step():
     """WF-06: on_step_complete enqueues the next PENDING step with a pre-assigned job_id."""
     from robotina.queue.workflow_runner import on_step_complete
 
-    # Use add-recipe acknowledge -> gather transition. The gather step's
-    # build_input only needs shared_context (recipe_query, household_id),
-    # so we don't have to seed any prior step artifacts.
-    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
+    # Phase 21 D-06: use add-recipe gather -> instructions transition.
+    # instructions' build_input reads RecipeData(**artifacts['gather']).
+    step = make_step(step_key="gather", task_type="recipe-research-gather",
+                     status=WorkflowStepStatus.RUNNING)
+    step.artifact = {"name": "spaghetti"}
     next_step = make_step(
-        step_key="gather", task_type="recipe-research-gather", task_job_id=None
+        step_key="instructions", task_type="recipe-research-instructions",
+        task_job_id=None,
     )
     run = make_run(
         workflow_type="add-recipe",
@@ -171,7 +173,10 @@ def test_on_step_complete_enqueues_next_step():
     session.query.return_value = query_mock
 
     queue = MagicMock()
-    output = {"result": "acknowledged"}
+    # Output IS the artifact for this non-structured step. instructions'
+    # build_input reads RecipeData(**artifacts['gather']) so the artifact
+    # must be a valid RecipeData dump (only `name` is required).
+    output = {"name": "spaghetti"}
 
     on_step_complete("test-job-id", output, session, queue)
 
@@ -189,7 +194,7 @@ def test_on_step_complete_marks_workflow_done_when_final_step():
     """WF-07: on_step_complete marks WorkflowRun.status=DONE when no PENDING steps remain."""
     from robotina.queue.workflow_runner import on_step_complete
 
-    step = make_step(step_key="notify", status=WorkflowStepStatus.RUNNING)
+    step = make_step(step_key="finalize-outcome", status=WorkflowStepStatus.RUNNING)
     run = make_run(workflow_type="add-recipe", shared_context={})
 
     session = MagicMock()
@@ -350,69 +355,69 @@ def test_extract_raises_when_not_structured_and_no_tool_message():
         _extract_task_output(result, expects_structured=False)
 
 
-def test_on_step_complete_advances_after_return_direct_ack():
-    """Regression: the acknowledge-add-recipe step uses QueueTool with return_direct=True,
-    which means the agent terminates with a ToolMessage as its final message. Before
-    the fix, _extract_task_output raised ValueError on the empty tool-call AIMessage,
-    on_step_complete bubbled to except, the step was marked FAILED, and the workflow
-    halted — the user saw the ack but never got the recipe.
+def test_on_step_complete_advances_after_return_direct_tool():
+    """Phase 21 regression: when an agent terminates via a return_direct=True
+    tool (e.g. TerminateTool), the final message is a ToolMessage. Before
+    Phase 11's _extract_task_output fix, this caused ValueError on the
+    empty tool-call AIMessage and the workflow halted.
 
-    This test drives on_step_complete with that exact agent-output shape and asserts
-    the step is marked DONE, the artifact is the {"tool_message": ...} fallback shape,
-    and the next step (gather) is enqueued.
+    Drives on_step_complete with the return_direct shape on a non-structured
+    final step (no next step) and asserts the step is DONE, the artifact
+    is the {"tool_message": ...} fallback dict, and the workflow flips to
+    DONE.
+
+    (Previously regressed the legacy ack agent; that agent + its
+    legacy queue tool are gone, so we test the same shape using a stubbed
+    non-structured agent config and a final-step scenario to avoid
+    coupling to the add-recipe step list.)
     """
     from robotina.queue.workflow_runner import on_step_complete
 
-    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
-    next_step = make_step(
-        step_key="gather", task_type="recipe-research-gather", task_job_id=None
-    )
-    run = make_run(
-        workflow_type="add-recipe",
-        shared_context={
-            "household_id": "hh-1",
-            "recipe_query": "spaghetti",
-            "reply_context": {
-                "platform": "telegram",
-                "chat_id": "c1",
-                "user_id": "u1",
-            },
-        },
-    )
+    step = make_step(step_key="finalize-outcome", task_type="finalize-outcome",
+                     status=WorkflowStepStatus.RUNNING)
+    run = make_run(workflow_type="add-recipe", shared_context={})
 
     session = MagicMock()
     query_mock = MagicMock()
     query_mock.filter.return_value = query_mock
     query_mock.order_by.return_value = query_mock
-    query_mock.first.side_effect = [step, run, next_step]
+    # first() returns: step (lookup), run (lookup), None (no next PENDING step)
+    query_mock.first.side_effect = [step, run, None]
     query_mock.all.return_value = [step]
     session.query.return_value = query_mock
 
     queue = MagicMock()
 
-    # Mirror what langchain.agents.create_agent leaves in state when QueueTool (return_direct=True) runs:
-    # the tool-call AIMessage's content is a list of tool_use blocks (no text), and the final
-    # message is the ToolMessage carrying the queue tool's return string.
+    # Mirror what langchain.agents.create_agent leaves in state when a
+    # return_direct=True tool runs: the tool-call AIMessage's content is a
+    # list of tool_use blocks, and the final message is the ToolMessage.
     human_msg = MagicMock()
     human_msg.type = "human"
-    human_msg.content = "Voy a agregar la receta de bocaditos de arroz"
+    human_msg.content = "Buscá la receta"
 
     ai_msg = MagicMock()
     ai_msg.type = "ai"
-    ai_msg.content = [{"type": "tool_use", "name": "queue", "input": {"text": "..."}}]
+    ai_msg.content = [{"type": "tool_use", "name": "terminate", "input": {}}]
 
     tool_msg = MagicMock()
     tool_msg.type = "tool"
-    tool_msg.content = "Reply queued. job_id=xyz"
+    tool_msg.content = "turn-terminated"
 
     output = {"messages": [human_msg, ai_msg, tool_msg]}
 
-    on_step_complete("test-job-id", output, session, queue)
+    # Force the non-structured path by stubbing get_agent_config.
+    from unittest.mock import patch
+    from robotina.agent.agents import AgentConfig
+    fake_cfg = AgentConfig(task_type="x", model_config={}, prompt_path="p",
+                           response_format_model=None)
+    with patch("robotina.agent.agents.get_agent_config", return_value=fake_cfg):
+        on_step_complete("test-job-id", output, session, queue)
 
     assert step.status == WorkflowStepStatus.DONE
-    assert step.artifact == {"tool_message": "Reply queued. job_id=xyz"}
-    assert queue.enqueue.called
-    assert next_step.task_job_id is not None
+    assert step.artifact == {"tool_message": "turn-terminated"}
+    # Final step: workflow flips to DONE, no next-step enqueue.
+    assert run.status == WorkflowStatus.DONE
+    queue.enqueue.assert_not_called()
 
 
 def test_reply_context_not_in_recipe_research_input():
@@ -439,19 +444,17 @@ def test_recipe_load_input_has_reply_context():
 # ---------------------------------------------------------------------------
 
 
-def test_on_step_failed_enqueues_dead_letter_when_reply_context_present(monkeypatch):
-    """When reply_context is present in shared_context AND the wake helper
-    raises (D-05), on_step_failed enqueues a send-notification at the front
-    of the queue with the locked Spanish apology text and the workflow_type
-    in parens.
+def test_on_step_failed_logs_and_swallows_wake_helper_exception(caplog, monkeypatch):
+    """Phase 21 D-08: when the wake helper raises, on_step_failed logs the
+    exception and re-stamps the workflow FAILED in a fresh transaction —
+    but DOES NOT enqueue any fallback send-notification. The Phase-20
+    best-effort apology block is gone (wake-respond path supersedes it).
 
-    Phase 20 / D-05: the dead-letter block is now a FALLBACK only — it runs
-    when _check_and_dispatch_wake raises an exception. The happy-path wake
-    dispatch is exercised by tests in tests/queue/test_wake_dispatch.py.
+    Replaces the Phase-20 dead-letter fallback tests.
     """
+    import logging
     from robotina.queue import workflow_runner
     from robotina.queue.workflow_runner import on_step_failed
-    from robotina.queue.task_types import SendNotificationInput
 
     step = make_step(status=WorkflowStepStatus.RUNNING, workflow_run_id="run-xyz")
     run = make_run(
@@ -478,37 +481,30 @@ def test_on_step_failed_enqueues_dead_letter_when_reply_context_present(monkeypa
 
     queue = MagicMock()
 
-    # Force the wake helper to raise so the dead-letter fallback runs (D-05).
     def _raise(*a, **kw):
         raise RuntimeError("simulated wake failure")
     monkeypatch.setattr(workflow_runner, "_check_and_dispatch_wake", _raise)
 
-    on_step_failed("test-job-id", session, queue)
+    with caplog.at_level(logging.ERROR, logger="robotina.queue.workflow_runner"):
+        on_step_failed("test-job-id", session, queue)
 
-    # Exactly one enqueue, with the locked shape
-    queue.enqueue.assert_called_once()
-    call = queue.enqueue.call_args
-    assert call.args[0] == "robotina.queue.jobs.run_task"
-    task_input = call.args[1]
-    assert isinstance(task_input, SendNotificationInput)
-    assert task_input.platform == "telegram"
-    assert task_input.chat_id == "c1"
-    assert task_input.user_id == "u1"
-    assert task_input.text == "Algo falló procesando tu pedido (add-recipe). Disculpá las molestias."
-    assert call.kwargs.get("at_front") is True
-    assert call.kwargs.get("result_ttl") == -1
-    assert call.kwargs.get("failure_ttl") == -1
-    assert call.kwargs.get("meta") == {"task_type": "send-notification"}
+    # Phase 21 D-08: NO fallback enqueue, regardless of reply_context.
+    queue.enqueue.assert_not_called()
+    # The exception was logged.
+    assert any(
+        "Wake dispatch failed in on_step_failed" in rec.getMessage()
+        and "run-xyz" in rec.getMessage()
+        for rec in caplog.records
+    ), f"Expected wake-failure log mentioning run-xyz; got: {[r.getMessage() for r in caplog.records]}"
+    # Workflow is still committed FAILED on the recovery path.
+    session.commit.assert_called()
 
 
-def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog, monkeypatch):
-    """When shared_context has no reply_context (e.g. workflow initiated by a
-    scheduled task) AND the wake helper raises (D-05), on_step_failed logs a
-    WARN and does NOT enqueue.
-
-    Phase 20 / D-05: dead-letter only runs on wake-helper exception.
+def test_on_step_failed_no_enqueue_when_reply_context_missing(monkeypatch):
+    """Phase 21 D-08: even when shared_context lacks reply_context AND the
+    wake helper raises, on_step_failed does NOT enqueue anything (the
+    Phase-20 dead-letter block is gone).
     """
-    import logging
     from robotina.queue import workflow_runner
     from robotina.queue.workflow_runner import on_step_failed
 
@@ -532,17 +528,9 @@ def test_on_step_failed_skips_dead_letter_when_reply_context_missing(caplog, mon
         raise RuntimeError("simulated wake failure")
     monkeypatch.setattr(workflow_runner, "_check_and_dispatch_wake", _raise)
 
-    with caplog.at_level(logging.WARNING, logger="robotina.queue.workflow_runner"):
-        on_step_failed("test-job-id", session, queue)
+    on_step_failed("test-job-id", session, queue)
 
     queue.enqueue.assert_not_called()
-    # WARN was emitted naming the run_id
-    assert any(
-        rec.levelno == logging.WARNING
-        and "skipping dead-letter" in rec.getMessage()
-        and "run-abc" in rec.getMessage()
-        for rec in caplog.records
-    ), f"Expected WARN log mentioning run-abc; got: {[r.getMessage() for r in caplog.records]}"
 
 
 # ---------------------------------------------------------------------------
@@ -689,17 +677,17 @@ def test_step_input_persisted_on_first_enqueue():
         session=session,
     )
 
-    # First step is "acknowledge" (per add-recipe workflow definition).
-    acknowledge_step = next(s for s in added_steps if s.step_key == "acknowledge")
+    # Phase 21 D-06: first step is "gather" (legacy acknowledge step deleted).
+    gather_step = next(s for s in added_steps if s.step_key == "gather")
     # step_input was assigned BEFORE queue.enqueue (so the dashboard can read it).
-    assert acknowledge_step.step_input is not None, (
+    assert gather_step.step_input is not None, (
         "step_input not set on the first enqueued step"
     )
-    # Pydantic model_dump(mode='json') output — assert key fields are present
-    # (AcknowledgeAddRecipeInput uses recipe_query + reply_context).
-    assert isinstance(acknowledge_step.step_input, dict)
-    assert acknowledge_step.step_input.get("recipe_query") == "spaghetti"
-    assert acknowledge_step.step_input.get("reply_context") == shared_context["reply_context"]
+    # RecipeResearchGatherInput shape: query + reply_context + household_id.
+    assert isinstance(gather_step.step_input, dict)
+    assert gather_step.step_input.get("query") == "spaghetti"
+    assert gather_step.step_input.get("household_id") == "hh-1"
+    assert gather_step.step_input.get("reply_context") == shared_context["reply_context"]
     # queue.enqueue actually called
     assert queue.enqueue.called
 
@@ -711,11 +699,14 @@ def test_step_input_persisted_on_subsequent_enqueue():
     """
     from robotina.queue.workflow_runner import on_step_complete
 
-    # acknowledge -> gather transition. The gather build_input takes
-    # recipe_query + household_id from shared_context.
-    step = make_step(step_key="acknowledge", status=WorkflowStepStatus.RUNNING)
+    # Phase 21 D-06: gather -> instructions transition. instructions'
+    # build_input reads RecipeData(**artifacts['gather']).
+    step = make_step(step_key="gather", task_type="recipe-research-gather",
+                     status=WorkflowStepStatus.RUNNING)
+    step.artifact = {"name": "spaghetti"}
     next_step = make_step(
-        step_key="gather", task_type="recipe-research-gather", task_job_id=None
+        step_key="instructions", task_type="recipe-research-instructions",
+        task_job_id=None,
     )
     # Explicit attribute so the assertion against None has a distinguishable
     # baseline (vs MagicMock's auto-created attribute behavior).
@@ -743,9 +734,10 @@ def test_step_input_persisted_on_subsequent_enqueue():
     session.query.return_value = query_mock
 
     queue = MagicMock()
-    # Use a tool_message-style artifact so _extract_task_output takes the
-    # non-structured branch and doesn't try to read structured_response.
-    output = {"result": "acknowledged"}
+    # Use a plain-dict artifact so _extract_task_output takes the
+    # non-structured branch (output is not {"messages": ...} so it falls to
+    # the elif isinstance(output, dict) path).
+    output = {"name": "spaghetti"}
 
     on_step_complete("test-job-id", output, session, queue)
 
@@ -753,8 +745,8 @@ def test_step_input_persisted_on_subsequent_enqueue():
         "step_input not set on the next enqueued step"
     )
     assert isinstance(next_step.step_input, dict)
-    # RecipeResearchGatherInput shape: query + household_id
-    assert next_step.step_input.get("query") == "spaghetti"
+    # RecipeResearchInstructionsInput shape: recipe + reply_context + household_id.
+    assert next_step.step_input.get("recipe", {}).get("name") == "spaghetti"
     assert next_step.step_input.get("household_id") == "hh-1"
     assert queue.enqueue.called
 
@@ -1045,16 +1037,20 @@ def test_queue_workflow_requires_conversation_id():
 
 def test_shared_context_reply_context_still_written():
     """ARCH-05 deprecation window: StartWorkflowTool must continue to write reply_context
-    into shared_context (workflow steps' build_input + dead-letter block still read it).
+    into shared_context (workflow steps' build_input read it).
     This test guards against premature removal of reply_context writes.
 
-    RED in Wave 0 / 1, GREEN after Wave 2 (depends on the conversation_id ctor field
-    landing on StartWorkflowTool). After Wave 2 this must STAY green forever — any
-    accidental removal of the reply_context write in start_workflow.py:144-152 flips
-    it back to RED.
+    Phase 21 D-08: the legacy dead-letter block that also read
+    shared_context.reply_context is gone, but the workflow-step
+    consumers (gather/instructions/ingredients/metadata/load
+    build_input lambdas) still rely on it, so the write must stay.
+
+    Plan 21-03 reshaped StartWorkflowTool._run to take a typed
+    AddRecipeQueryInput; this test now passes that shape.
     """
     from unittest.mock import MagicMock, patch
     from robotina.agent.tools.start_workflow import StartWorkflowTool
+    from robotina.queue.task_types import AddRecipeQueryInput
 
     tool = StartWorkflowTool(
         chat_id="c1", user_id="u1", platform="telegram",
@@ -1071,7 +1067,10 @@ def test_shared_context_reply_context_still_written():
     with patch("robotina.queue.workflow_runner.queue_workflow", side_effect=_capture):
         with patch("robotina.db.SessionLocal", return_value=MagicMock()):
             with patch("rq.Queue"), patch("redis.Redis"):
-                tool._run(workflow_type="add-recipe", recipe_query="carbonara")
+                tool._run(
+                    workflow_type="add-recipe",
+                    input=AddRecipeQueryInput(value="carbonara"),
+                )
 
     assert "shared_context" in captured
     rc = captured["shared_context"].get("reply_context")

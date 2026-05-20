@@ -268,9 +268,10 @@ def test_run_task_does_not_pass_agent_logging_handler():
     )
 
 
-def test_run_task_injects_all_three_tools_for_handle_incoming_message():
-    """ROBOT-01/D-04: run_task() injects HouseholdManagerApiTool, QueueTool, StartWorkflowTool
-    for task_type == 'handle-incoming-message'."""
+def test_run_task_injects_all_four_tools_for_handle_incoming_message():
+    """Phase 21 D-01/D-02/D-06: run_task() injects HouseholdManagerApiTool,
+    RespondTool, TerminateTool, StartWorkflowTool for task_type ==
+    'handle-incoming-message' (legacy queue tool retired)."""
     from unittest.mock import MagicMock, patch
 
     mock_job = MagicMock()
@@ -342,19 +343,24 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
         run_task(task_input)
 
     from robotina.agent.tools.household_manager_api import HouseholdManagerApiTool
-    from robotina.agent.tools.queue import QueueTool
+    from robotina.agent.tools.respond import RespondTool
     from robotina.agent.tools.start_workflow import StartWorkflowTool
+    from robotina.agent.tools.terminate import TerminateTool
 
     hm_tools = [t for t in injected_tools if isinstance(t, HouseholdManagerApiTool)]
-    q_tools = [t for t in injected_tools if isinstance(t, QueueTool)]
+    r_tools = [t for t in injected_tools if isinstance(t, RespondTool)]
+    t_tools = [t for t in injected_tools if isinstance(t, TerminateTool)]
     sw_tools = [t for t in injected_tools if isinstance(t, StartWorkflowTool)]
 
     assert len(hm_tools) == 1, f"Expected 1 HouseholdManagerApiTool, got {injected_tools}"
     assert hm_tools[0].household_id == "household-abc"
 
-    assert len(q_tools) == 1, f"Expected 1 QueueTool, got {injected_tools}"
-    assert q_tools[0].chat_id == "chat-hm-1"
-    assert q_tools[0].user_id == "user-hm-1"
+    assert len(r_tools) == 1, f"Expected 1 RespondTool, got {injected_tools}"
+    assert r_tools[0].chat_id == "chat-hm-1"
+    assert r_tools[0].user_id == "user-hm-1"
+    assert r_tools[0].household_id == "household-abc"
+
+    assert len(t_tools) == 1, f"Expected 1 TerminateTool, got {injected_tools}"
 
     assert len(sw_tools) == 1, f"Expected 1 StartWorkflowTool, got {injected_tools}"
     assert sw_tools[0].chat_id == "chat-hm-1"
@@ -368,69 +374,11 @@ def test_run_task_injects_all_three_tools_for_handle_incoming_message():
     assert mock_config.tools == []
 
 
-def test_run_task_injects_queue_tool_for_acknowledge_add_recipe():
-    """Phase 07.1: acknowledge-add-recipe agent receives only QueueTool."""
-    from unittest.mock import MagicMock, patch
-
-    mock_job = MagicMock()
-    mock_job.id = "job-ack-001"
-    mock_job.meta = {"task_type": "acknowledge-add-recipe", "queue_name": "agent-tasks"}
-
-    mock_config = MagicMock()
-    mock_config.skills = []
-    mock_config.tools = []
-    mock_config.model_config = {
-        "provider": "ollama",
-        "url": "http://localhost:11434",
-        "model": "gpt-oss:20b",
-        "api_key_env": "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN",
-    }
-    mock_config.prompt_path = "/tmp/test_prompt.md"
-
-    mock_backend = MagicMock()
-    mock_agent = MagicMock()
-    mock_agent.invoke.return_value = {"messages": []}
-    mock_backend.create_agent.return_value = mock_agent
-
-    mock_session = MagicMock()
-
-    task_input = MagicMock()
-    task_input.chat_id = "chat-ack-1"
-    task_input.user_id = "user-ack-1"
-    task_input.platform = "telegram"
-    task_input.recipe_query = "carbonara"
-    task_input.to_user_message.return_value = "Compose ack"
-
-    injected_tools = []
-
-    def capture_tools(**kwargs):
-        injected_tools.extend(kwargs.get("tools", []))
-        return mock_agent
-
-    mock_backend.create_agent.side_effect = capture_tools
-
-    with (
-        patch("robotina.queue.jobs.get_current_job", return_value=mock_job),
-        patch("robotina.agent.agents.get_agent_config", return_value=mock_config),
-        patch("robotina.llm.make_backend", return_value=mock_backend),
-        patch("pathlib.Path.read_text", return_value="system prompt"),
-        patch("robotina.db.SessionLocal", return_value=mock_session),
-        patch("robotina.queue.workflow_runner.on_step_start"),
-        patch("robotina.queue.workflow_runner.on_step_complete"),
-        patch("robotina.queue.workflow_runner.on_step_failed"),
-    ):
-        from robotina.queue.jobs import run_task
-        run_task(task_input)
-
-    from robotina.agent.tools.queue import QueueTool
-
-    q_tools = [t for t in injected_tools if isinstance(t, QueueTool)]
-    assert len(q_tools) == 1, f"Expected 1 QueueTool, got {injected_tools}"
-    assert q_tools[0].chat_id == "chat-ack-1"
-    assert q_tools[0].user_id == "user-ack-1"
-    assert q_tools[0].platform == "telegram"
-    # No other tools — ack agent only has queue.
-    assert len(injected_tools) == 1
+# Phase 21 D-06: the legacy per-workflow ack injection test was deleted
+# along with the corresponding agent + its registry entry + the jobs.py
+# elif branch that injected the legacy queue tool for it. The
+# per-workflow acknowledgment role is gone; Robotina's V005 turn now
+# sends the ack directly via RespondTool BEFORE start-workflow.
 
 
 # ---------------------------------------------------------------------------

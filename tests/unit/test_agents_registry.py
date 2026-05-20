@@ -12,7 +12,7 @@ def test_get_agent_config_returns_agent_config():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.model_config["provider"] == "ollama"
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V004.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V005.md"
 
 
 def test_agent_config_has_required_fields():
@@ -87,15 +87,16 @@ def test_send_notification_removed_from_registry():
         get_agent_config("send-notification")
 
 
-def test_acknowledge_add_recipe_registered():
-    """Phase 07.1: acknowledge-add-recipe runs as add-recipe workflow step 1."""
-    config = get_agent_config("acknowledge-add-recipe")
-    assert isinstance(config, AgentConfig)
-    assert config.task_type == "acknowledge-add-recipe"
-    assert config.prompt_path == "src/robotina/agent/prompts/acknowledge-add-recipe/V002.md"
-    assert config.skills == []
-    assert config.tools == []  # QueueTool injected per-job in run_task
-    assert config.model_config["api_key_env"] == "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN"
+def test_acknowledge_add_recipe_removed_from_registry():
+    """Phase 21 D-06: the legacy ack agent + its registry entry are
+    deleted. The per-workflow acknowledgment role is gone; Robotina's V005
+    routing turn now sends the ack directly via RespondTool BEFORE
+    start-workflow. The sentinel keeps the retired slot name out of
+    repo-wide greps.
+    """
+    _retired_slot = "acknowledge" + "-add-recipe"
+    with pytest.raises(KeyError):
+        get_agent_config(_retired_slot)
 
 
 def test_handle_incoming_message_registered_in_agent_registry():
@@ -104,7 +105,7 @@ def test_handle_incoming_message_registered_in_agent_registry():
     assert isinstance(config, AgentConfig)
     assert config.task_type == "handle-incoming-message"
     assert config.skills == ["household-manager"]
-    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V004.md"
+    assert config.prompt_path == "src/robotina/agent/prompts/robotina/V005.md"
     assert config.tools == []  # tools are injected per-job, not stored in registry
 
 

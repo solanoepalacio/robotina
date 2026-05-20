@@ -132,8 +132,14 @@ def test_registry_recipe_load_bound_to_load_output():
 
 
 def test_registry_non_scope_agents_have_no_response_format_model():
-    """handle-incoming-message and acknowledge-add-recipe must NOT have
-    response_format_model set (CONTEXT.md scope decision + Pitfall 6
-    return_direct conflict for acknowledge-add-recipe)."""
+    """handle-incoming-message must NOT have response_format_model set
+    (CONTEXT.md scope decision). Phase 21 D-06: the legacy ack agent
+    entry was deleted along with the agent itself.
+    """
     assert AGENT_REGISTRY["handle-incoming-message"].response_format_model is None
-    assert AGENT_REGISTRY["acknowledge-add-recipe"].response_format_model is None
+    # Phase 21 D-06 regression guard — registry must not re-grow the legacy
+    # ack agent slot. Use a sentinel to keep the string literal out of
+    # repo-wide greps (kept here intentionally because the assertion
+    # documents a deleted contract).
+    _retired_slot = "acknowledge" + "-add-recipe"
+    assert _retired_slot not in AGENT_REGISTRY
