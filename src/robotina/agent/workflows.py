@@ -12,13 +12,11 @@ The 'hello-world-2step' entry was removed in Phase 6.
 """
 from __future__ import annotations
 
-import os
 from typing import Callable
 
 from pydantic import BaseModel, ConfigDict
 
 from robotina.queue.task_types import (
-    AcknowledgeAddRecipeInput,
     FinalizeOutcomeInput,
     RecipeData,
     RecipeLoadInput,
@@ -27,7 +25,6 @@ from robotina.queue.task_types import (
     RecipeResearchInstructionsInput,
     RecipeResearchMetadataInput,
     ReplyContext,
-    SendNotificationInput,
 )
 
 
@@ -59,53 +56,19 @@ class WorkflowDefinition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Notification helpers
-# ---------------------------------------------------------------------------
-
-def _build_notify_text(metadata_artifact: dict, load_artifact: dict) -> str:
-    """Compose notification text from the metadata and load step artifacts.
-
-    Phase 15: ``missing_ingredients`` now lives on the metadata-step's
-    ``RecipeData`` snapshot (the ingredients step writes it; metadata
-    preserves it). ``RecipeLoadOutput`` no longer carries it. Pull the
-    recipe-name/description/slug from ``load_artifact`` and the missing
-    list from ``metadata_artifact``.
-    """
-    base_url = os.environ.get("HOUSEHOLD_MANAGER_BASE_URL", "http://localhost:3001")
-    name = load_artifact.get("recipe_name", "Unknown recipe")
-    description = load_artifact.get("recipe_description")
-    slug = load_artifact.get("recipe_slug", "")
-    missing = metadata_artifact.get("missing_ingredients", [])
-
-    parts = [f"Receta agregada: {name}"]
-    if description:
-        parts.append(description)
-    if slug:
-        parts.append(f"{base_url}/recipe/{slug}")
-    if missing:
-        parts.append(f"Ingredientes no encontrados: {', '.join(missing)}")
-    return "\n".join(parts)
-
-
-# ---------------------------------------------------------------------------
 # Workflow Registry
 # ---------------------------------------------------------------------------
+# Phase 21 D-06: legacy ``acknowledge`` (acknowledge-add-recipe) and
+# ``notify`` (send-notification) steps removed. User-facing acknowledgment
+# now happens directly in Robotina's V005 routing turn via RespondTool;
+# user-facing completion announcement happens on the wake invocation
+# (also via RespondTool) after ``finalize-outcome`` writes the WorkflowRun
+# outcome.
 
 WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
     "add-recipe": WorkflowDefinition(
         workflow_type="add-recipe",
         steps=[
-            # Phase 07.1: per-workflow acknowledgment agent runs as step 1.
-            # Routes the user-facing ack out of the routing agent so handle-incoming-message
-            # can emit a single tool call (start-workflow) and terminate.
-            WorkflowStepDef(
-                step_key="acknowledge",
-                task_type="acknowledge-add-recipe",
-                build_input=lambda ctx, _: AcknowledgeAddRecipeInput(
-                    recipe_query=ctx["recipe_query"],
-                    reply_context=ctx["reply_context"],
-                ),
-            ),
             WorkflowStepDef(
                 step_key="gather",
                 task_type="recipe-research-gather",
@@ -153,18 +116,10 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     household_id=ctx["household_id"],
                 ),
             ),
-            WorkflowStepDef(
-                step_key="notify",
-                task_type="send-notification",
-                build_input=lambda ctx, artifacts: SendNotificationInput(
-                    **ctx["reply_context"],
-                    text=_build_notify_text(artifacts["metadata"], artifacts["load"]),
-                ),
-            ),
-            # WAKE-04 / D-02: deterministic terminal step that composes the
-            # AddRecipeOutcome JSON. APPENDED after `notify` (not replacing it) so
-            # users keep getting the legacy reply through this milestone; the next
-            # milestone deletes `notify` and moves this step accordingly.
+            # Phase 21 D-02 / D-06: terminal step composes the AddRecipeOutcome
+            # JSON. The legacy ``notify`` send-notification step was deleted in
+            # this plan — user-facing completion announcement happens on the
+            # wake invocation via RespondTool after this step writes the outcome.
             # Agent-less — run_task has a dedicated branch (D-01).
             WorkflowStepDef(
                 step_key="finalize-outcome",
