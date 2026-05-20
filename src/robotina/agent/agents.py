@@ -81,9 +81,9 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
             "api_key_env": "HANDLE_INCOMING_MESSAGE_API_TOKEN",
             "reasoning": True,
         },
-        prompt_path="src/robotina/agent/prompts/robotina/V004.md",
+        prompt_path="src/robotina/agent/prompts/robotina/V005.md",
         skills=["household-manager"],
-        tools=[],  # HouseholdManagerApiTool, QueueTool, StartWorkflowTool injected per-job in run_task()
+        tools=[],  # HouseholdManagerApiTool, RespondTool, TerminateTool, StartWorkflowTool injected per-job in run_task() — per Phase 21 D-01/D-02/D-10
     ),
     "recipe-research-gather": AgentConfig(
         task_type="recipe-research-gather",
@@ -155,9 +155,6 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         tools=[],  # HouseholdManagerApiTool + ValidateFoodsTool + ValidateUnitsTool injected per-job in run_task()
         response_format_model=RecipeLoadOutput,
     ),
-    # Phase 07.1: per-workflow acknowledgment agent. Runs as add-recipe step 1,
-    # composes a brief Spanish ack and delivers via queue tool. Per-workflow
-    # (not generic) per feedback_avoid_premature_abstraction.md.
     # Phase 15: matcher LLM for validate-foods / validate-units tools. Not a
     # workflow task type — invoked synchronously from inside a tool call
     # (see robotina.agent.tools._catalog_match.resolve_catalog). Registered
@@ -176,19 +173,6 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         skills=[],
         tools=[],
         response_format_model=SemanticMatchResult,
-    ),
-    "acknowledge-add-recipe": AgentConfig(
-        task_type="acknowledge-add-recipe",
-        model_config={
-            "provider": "ollama",
-            "url": "http://localhost:11434",
-            "model": "gpt-oss:20b",
-            "api_key_env": "ACKNOWLEDGE_ADD_RECIPE_API_TOKEN",
-            "reasoning": True,
-        },
-        prompt_path="src/robotina/agent/prompts/acknowledge-add-recipe/V002.md",
-        skills=[],
-        tools=[],  # QueueTool injected per-job in run_task()
     ),
 }
 
