@@ -1,25 +1,30 @@
 ---
-version: 1
+version: 2
 created: 2026-05-20
-coverage_classes: 10
-utterance_count: 30
+updated: 2026-05-21
+coverage_classes: 9
+utterance_count: 27
 ---
 
-# Phase 22 Multi-Recipe Eval Set
+# Multi-Recipe Eval Set
 
-Empirical acceptance evidence for BATCH-01..05. The harness in
+Empirical acceptance evidence for the `handle-incoming-message` agent's
+multi-recipe extraction behavior. The harness in
 `experiments/robotina/multi_recipe_eval.py` runs each utterance below
-through the production `handle-incoming-message` agent (V006) against the
-configured LLM backend and compares observed tool-call counts + recipe
-values against the expected columns. OpenAI staging is the merge gate
-per D-04 (≥ 95% count accuracy, ≥ 90% name accuracy on multi-recipe rows).
+through the production agent (V006+) against the configured LLM backend
+and compares observed tool-call counts + recipe values against the
+expected columns. OpenAI staging is the merge gate per Phase 22 D-04
+(≥ 95% count accuracy, ≥ 90% name accuracy on multi-recipe rows).
+
+This eval set is **evergreen** — it lives outside any single phase
+directory because it's a continuing quality bar for the agent prompt,
+not a phase-22 artifact.
 
 ## Coverage Classes
 
-Each class has at least 3 utterances. All 10 classes from CONTEXT D-03 are
-covered (URL-mention deflection replaces the deferred "cross-source" class —
-URL handling is Phase 23 scope and V006 must respond "no manejo enlaces"
-+ terminate without starting any workflow).
+Each class has at least 3 utterances. URL-handling was originally a
+class here (deferred to Phase 23); Phase 23 implemented URL ingestion,
+so URL utterances now belong to that agent's eval, not this one.
 
 1. Single-recipe (N=1)
 2. Multi-recipe N=2
@@ -30,12 +35,11 @@ URL handling is Phase 23 scope and V006 must respond "no manejo enlaces"
 7. Sauce-on-recipe (1 not 2) per D-12
 8. Sanity / must-NOT-split (multi-word recipe names, English noun phrases)
 9. Ambiguous non-recipe — clarify via `respond()` per D-10
-10. URL-mention deflection — URL handling deferred to Phase 23; V006 must respond "no manejo enlaces" + terminate
 
 ## Utterances
 
 The `Expected respond()` column holds a short substring tag (e.g. `ack`,
-`ask-to-split`, `clarify-what-recipe`, `no manejo enlaces`). The harness
+`ask-to-split`, `clarify-what-recipe`). The harness
 treats it as a case-insensitive substring assertion against the recorded
 `respond(text=...)` payload. `Expected recipe value(s)` is a comma-separated
 list of recipe strings the harness expects to see in `start-workflow` `input.value`
@@ -70,6 +74,3 @@ arguments; empty when `Expected N` is 0.
 | 25 | hola | 9 ambiguous | 0 |  | clarify-what-recipe | greeting, no recipe at all |
 | 26 | agregá algo rico | 9 ambiguous | 0 |  | clarify | no specific recipe named |
 | 27 | qué hago de cena | 9 ambiguous | 0 |  | clarify | asking for suggestion, not adding |
-| 28 | agregá esta receta: https://example.com/canelones | 10 url-deflection | 0 |  | no manejo enlaces | URL in message — Phase 23 scope |
-| 29 | guardame https://cookpad.com/recetas/123 plis | 10 url-deflection | 0 |  | no manejo enlaces | URL is the whole content |
-| 30 | https://recipes.test.example/x — agregala | 10 url-deflection | 0 |  | no manejo enlaces | URL with imperative tail |
