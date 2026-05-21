@@ -8,10 +8,11 @@ The harness loads the production ``handle-incoming-message`` agent config
 (which points at V006 after Phase 22 Plan 02), swaps in **stub** Respond /
 StartWorkflow / Terminate tools that RECORD calls without enqueuing real
 workflows or sending Telegram messages, then dispatches each utterance from
-``22-EVAL-SET.md`` through the agent and counts how many ``start-workflow``
-tool calls the LLM emits per turn. The observed count + the recipe values
-inside each call are compared against the eval set's expected columns and
-written to ``22-EVAL-RESULTS-<backend>.md`` for operator review.
+``experiments/robotina/multi_recipe_eval_set.md`` through the agent and
+counts how many ``start-workflow`` tool calls the LLM emits per turn. The
+observed count + the recipe values inside each call are compared against
+the eval set's expected columns and written to
+``experiments/results/multi_recipe_eval/<backend>.md`` for operator review.
 
 **No side effects guarantee (T-22-07 / T-22-08):** the stub tools NEVER call
 ``workflow_runner.queue_workflow``, NEVER open a ``SessionLocal()``, and NEVER
@@ -63,12 +64,8 @@ logger = logging.getLogger(__name__)
 PHASE = "22"
 PROMPT_VERSION = "V006"
 EXPERIMENT_NAME = "multi-recipe-eval"
-DEFAULT_EVAL_SET = Path(
-    ".planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-SET.md"
-)
-DEFAULT_OUT_TEMPLATE = (
-    ".planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-{backend}.md"
-)
+DEFAULT_EVAL_SET = Path("experiments/robotina/multi_recipe_eval_set.md")
+DEFAULT_OUT_TEMPLATE = "experiments/results/multi_recipe_eval/{backend}.md"
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +87,7 @@ class EvalRow:
 
 
 def parse_eval_set(path: Path) -> list[EvalRow]:
-    """Parse ``22-EVAL-SET.md`` into a list of ``EvalRow``.
+    """Parse the eval-set markdown into a list of ``EvalRow``.
 
     Accepted format for the ``Expected recipe value(s)`` column:
       - empty cell when ``Expected N == 0``
@@ -622,6 +619,7 @@ def write_results(
             "Informational: ≥ 70% count accuracy = usable for dev. Below = model-upgrade candidate."
         )
 
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("Wrote eval results to %s", out_path)
 
