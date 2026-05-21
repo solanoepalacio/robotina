@@ -52,7 +52,7 @@ metrics:
 
 - Frontmatter `verdict: pending`, `date:` and `operator:` placeholders.
 - Header `# Phase 22 Multi-Recipe Eval Smoke — Final Verdict` + 3-line intro citing D-15 as the load-bearing gate for BATCH-01..05.
-- `## Sources` listing `22-EVAL-SET.md`, `22-EVAL-RESULTS-ollama.md` (informational), `22-EVAL-RESULTS-openai.md` (MERGE GATE per D-04).
+- `## Sources` listing `experiments/robotina/multi_recipe_eval_set.md` (relocated from `22-EVAL-SET.md` on 2026-05-21), `experiments/results/multi_recipe_eval/ollama.md` (informational), `experiments/results/multi_recipe_eval/openai.md` (MERGE GATE per D-04).
 - `## Thresholds (per D-04)` — OpenAI ≥95% count + ≥90% name; Ollama informational only; Anthropic optional.
 - `## Operator runbook` — numbered 9-step procedure with exact `uv run experiments.multi_recipe_eval --backend ollama|openai` commands and the two commit messages.
 - `## Verdict` section with PENDING placeholders for OpenAI / Ollama / Decision; PASS / PIVOT / FAIL options spelled out.
@@ -63,8 +63,8 @@ metrics:
 - File exists: yes.
 - `verdict: pending` count: 1.
 - `MERGE GATE|merge gate` count: 4.
-- `22-EVAL-RESULTS-openai.md` references: 3.
-- `22-EVAL-RESULTS-ollama.md` references: 3.
+- `experiments/results/multi_recipe_eval/openai.md` references: 3.
+- `experiments/results/multi_recipe_eval/ollama.md` references: 3.
 - `Operator runbook` count: 1.
 - `uv run experiments.multi_recipe_eval --backend ollama` count: 1.
 - `uv run experiments.multi_recipe_eval --backend openai` count: 1.
@@ -80,7 +80,7 @@ The executor returned a `CHECKPOINT REACHED — Operator gate (Plan 22-04 Task 2
 ## Resume Protocol
 
 1. Operator runs the two eval commands (see runbook in `22-SMOKE.md`).
-2. Operator commits both filled `22-EVAL-RESULTS-{ollama,openai}.md` files.
+2. Operator commits both filled `experiments/results/multi_recipe_eval/{ollama,openai}.md` files.
 3. Operator fills in the Verdict section of `22-SMOKE.md` and sets frontmatter `verdict:` to `pass`, `pivot`, or `fail`.
 4. Operator commits `22-SMOKE.md`.
 5. To run Task 3 (only on verdict=pass): re-invoke `/gsd:execute-phase 22` or ask Claude to run "Plan 22-04 Task 3 conditional REQUIREMENTS tick" — Claude reads the verdict from `22-SMOKE.md` frontmatter; on `pass` flips BATCH-01..05 to `[x]`, traceability `Pending` → `Complete`, and refreshes the "Last updated" line; on any other verdict skips and documents the skip.

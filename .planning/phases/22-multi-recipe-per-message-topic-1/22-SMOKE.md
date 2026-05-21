@@ -6,13 +6,13 @@ operator: <name — operator fills>
 
 # Phase 22 Multi-Recipe Eval Smoke — Final Verdict
 
-**Status:** PENDING — operator must run the eval harness against both backends and fill this file before Phase 22 closes. Per D-15, this verdict is the load-bearing acceptance gate for BATCH-01..05 — no automated test can measure whether the LLM extracts N recipes from a Spanish multi-recipe utterance. See the eval set (`22-EVAL-SET.md`) and the two per-backend results files (`22-EVAL-RESULTS-ollama.md`, `22-EVAL-RESULTS-openai.md`) referenced below.
+**Status:** PENDING — operator must run the eval harness against both backends and fill this file before Phase 22 closes. Per D-15, this verdict is the load-bearing acceptance gate for BATCH-01..05 — no automated test can measure whether the LLM extracts N recipes from a Spanish multi-recipe utterance. See the eval set (`experiments/robotina/multi_recipe_eval_set.md`) and the two per-backend results files (`experiments/results/multi_recipe_eval/ollama.md`, `experiments/results/multi_recipe_eval/openai.md`) referenced below. (The eval set + results live outside `.planning/phases/22-…` because they're an evergreen quality bar for the agent prompt, not phase-22 artifacts; class 10 "url-deflection" was pruned after Phase 23 shipped URL ingestion.)
 
 ## Sources
 
-- `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-SET.md` — 30 Spanish utterances across 10 coverage classes (per D-03)
-- `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-ollama.md` — Ollama `gpt-oss:20b` results (informational only per D-04)
-- `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-openai.md` — OpenAI staging results (MERGE GATE per D-04)
+- `experiments/robotina/multi_recipe_eval_set.md` — 27 Spanish utterances across 9 coverage classes (per D-03; class 10 url-deflection removed after Phase 23 shipped URL ingestion)
+- `experiments/results/multi_recipe_eval/ollama.md` — Ollama `gpt-oss:20b` results (informational only per D-04)
+- `experiments/results/multi_recipe_eval/openai.md` — OpenAI staging results (MERGE GATE per D-04)
 
 ## Thresholds (per D-04)
 
@@ -23,13 +23,13 @@ operator: <name — operator fills>
 ## Operator runbook
 
 1. Ensure `OPENAI_API_KEY` and `LANGWATCH_API_KEY` are exported in the shell. (`OLLAMA_URL` + a running Ollama daemon with `gpt-oss:20b` is OPTIONAL — skip the dev pass if absent.)
-2. Run dev pass (informational): `uv run experiments.multi_recipe_eval --backend ollama` — produces filled `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-ollama.md`.
+2. Run dev pass (informational): `uv run experiments.multi_recipe_eval --backend ollama` — produces filled `experiments/results/multi_recipe_eval/ollama.md`.
 3. Eyeball the per-class breakdown; note anything systemic in the Ollama results "Notes" section.
-4. Run merge-gate pass: `uv run experiments.multi_recipe_eval --backend openai` — produces filled `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-openai.md`.
+4. Run merge-gate pass: `uv run experiments.multi_recipe_eval --backend openai` — produces filled `experiments/results/multi_recipe_eval/openai.md`.
 5. Review the OpenAI results table — confirm count-correct and name-correct numbers against the thresholds above (≥95% count + ≥90% name on multi-recipe rows).
-6. Commit both filled EVAL-RESULTS files:
+6. Commit both filled results files:
    ```
-   git add .planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-*.md
+   git add experiments/results/multi_recipe_eval/*.md
    git commit -m "test(22): commit eval results — openai=<pass|fail>, ollama=<note>"
    ```
 7. Fill in the **Verdict** section below; set frontmatter `verdict:` to one of `pass`, `pivot`, or `fail`; fill `date:` and `operator:`.

@@ -22,9 +22,9 @@ tech_stack:
     - "Tolerant name-matching via accent-strip + difflib.SequenceMatcher"
 key_files:
   created:
-    - ".planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-SET.md"
-    - ".planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-ollama.md"
-    - ".planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-openai.md"
+    - "experiments/robotina/multi_recipe_eval_set.md (originally .planning/phases/22-…/22-EVAL-SET.md; relocated 2026-05-21)"
+    - "experiments/results/multi_recipe_eval/ollama.md (originally .planning/phases/22-…/22-EVAL-RESULTS-ollama.md; relocated 2026-05-21)"
+    - "experiments/results/multi_recipe_eval/openai.md (originally .planning/phases/22-…/22-EVAL-RESULTS-openai.md; relocated 2026-05-21)"
     - "experiments/robotina/__init__.py"
     - "experiments/robotina/multi_recipe_eval.py"
   modified:
@@ -104,7 +104,7 @@ None — both tasks executed exactly as written. The plan's smoke-test step (`uv
 ## Verification
 
 - `uv run python -c "from experiments.robotina.multi_recipe_eval import parse_eval_set, count_start_workflow_calls, main; print('ok')"` → `imports ok`
-- `parse_eval_set('.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-SET.md')` → `30 rows` ✓
+- `parse_eval_set('experiments/robotina/multi_recipe_eval_set.md')` → `27 rows` (post-2026-05-21 relocate + url-deflection class pruned; was 30 at original Plan 03 time)
 - `wc -l experiments/robotina/multi_recipe_eval.py` → `753` (well above 150 minimum)
 - `grep -c 'experiments.multi_recipe_eval' pyproject.toml` → `1`
 - All three EVAL-* docs exist with `verdict: pending`; OpenAI doc contains 4 `MERGE GATE` mentions; Ollama doc contains 1 `informational only`
@@ -119,9 +119,9 @@ None — both tasks executed exactly as written. The plan's smoke-test step (`uv
 
 ## Self-Check: PASSED
 
-- FOUND: `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-SET.md`
-- FOUND: `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-ollama.md`
-- FOUND: `.planning/phases/22-multi-recipe-per-message-topic-1/22-EVAL-RESULTS-openai.md`
+- FOUND: `experiments/robotina/multi_recipe_eval_set.md` (relocated from `.planning/phases/22-…/22-EVAL-SET.md` on 2026-05-21)
+- FOUND: `experiments/results/multi_recipe_eval/ollama.md` (relocated from `.planning/phases/22-…/22-EVAL-RESULTS-ollama.md` on 2026-05-21)
+- FOUND: `experiments/results/multi_recipe_eval/openai.md` (relocated from `.planning/phases/22-…/22-EVAL-RESULTS-openai.md` on 2026-05-21)
 - FOUND: `experiments/robotina/__init__.py`
 - FOUND: `experiments/robotina/multi_recipe_eval.py`
 - FOUND commit: `1f848b8` (Task 1)
