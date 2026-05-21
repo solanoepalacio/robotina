@@ -476,6 +476,7 @@ class EvalResult:
     observed_values: list[str]
     respond_texts: list[str]
     terminated: bool
+    trace_id: str | None = None
     error: str | None = None
 
     @property
@@ -566,24 +567,41 @@ def write_results(
     lines.append("## Per-utterance results")
     lines.append("")
     lines.append(
+        "OK? gates on count + name per D-04. Trace cell links to LangWatch when "
+        "`LANGWATCH_UI_BASE_URL` is set; otherwise renders the bare trace_id."
+    )
+    lines.append("")
+    lines.append(
         "| # | Utterance | Class | Expected N | Observed N | Observed values | OK? | LangWatch trace |"
     )
     lines.append(
         "|---|-----------|-------|------------|------------|-----------------|-----|------------------|"
     )
+    ui_base = os.environ.get("LANGWATCH_UI_BASE_URL", "").rstrip("/")
     for r in results:
         observed = ", ".join(r.observed_values) if r.observed_values else ""
         if r.error:
             ok = "ERR"
             observed = f"<error: {r.error}>"
         else:
-            ok = "OK" if (r.count_ok and r.name_ok and r.respond_ok) else "FAIL"
+            # D-04 merge gate is count + name only. respond_tag is informational
+            # (see _respond_tag_note column) — it uses class-internal labels
+            # that are not literal substrings of the Spanish text the LLM emits.
+            ok = "OK" if (r.count_ok and r.name_ok) else "FAIL"
         # Pipe-safe utterance
         utt = r.row.utterance.replace("|", "\\|")
         observed_safe = observed.replace("|", "\\|")
+        if r.trace_id and r.trace_id != "0" * 32:
+            trace_cell = (
+                f"[{r.trace_id}]({ui_base}/messages/{r.trace_id})"
+                if ui_base
+                else r.trace_id
+            )
+        else:
+            trace_cell = ""
         lines.append(
             f"| {r.row.idx} | {utt} | {r.row.class_name} | {r.row.expected_n} | "
-            f"{r.observed_n} | {observed_safe} | {ok} |  |"
+            f"{r.observed_n} | {observed_safe} | {ok} | {trace_cell} |"
         )
     lines.append("")
     lines.append("## Notes")
@@ -694,11 +712,15 @@ def main() -> None:
         )
 
         try:
+            trace_id: str | None = None
             with tracer:
                 agent.invoke(
                     {"messages": [{"role": "user", "content": row.utterance}]},
                     config=RunnableConfig(callbacks=[tracer]),
                 )
+                lw_trace = getattr(tracer, "trace", None)
+                if lw_trace is not None:
+                    trace_id = getattr(lw_trace, "trace_id", None)
             observed_n, observed_values = count_start_workflow_calls(stubs)
             respond_texts = [c.get("text", "") for c in stubs["respond"].calls]
             terminated = bool(stubs["terminate"].calls)
@@ -709,6 +731,7 @@ def main() -> None:
                     observed_values=observed_values,
                     respond_texts=respond_texts,
                     terminated=terminated,
+                    trace_id=trace_id,
                 )
             )
             logger.info(
