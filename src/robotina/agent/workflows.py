@@ -38,6 +38,12 @@ class WorkflowStepDef(BaseModel):
         build_input: Callable(shared_context, accumulated_artifacts) -> Pydantic input model.
                      shared_context is a frozen dict — never mutate it.
                      accumulated_artifacts is {step_key: step_output_dict} for DONE steps.
+        non_fatal_on_failure: Phase 24 / D-01 — when True, exceptions from this step
+                     are converted to a StepUnavailableArtifact via
+                     workflow_runner._finalize_step_unavailable and the workflow
+                     continues. Default False preserves v1.0 strict semantics.
+                     Per D-01b, this is an opt-in flag — downstream plans
+                     declare opt-ins on a per-step basis.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -45,6 +51,7 @@ class WorkflowStepDef(BaseModel):
     step_key: str
     task_type: str
     build_input: Callable[[dict, dict], object]
+    non_fatal_on_failure: bool = False  # Phase 24 / D-01
 
 
 class WorkflowDefinition(BaseModel):

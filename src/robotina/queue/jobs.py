@@ -387,13 +387,55 @@ def run_task(task_input) -> object:
         return result
 
     except Exception as exc:  # DASH-03 / Phase 13
-        # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
-        workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
-        # Phase 20 / D-10: invocation lifecycle FAILED transition.
-        if task_type == "handle-incoming-message":
-            _write_invocation_terminal_status(
-                _session, job, terminal="failed"
+        # Phase 24 / D-01 dispatch: look up the step's WorkflowStepDef and
+        # check its non_fatal_on_failure flag. When True, write a
+        # StepUnavailableArtifact and route through DONE-path advancement
+        # instead of FAILED-path cancellation. Lookup is wrapped in its own
+        # try/except so any lookup failure CANNOT mask the original exception
+        # path — we fall back to on_step_failed in that case.
+        from robotina.agent.workflows import WORKFLOW_REGISTRY
+        from robotina.queue.models import WorkflowRun, WorkflowRunStep
+
+        is_non_fatal = False
+        try:
+            step = (
+                _session.query(WorkflowRunStep)
+                .filter(WorkflowRunStep.task_job_id == job.id)
+                .first()
             )
+            if step is not None:
+                run = (
+                    _session.query(WorkflowRun)
+                    .filter(WorkflowRun.id == step.workflow_run_id)
+                    .first()
+                )
+                if run is not None:
+                    wf_def = WORKFLOW_REGISTRY.get(run.workflow_type)
+                    if wf_def is not None:
+                        step_def = next(
+                            (s for s in wf_def.steps if s.step_key == step.step_key),
+                            None,
+                        )
+                        if step_def is not None and step_def.non_fatal_on_failure:
+                            is_non_fatal = True
+        except Exception:
+            # Lookup failure must NOT mask the original exception path — fall
+            # through to on_step_failed.
+            is_non_fatal = False
+
+        if is_non_fatal:
+            reason = f"{type(exc).__name__}: {exc}"
+            workflow_runner._finalize_step_unavailable(
+                job.id, reason, _session, _queue
+            )
+        else:
+            # Workflow hook: mark step FAILED, cancel pending steps, mark WorkflowRun FAILED
+            workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
+            # Phase 20 / D-10: invocation lifecycle FAILED transition.
+            if task_type == "handle-incoming-message":
+                _write_invocation_terminal_status(
+                    _session, job, terminal="failed"
+                )
         raise  # re-raise so RQ moves the job to FailedJobRegistry
 
     finally:

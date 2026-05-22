@@ -49,6 +49,29 @@ _PYDANTIC_URL_NOISE_RE = _re.compile(
 )
 
 
+def _truncate_reason(raw: str, step_key: str) -> str:
+    """Phase 24 / D-01 — shared reason composer for FAILED + unavailable artifacts.
+
+    Strips Pydantic URL noise, collapses whitespace, truncates to
+    ``_OUTCOME_FAILURE_REASON_MAX_CHARS``, prefixes with ``f"{step_key}: "``.
+    Returns empty string when input is empty after cleaning.
+
+    Used by both ``_compose_failure_outcome`` (FAILED-path) and
+    ``_finalize_step_unavailable`` (unavailable-path) so the surfaced reason
+    shape is identical across both terminal artifacts.
+    """
+    raw = (raw or "").strip()
+    raw = _PYDANTIC_URL_NOISE_RE.sub("", raw)
+    raw = _re.sub(r"\s+", " ", raw).strip()
+    if not raw:
+        return ""
+    if len(raw) > _OUTCOME_FAILURE_REASON_MAX_CHARS:
+        short = raw[:_OUTCOME_FAILURE_REASON_MAX_CHARS].rstrip() + "…"
+    else:
+        short = raw
+    return f"{step_key}: {short}"
+
+
 def _compose_failure_outcome(step) -> dict:
     """Compose an AddRecipeOutcome(status='failure', ...) dict for a failed step.
 
@@ -63,20 +86,162 @@ def _compose_failure_outcome(step) -> dict:
     """
     from robotina.queue.task_types import AddRecipeOutcome
 
-    raw = (step.failure_reason or "").strip()
-    # Strip Pydantic doc URL noise (single-line and multi-line forms).
-    raw = _PYDANTIC_URL_NOISE_RE.sub("", raw)
-    # Collapse whitespace / newlines to single spaces.
-    raw = _re.sub(r"\s+", " ", raw).strip()
-    if raw:
-        if len(raw) > _OUTCOME_FAILURE_REASON_MAX_CHARS:
-            short = raw[:_OUTCOME_FAILURE_REASON_MAX_CHARS].rstrip() + "…"
-        else:
-            short = raw
-        reason = f"{step.step_key}: {short}"
-    else:
+    reason = _truncate_reason(step.failure_reason or "", step.step_key)
+    if not reason:
         reason = f"{step.step_key}: failed"
     return AddRecipeOutcome(status="failure", failure_reason=reason).model_dump()
+
+
+def _advance_after_step(step, session: Session, queue) -> None:
+    """Phase 24 / D-01 — shared post-step advancement.
+
+    Called by BOTH ``on_step_complete`` (DONE path) AND
+    ``_finalize_step_unavailable`` (unavailable path) after the step's
+    artifact has been written and its status has been flipped to DONE.
+
+    Behavior:
+      1. Build ``accumulated_artifacts`` from all DONE siblings of ``step``.
+      2. Find the next PENDING step (ordered by ``step_order``).
+      3. If found: build its input via the registered ``build_input`` lambda,
+         pre-assign a job_id, persist ``step_input``, enqueue, then commit.
+      4. If none: mark the WorkflowRun DONE and dispatch the wake. Commit.
+
+    The caller is responsible for flushing the step's own status/artifact
+    write (so its DONE state is visible to the accumulated_artifacts SELECT
+    issued here).
+    """
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    from robotina.queue.models import (
+        WorkflowRun,
+        WorkflowRunStep,
+        WorkflowStatus,
+        WorkflowStepStatus,
+    )
+
+    # Build accumulated_artifacts from all DONE steps for this run
+    done_steps = (
+        session.query(WorkflowRunStep)
+        .filter(
+            WorkflowRunStep.workflow_run_id == step.workflow_run_id,
+            WorkflowRunStep.status == WorkflowStepStatus.DONE,
+        )
+        .all()
+    )
+    accumulated_artifacts: dict[str, dict] = {
+        s.step_key: s.artifact for s in done_steps
+    }
+
+    # Find the WorkflowRun for this step
+    run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
+
+    # Find the next PENDING step
+    next_step = (
+        session.query(WorkflowRunStep)
+        .filter(
+            WorkflowRunStep.workflow_run_id == step.workflow_run_id,
+            WorkflowRunStep.status == WorkflowStepStatus.PENDING,
+        )
+        .order_by(WorkflowRunStep.step_order)  # deterministic step ordering
+        .first()
+    )
+
+    if next_step is not None:
+        # Enqueue next step — pre-assign job_id before commit (D-07)
+        workflow_def = WORKFLOW_REGISTRY[run.workflow_type]
+        next_step_def = next(
+            s for s in workflow_def.steps if s.step_key == next_step.step_key
+        )
+        next_job_id = str(uuid.uuid4())
+        task_input = next_step_def.build_input(dict(run.shared_context), accumulated_artifacts)
+
+        # DASH-02 / Phase 13: persist step_input before commit (same pattern as
+        # the first-step site in queue_workflow).
+        if hasattr(task_input, "model_dump"):
+            next_step.step_input = task_input.model_dump(mode="json")
+        else:
+            next_step.step_input = task_input
+
+        queue.enqueue(
+            "robotina.queue.jobs.run_task",
+            task_input,
+            job_id=next_job_id,
+            meta={"task_type": next_step.task_type, "queue_name": queue.name},
+            result_ttl=-1,
+            failure_ttl=-1,
+        )
+
+        next_step.task_job_id = next_job_id
+        session.commit()
+        logger.info(
+            "Step complete, advanced | run_id=%s completed_step=%s next_step=%s next_job_id=%s",
+            step.workflow_run_id,
+            step.step_key,
+            next_step.step_key,
+            next_job_id,
+        )
+    else:
+        # Final step — mark WorkflowRun DONE
+        run.status = WorkflowStatus.DONE
+        # WAKE-01..03 / D-04 / Pitfall 2: wake check inside the same session
+        # so the run.status=DONE flush is visible to the helper's sibling
+        # SELECT, and the helper's insert + the status flip commit together
+        # (atomic).
+        _check_and_dispatch_wake(run.triggered_by_invocation_id, session, queue)
+        session.commit()
+        logger.info(
+            "Workflow complete | run_id=%s final_step=%s",
+            step.workflow_run_id,
+            step.step_key,
+        )
+
+
+def _finalize_step_unavailable(
+    job_id: str,
+    reason: str,
+    session: Session,
+    queue,
+) -> None:
+    """Phase 24 / D-01 — write StepUnavailableArtifact, advance through DONE path.
+
+    Mirrors ``on_step_complete``'s artifact+status flip, but the artifact is
+    the structured `unavailable` sentinel and the step still transitions to
+    DONE (not FAILED) so the workflow continues. Reason is composed via
+    ``_truncate_reason`` (shared with ``_compose_failure_outcome``).
+
+    Called from ``run_task``'s outer except block (``jobs.py``) when the
+    failing step's ``WorkflowStepDef.non_fatal_on_failure`` is True.
+    """
+    from robotina.queue.task_types import StepUnavailableArtifact
+    from robotina.queue.models import WorkflowRunStep, WorkflowStepStatus
+
+    step = (
+        session.query(WorkflowRunStep)
+        .filter(WorkflowRunStep.task_job_id == job_id)
+        .first()
+    )
+    if step is None:
+        logger.debug(
+            "_finalize_step_unavailable: no workflow step for job_id=%s", job_id
+        )
+        return
+
+    truncated = _truncate_reason(reason, step.step_key) or f"{step.step_key}: unavailable"
+    artifact_obj = StepUnavailableArtifact(
+        step_key=step.step_key,
+        reason=truncated,
+    )
+    step.artifact = artifact_obj.model_dump(mode="json")
+    step.status = WorkflowStepStatus.DONE   # the whole point — DONE, not FAILED
+    step.completed_at = datetime.now(timezone.utc)
+    session.flush()
+
+    _advance_after_step(step, session, queue)
+    logger.info(
+        "Step unavailable, advanced | run_id=%s step_key=%s reason=%r",
+        step.workflow_run_id,
+        step.step_key,
+        artifact_obj.reason,
+    )
 
 
 def _extract_task_output(result: dict, *, expects_structured: bool = False) -> dict:
@@ -483,13 +648,7 @@ def on_step_complete(
         session: SQLAlchemy session.
         queue: RQ Queue instance connected to "agent-tasks".
     """
-    from robotina.agent.workflows import WORKFLOW_REGISTRY
-    from robotina.queue.models import (
-        WorkflowRun,
-        WorkflowRunStep,
-        WorkflowStatus,
-        WorkflowStepStatus,
-    )
+    from robotina.queue.models import WorkflowRunStep, WorkflowStepStatus
 
     step = (
         session.query(WorkflowRunStep)
@@ -528,81 +687,9 @@ def on_step_complete(
     step.completed_at = datetime.now(timezone.utc)
     session.flush()
 
-    # Build accumulated_artifacts from all DONE steps for this run
-    done_steps = (
-        session.query(WorkflowRunStep)
-        .filter(
-            WorkflowRunStep.workflow_run_id == step.workflow_run_id,
-            WorkflowRunStep.status == WorkflowStepStatus.DONE,
-        )
-        .all()
-    )
-    accumulated_artifacts: dict[str, dict] = {
-        s.step_key: s.artifact for s in done_steps
-    }
-
-    # Find the WorkflowRun for this step
-    run = session.query(WorkflowRun).filter(WorkflowRun.id == step.workflow_run_id).first()
-
-    # Find the next PENDING step
-    next_step = (
-        session.query(WorkflowRunStep)
-        .filter(
-            WorkflowRunStep.workflow_run_id == step.workflow_run_id,
-            WorkflowRunStep.status == WorkflowStepStatus.PENDING,
-        )
-        .order_by(WorkflowRunStep.step_order)  # deterministic step ordering
-        .first()
-    )
-
-    if next_step is not None:
-        # Enqueue next step — pre-assign job_id before commit (D-07)
-        workflow_def = WORKFLOW_REGISTRY[run.workflow_type]
-        next_step_def = next(
-            s for s in workflow_def.steps if s.step_key == next_step.step_key
-        )
-        next_job_id = str(uuid.uuid4())
-        task_input = next_step_def.build_input(dict(run.shared_context), accumulated_artifacts)
-
-        # DASH-02 / Phase 13: persist step_input before commit (same pattern as
-        # the first-step site in queue_workflow).
-        if hasattr(task_input, "model_dump"):
-            next_step.step_input = task_input.model_dump(mode="json")
-        else:
-            next_step.step_input = task_input
-
-        queue.enqueue(
-            "robotina.queue.jobs.run_task",
-            task_input,
-            job_id=next_job_id,
-            meta={"task_type": next_step.task_type, "queue_name": queue.name},
-            result_ttl=-1,
-            failure_ttl=-1,
-        )
-
-        next_step.task_job_id = next_job_id
-        session.commit()
-        logger.info(
-            "Step complete, advanced | run_id=%s completed_step=%s next_step=%s next_job_id=%s",
-            step.workflow_run_id,
-            step.step_key,
-            next_step.step_key,
-            next_job_id,
-        )
-    else:
-        # Final step — mark WorkflowRun DONE
-        run.status = WorkflowStatus.DONE
-        # WAKE-01..03 / D-04 / Pitfall 2: wake check inside the same session
-        # so the run.status=DONE flush is visible to the helper's sibling
-        # SELECT, and the helper's insert + the status flip commit together
-        # (atomic).
-        _check_and_dispatch_wake(run.triggered_by_invocation_id, session, queue)
-        session.commit()
-        logger.info(
-            "Workflow complete | run_id=%s final_step=%s",
-            step.workflow_run_id,
-            step.step_key,
-        )
+    # Phase 24 / D-01: post-step advancement extracted into shared helper so
+    # _finalize_step_unavailable can reuse the same DONE-path advancement.
+    _advance_after_step(step, session, queue)
 
 
 def on_step_failed(
