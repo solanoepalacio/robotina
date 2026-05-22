@@ -50,10 +50,12 @@ Concretely:
    in the recipe payload; household-manager stores the URL string.
    No backend upload endpoint. No EXIF strip. No image bytes
    redistributed by Robotina. (D-05)
-6. **Shared-tail helper extraction** — `build_recipe_tail() -> list[WorkflowStepDef]`
-   in `src/robotina/agent/workflows.py`; both `add-recipe-from-query`
-   and `add-recipe-from-url` compose `[gather*] + build_recipe_tail()`.
-   This is the deferred extraction from Phase 23 D-01. (D-06)
+6. **Inline-duplicate `recipe-image` insertion** in both
+   `add-recipe-from-query` and `add-recipe-from-url` entries of
+   `WORKFLOW_REGISTRY`. No shared-tail helper. Phase 23 D-01's
+   deferred extraction is **further deferred** — recipe-quality
+   iteration is expected to churn the tail steps; abstracting now
+   would force refactoring as quality work lands. (D-06)
 7. **`AddRecipeOutcome.image_present`** — `finalize-outcome` (already
    at `jobs.py:131`, hardcoded `False`) reads
    `artifacts["recipe-image"]`'s status: `True` if `image_url` is a
@@ -383,63 +385,61 @@ Concretely:
   no flag to gate. If rehost lands in v1.2, the flag is a 5-line
   addition then.
 
-### Shared-tail helper extraction (Phase 23 D-01 carry-over)
+### Workflow registry insertion (Phase 23 D-01 extraction *further* deferred)
 
-- **D-06: Extract `build_recipe_tail() -> list[WorkflowStepDef]` in
-  `src/robotina/agent/workflows.py`.**
+- **D-06: Inline-duplicate the `recipe-image` step insertion in both
+  `add-recipe-from-query` and `add-recipe-from-url` entries of
+  `WORKFLOW_REGISTRY`.** No `build_recipe_tail()` helper. Each
+  variant explicitly lists its 7 steps (gather + instructions +
+  ingredients + metadata + recipe-image + load + finalize-outcome).
 
-  Signature and return shape:
+  Concrete shape in both `WORKFLOW_REGISTRY` entries:
   ```python
-  def build_recipe_tail() -> list[WorkflowStepDef]:
-      """The 5-step tail shared by both add-recipe workflow variants.
-
-      Steps (in order): instructions, ingredients, metadata,
-      recipe-image, load, finalize-outcome.
-
-      Phase 23 D-01 deferred this extraction to Phase 24 (when
-      recipe-image insertion forces a 2nd point of variance).
-      """
-      return [
-          WorkflowStepDef(step_key="instructions", ...),
-          WorkflowStepDef(step_key="ingredients", ...),
-          WorkflowStepDef(step_key="metadata", ...),
-          WorkflowStepDef(
-              step_key="recipe-image",
-              task_type="recipe-image",
-              build_input=lambda ctx, artifacts: RecipeImageInput(
-                  recipe=RecipeData(**artifacts["metadata"]),
-                  reply_context=ReplyContext(**ctx["reply_context"]),
-                  household_id=ctx["household_id"],
-              ),
-              non_fatal_on_failure=True,
-          ),
-          WorkflowStepDef(step_key="load", ...),  # reads recipe.image_url from artifacts["recipe-image"]
-          WorkflowStepDef(step_key="finalize-outcome", ...),
-      ]
+  WorkflowStepDef(
+      step_key="recipe-image",
+      task_type="recipe-image",
+      build_input=lambda ctx, artifacts: RecipeImageInput(
+          recipe=RecipeData(**artifacts["metadata"]),
+          reply_context=ReplyContext(**ctx["reply_context"]),
+          household_id=ctx["household_id"],
+      ),
+      non_fatal_on_failure=True,
+  ),
   ```
-  - `add-recipe-from-query` composes `[gather_step] + build_recipe_tail()`.
-  - `add-recipe-from-url` composes `[gather_from_url_step] + build_recipe_tail()`.
+  Duplicated verbatim in both entries (the lambdas are independent
+  closures; Python is fine with this).
 
-  **Why now:**
-  - Phase 23 D-01 explicitly named Phase 24 as the extraction moment
-    ("extract a helper in Phase 24 when `recipe-image` inserts a step
-    in both variants").
-  - 6 shared steps × 2 variants = 12 places to maintain in lock-step.
-    Memory `feedback_avoid_premature_abstraction` is about not
-    pre-abstracting before duplication shows; here we have 6 instances
-    of shared structure, well past the 3+ threshold.
-  - Inserting `recipe-image` in two duplicated places is exactly the
-    drift risk the helper prevents.
-
-  **Build-input lambdas stay inline.** No parameterization on the
-  helper; the lambdas hold the per-step input-construction logic
-  unchanged from current code.
+  **Why inline duplication wins over the helper now (user redirect):**
+  - **Recipe-quality iteration is the next thing.** The scraped/loaded
+    recipes are still low-quality; the tail steps (instructions,
+    ingredients, metadata, recipe-image, load) will churn as we tune
+    prompts, ladders, and validation. Abstracting the tail before
+    that churn forces refactoring the helper repeatedly — exactly
+    the "premature abstraction requires later refactoring" failure
+    mode `feedback_avoid_premature_abstraction` warns against.
+  - **Two duplicated lists are easy to diff and easy to diverge
+    when needed.** A helper makes per-variant divergence (e.g. a
+    URL-specific metadata step) painful — you have to either
+    parameterize the helper or partially un-extract it, both of
+    which are worse than just editing two lists side by side.
+  - **Phase 23 D-01's deferred-to-Phase-24 directive is *advisory*,
+    not a hard contract.** Phase 23 wrote that directive before
+    Phase 24's quality-iteration scope was clear. Now that
+    quality-iteration is on the near horizon, deferring further is
+    the right call. Document the further deferral consciously
+    (see `<deferred>`).
+  - **Drift risk on `recipe-image` step is low.** It's one
+    `WorkflowStepDef` literal with a 5-line lambda. Tests assert
+    both variants have the step (D-19), which catches accidental
+    deletion in either entry.
 
 - **D-06b: `recipe-load`'s `build_input` updated to read
-  `artifacts["recipe-image"]` instead of `artifacts["metadata"]`.**
-  Both shapes are full RecipeData dumps; only the source step key
-  changes. (`RecipeImageOutput` is shaped identically to RecipeData
-  with `image_url` set — see D-03.) Pure key swap in the helper.
+  `artifacts["recipe-image"]` instead of `artifacts["metadata"]` in
+  BOTH variants' inline step lists.** Both shapes are full
+  RecipeData dumps; only the source step key changes.
+  (`RecipeImageOutput` is shaped identically to RecipeData with
+  `image_url` set — see D-03.) Pure key swap, duplicated in both
+  entries.
 
 ### `AddRecipeOutcome.image_present` wiring (Success Criterion 3)
 
@@ -479,7 +479,9 @@ Concretely:
 
 ### Wake-reply update (V007 → V008?)
 
-- **D-08: NO wake-reply prompt change in v1.1. V007 stays.**
+- **D-08: NO wake-reply prompt change in v1.1. V007 stays.** Gated
+  via the `experiments.robotina_wake` smoke (D-10b below) — the
+  decision is verified, not assumed.
 
   - `outcome.image_present` is structural data consumed by the future
     household UI, not user-facing text in v1.1.
@@ -494,6 +496,29 @@ Concretely:
     memory warns against.
   - If user feedback later requests it, V008 is a one-section addition
     (V007 already accepts arbitrary outcome fields).
+
+- **D-08b: `experiments.robotina_wake` is part of the Phase 24
+  gate — explicitly verifies V007's wake-reply across all image
+  outcomes.** The script's fixture set MUST include:
+  - `outcome.status=success, image_present=True` — wake reply should
+    confirm the save naturally (no special image mention).
+  - `outcome.status=success, image_present=False` — wake reply
+    should STILL confirm the save naturally (no "sin foto" mention;
+    the V007 decision in D-08 is that the gap is not surfaced in
+    chat). Operator review confirms the reply doesn't awkwardly
+    omit a fact the user would expect.
+  - `outcome.status=failure` — wake reply surfaces the failure
+    reason (V005/V007 existing behavior).
+  - Multi-outcome batch with mixed `image_present` — wake reply
+    summarizes all outcomes; no per-outcome image annotation in
+    v1.1.
+  - **Verdict line in `24-SMOKE.md`** explicitly records the operator's
+    "V007 wake replies acceptable across image-present True/False"
+    decision. If the operator finds the no-mention awkward, that's
+    the trigger to revisit D-08 (potentially fork V008 in a
+    follow-up); the smoke is the empirical gate, not a vibe call.
+  - Memory `feedback_test_before_handoff` — the script doubles as
+    the V007-on-image-outcomes pre-handoff smoke.
 
 ### Experiment scripts (EXP-03, EXP-04, EXP-06)
 
@@ -537,21 +562,29 @@ Concretely:
      fires correctly.
 
 - **D-10: `experiments/robotina_wake.py` — synthetic in-memory
-  WakeInvocationInput exercise.**
+  WakeInvocationInput exercise; doubles as the V007 wake-reply gate
+  (D-08b).**
 
-  - Constructs SYNTHETIC `WakeInvocationInput` objects in memory:
-    one with `outcomes=[success(image_present=True)]`, one with
-    `outcomes=[success(image_present=False)]`, one with
-    `outcomes=[failure]`, one with mixed outcomes (multi-recipe
-    batch).
+  - Constructs SYNTHETIC `WakeInvocationInput` objects in memory.
+    Required fixture rows (per D-08b):
+    1. `outcomes=[success(image_present=True)]` — single recipe
+       saved with image.
+    2. `outcomes=[success(image_present=False)]` — single recipe
+       saved without image; **load-bearing for the D-08 W1 decision**
+       (V007 should NOT surface "sin foto").
+    3. `outcomes=[failure]` — recipe failed; failure reason in reply.
+    4. `outcomes=[success(image_present=True), success(image_present=False), failure]` —
+       multi-recipe batch with mixed outcomes.
   - Invokes the wake-context Robotina agent DIRECTLY (calls the
     AGENT_REGISTRY entry's `_build_*_agent_for_run` factory and
     runs the agent against the synthetic input).
   - No DB writes; no Redis writes; no Telegram round-trip. The
     script's only output is the agent's `respond()` text + LangWatch
-    trace link printed to stdout.
+    trace link printed to stdout, plus a per-row "operator
+    verdict" markdown row for `24-WAKE-RESULTS-<backend>.md`.
   - Memory `feedback_test_before_handoff` — this script IS the
-    pre-handoff smoke for V007's wake-context behavior.
+    pre-handoff smoke for V007's wake-context behavior across image
+    outcomes.
   - **Why synthetic over DB-fixture:** synthetic is 5× faster to
     iterate, no DB-fixture teardown complexity, and the
     `WakeInvocationInput` schema is the actual contract (not the DB
@@ -566,8 +599,17 @@ Concretely:
     output (table with name, source_url, branch fired, candidate
     URL, safe_fetch verdict, manual "image looks right? Y/N",
     LangWatch trace link). Committed by operator post-run.
-  - `24-SMOKE.md` — final verdict. References per-backend results;
-    ends with `verdict: pass/fail/needs-revision` line.
+  - `24-WAKE-RESULTS-<backend>.md` — operator's per-backend
+    `experiments.robotina_wake` output (table with fixture row,
+    synthetic outcomes, V007 reply text, manual "reply acceptable?
+    Y/N", LangWatch trace link). Committed by operator post-run.
+    Load-bearing for D-08b — confirms the W1 decision empirically.
+  - `24-SMOKE.md` — final verdict. References BOTH per-backend
+    results files (image eval + wake eval); ends with
+    `verdict: pass/fail/needs-revision` line. The wake verdict
+    sub-section explicitly records "V007 acceptable across
+    image_present True/False" (or flags a follow-up V008 fork
+    if rejected).
 
 ### Test strategy (Claude's Discretion)
 
@@ -656,21 +698,30 @@ Concretely:
     `.env.example` already has the key (Phase 8).
   - **Plan 24-04:** `acquire_recipe_image` deterministic function
     in `src/robotina/agent/tasks/recipe_image.py` + tests (D-15).
-  - **Plan 24-05:** `build_recipe_tail()` helper + workflow registry
-    composition refactor (D-06) + `recipe-load`'s `build_input`
-    artifact-key swap (D-06b) + `recipe-image` `run_task` branch in
-    `jobs.py` (D-02) + workflow registry tests (D-19).
+  - **Plan 24-05:** `WORKFLOW_REGISTRY` inline-insertion of
+    `recipe-image` step in BOTH `add-recipe-from-query` and
+    `add-recipe-from-url` entries (D-06) + `recipe-load`'s
+    `build_input` artifact-key swap from `"metadata"` to
+    `"recipe-image"` in both entries (D-06b) + `recipe-image`
+    `run_task` branch in `jobs.py` (D-02) + workflow registry tests
+    asserting both variants have the new step (D-19). No
+    `build_recipe_tail()` helper — duplication is intentional.
   - **Plan 24-06:** `finalize-outcome` reads `recipe-image` artifact
     + `image_present` flip (D-07) + tests (D-18).
   - **Plan 24-07:** `experiments/recipe_image.py` + `24-IMG-EVAL-SET.md`
     (10-15 rows) + `pyproject.toml` entry + CLAUDE.md table update
     (EXP-06).
-  - **Plan 24-08:** `experiments/robotina_wake.py` + `pyproject.toml`
+  - **Plan 24-08:** `experiments/robotina_wake.py` (D-10, with the
+    D-08b fixture rows for V007 wake-reply gate) + `pyproject.toml`
     entry + CLAUDE.md table update.
-  - **Plan 24-09 (autonomous=false):** Operator runs eval against
-    Tavily live; commits `24-IMG-EVAL-RESULTS-<backend>.md` +
-    `24-SMOKE.md`; ticks REQUIREMENTS.md IMG-01..06 + EXP-01 +
-    EXP-03 + EXP-04 + EXP-06.
+  - **Plan 24-09 (autonomous=false):** Operator runs BOTH evals
+    against Tavily live + V007 wake replies; commits
+    `24-IMG-EVAL-RESULTS-<backend>.md` +
+    `24-WAKE-RESULTS-<backend>.md` + `24-SMOKE.md`; the smoke
+    verdict covers (a) image-search quality (≥60% relevant top
+    results) AND (b) V007 wake reply acceptability across
+    `image_present` True/False. Ticks REQUIREMENTS.md IMG-01..06
+    + EXP-01 + EXP-03 + EXP-04 + EXP-06.
 
 - **No new dependency.** `recipe-scrapers` (Phase 8) and `tavily-python`
   (Phase 8) are already declared. `httpx` and `safe_fetch` are reused.
@@ -734,7 +785,7 @@ Concretely:
 
 ### Prior phase context (carries forward — do NOT re-decide)
 - `.planning/phases/23-url-ingestion-topic-2/23-CONTEXT.md` — Phase 23 decisions. Phase 24 inherits:
-  - D-01 per-source workflow variants (rename + paired entries) — extends with `build_recipe_tail()` helper (Phase 24 D-06).
+  - D-01 per-source workflow variants (rename + paired entries) — kept; the Phase-23-deferred shared-tail helper extraction is **further deferred** by Phase 24 D-06 (recipe-quality iteration ahead will churn the tail; abstracting now would force repeated refactoring).
   - D-14..D-17 `safe_fetch` design — Phase 24 reuses unchanged; only extends caller-side usage (`expected_content_type="image/*"`, larger `max_bytes`).
   - D-08 `WorkflowOutcomeSummary.recipe_query` dual semantic — unchanged by Phase 24.
   - D-09 manual eval pattern — Phase 24 mirrors (24-IMG-EVAL-SET, 24-IMG-EVAL-RESULTS-<backend>, 24-SMOKE).
@@ -811,8 +862,7 @@ Concretely:
 
 ### Integration Points
 - `src/robotina/agent/workflows.py:32` — D-01 add `non_fatal_on_failure: bool = False` to `WorkflowStepDef`.
-- `src/robotina/agent/workflows.py:68` — D-06 refactor both `WORKFLOW_REGISTRY` entries to compose `[gather_step] + build_recipe_tail()`.
-- `src/robotina/agent/workflows.py` (new function) — D-06 `build_recipe_tail()` helper.
+- `src/robotina/agent/workflows.py:68` — D-06 inline-insert `recipe-image` `WorkflowStepDef` literal in BOTH `add-recipe-from-query` and `add-recipe-from-url` entries (duplicated verbatim; no helper).
 - `src/robotina/agent/tasks/recipe_image.py` (NEW module) — D-02 `acquire_recipe_image(input) -> RecipeImageOutput` deterministic function.
 - `src/robotina/agent/tools/tavily_image_search.py` (NEW) — D-12 `tavily_image_search(query: str) -> list[str]` function (or `TavilyImageSearchTool` class — planner's call).
 - `src/robotina/queue/task_types.py:105` — D-04 add `image_url: str | None = None` to `RecipeData`.
@@ -861,10 +911,12 @@ Concretely:
 - **URL pin (D-05) is the v1.1 stance.** Backend coordination is
   minimal (one new field on the recipe entity). Download-and-upload
   needs a NEW backend endpoint that hasn't been committed.
-- **Shared-tail helper extraction is a deferred-from-Phase-23 commitment.**
-  D-06 acts on the explicit Phase 23 D-01 directive ("extract a helper
-  in Phase 24"). 6 shared steps × 2 variants is past the duplication
-  threshold.
+- **Shared-tail helper extraction is *further* deferred** (D-06).
+  Phase 23 D-01 named Phase 24 as the extraction moment, but the
+  recipe-quality iteration ahead will churn the tail steps; abstracting
+  now would force refactoring the helper repeatedly. Inline duplication
+  in both `WORKFLOW_REGISTRY` entries is the v1.1 stance. Revisit when
+  the tail stabilizes.
 - **`safe_fetch` reuse is universal.** Same helper, same six defenses,
   with `image/*` content-type and 15 MB cap. The local-dev
   `127.0.0.1` SSRF caveat (`project_local_dev_setup` memory) applies:
@@ -876,6 +928,13 @@ Concretely:
 <deferred>
 ## Deferred Ideas
 
+- **`build_recipe_tail()` shared-tail helper** — Phase 23 D-01
+  named Phase 24 as the extraction point, but D-06 defers further:
+  recipe-quality iteration is expected to churn the tail steps, so
+  abstracting now would force repeated refactoring. Revisit when
+  (a) the tail steps stabilize AND (b) a 3rd workflow variant
+  (beyond query/url) lands. Until then, both `WORKFLOW_REGISTRY`
+  entries hold inline-duplicated step lists.
 - **Vision-LLM "is this the right dish?" check** (Pitfall 8 full
   mitigation) — v1.2 follow-up phase. Gated on Phase 24 eval results
   (<60% Tavily image relevance → escalate; >60% → defer further).

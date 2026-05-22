@@ -80,10 +80,10 @@
 
 | Option (helper extraction) | Description | Selected |
 |----------------------------|-------------|----------|
-| (A) Inline-duplicate insertion of `recipe-image` in both variants | Two near-identical 7-step lists in `WORKFLOW_REGISTRY`. | |
-| (B) Extract `build_recipe_tail()` helper returning the 6-step tail | Both variants compose `[gather_step] + build_recipe_tail()`. Phase 23 D-01 explicitly deferred this extraction to Phase 24. | ✓ |
+| (A) Inline-duplicate insertion of `recipe-image` in both variants | Two explicit 7-step lists in `WORKFLOW_REGISTRY`. No helper. | ✓ |
+| (B) Extract `build_recipe_tail()` helper returning the 6-step tail | Both variants compose `[gather_step] + build_recipe_tail()`. Phase 23 D-01 explicitly deferred this extraction to Phase 24. | |
 
-**Selected (helper): (B) — Extract `build_recipe_tail()` now.**
+**Selected (helper): (A) — Inline duplication; further-defer the helper (user redirect from initial Auto Mode B-recommendation).**
 
 | Option (wake-reply update) | Description | Selected |
 |----------------------------|-------------|----------|
@@ -91,19 +91,41 @@
 | (W2) V008 fork mentioning "sin foto" when image_present=False AND status=success | Surfaces the gap in the chat-side reply. | |
 | (W3) Optional mention — V007 unchanged; agent uses judgment | Receives the flag; no new worked example. | |
 
-**Selected (wake-reply): (W1) — No V008 fork in v1.1.**
+**Selected (wake-reply): (W1) — No V008 fork in v1.1; gated empirically via `experiments.robotina_wake` smoke.**
 
-**Notes (helper):**
-- Phase 23 D-01 explicitly named Phase 24 as the extraction moment.
-- 6 shared steps × 2 variants = 12 maintenance points; well past the 3-instance threshold for `feedback_avoid_premature_abstraction`.
-- Inserting `recipe-image` in two places is exactly the drift risk the helper prevents.
-- `build_input` lambdas stay inline; no helper parameterization needed.
+**Notes (helper) — user redirect:**
+- **Initial Auto Mode call was (B) extract helper now.** User redirected
+  to (A) inline duplication.
+- **User's reasoning:** "Though the workflow is working, the quality of
+  the recipes scraped is very low still so we need to iterate over them.
+  Premature abstraction will require refactoring later."
+- The tail steps (instructions, ingredients, metadata, recipe-image,
+  load) will churn as recipe-quality iteration lands. A shared helper
+  would have to be refactored each time the per-variant divergence grows.
+- Memory `feedback_avoid_premature_abstraction` — "Architecture immature;
+  prefer concrete duplicated agents over generic ones until 3+ instances
+  exist." Tail-steps stability is the precondition, not just step count.
+- Phase 23 D-01's "extract in Phase 24" directive is advisory, not a
+  hard contract — written before Phase 24's quality-iteration scope was
+  clear. Consciously re-deferred with documentation in `<deferred>`.
+- Drift risk mitigated by D-19: workflow-registry tests assert both
+  variants have the `recipe-image` step.
 
 **Notes (wake-reply):**
-- Memory `project_compose_agent_vision` — the future Compose agent will own image-aware reply composition. Don't churn V007 for a feature the future agent absorbs.
-- Telegram chat is a notification surface, not the recipe view. Users see photo absence when they open the recipe.
-- V008 fork for one optional sentence is exactly the pre-feature churn `feedback_avoid_premature_abstraction` warns against.
-- If user feedback requests it later, V008 is a one-section addition.
+- W1 stance preserved, BUT the decision is no longer a vibe call —
+  D-08b makes `experiments.robotina_wake` part of the Phase 24 gate.
+- D-10 fixture set MUST include `outcome.status=success,
+  image_present=False` so the operator can review V007's reply on the
+  exact case where "sin foto" surfacing would be tempting. If the
+  operator finds V007's no-mention behavior awkward, that triggers a
+  V008 follow-up.
+- A new artifact `24-WAKE-RESULTS-<backend>.md` is added (D-13) for the
+  operator's per-row verdicts; `24-SMOKE.md` references it.
+- Memory `feedback_test_before_handoff` honored — the script is the
+  pre-handoff smoke.
+- Memory `project_compose_agent_vision` — the future Compose agent
+  will own image-aware reply composition. Don't churn V007 for a
+  feature the future agent absorbs.
 
 ---
 
@@ -115,7 +137,7 @@ The following decisions were made by Claude (per Auto Mode) without explicit use
 - **Tavily `max_results`:** 5 (only top result used in v1.1).
 - **`safe_fetch(max_bytes)` for images:** 15 MB (vs 5 MB default for HTML).
 - **`RecipeImageOutput` shape:** identical to `RecipeData` dump with `image_url` added (mirrors Phase 15 accumulator pattern).
-- **Plan order:** 9 plans (24-01 non-fatal runner FIRST, then `RecipeData.image_url` field, then Tavily wiring, then `acquire_recipe_image`, then workflow refactor, then `finalize-outcome` update, then both experiment scripts, finally operator eval).
+- **Plan order:** 9 plans (24-01 non-fatal runner FIRST, then `RecipeData.image_url` field, then Tavily wiring, then `acquire_recipe_image`, then inline `recipe-image` insertion in both `WORKFLOW_REGISTRY` entries, then `finalize-outcome` update, then both experiment scripts, finally operator eval covering both image quality AND V007 wake-reply acceptability).
 - **No new dependencies:** `tavily-python` + `recipe-scrapers` already declared.
 - **No new env vars:** `TAVILY_API_KEY` already declared.
 - **Dashboard label:** `"recipe-image": "Imagen"`.
@@ -124,6 +146,7 @@ The following decisions were made by Claude (per Auto Mode) without explicit use
 ## Deferred Ideas
 
 See `24-CONTEXT.md` `<deferred>` section for full list. Highlights:
+- `build_recipe_tail()` shared-tail helper — *further* deferred (was Phase 23 D-01's directive for Phase 24) until tail steps stabilize.
 - Vision-LLM "is this the right dish?" check (v1.2 follow-up gated on eval).
 - Image download-and-rehost (v1.2 backend endpoint).
 - EXIF strip + magic-byte validation (v1.2 alongside rehost).
