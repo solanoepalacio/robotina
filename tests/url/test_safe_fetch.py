@@ -263,6 +263,65 @@ def test_content_type_application_xhtml_passes(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Phase 24 / D-13, D-17 — image/* wildcard regression-guard (Pitfall 4)
+#
+# The wildcard sniff at safe_fetch.py:213-223 already accepts image/* subtypes
+# today; these tests PIN the contract so a future "cleanup" of the special
+# case (e.g. collapsing the elif branch) breaks the test before it breaks
+# the recipe-image step in Phase 24.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "image_subtype",
+    ["image/jpeg", "image/png", "image/webp", "image/gif"],
+)
+def test_safe_fetch_image_wildcard_accepts_image_subtypes(
+    monkeypatch, image_subtype
+):
+    """image/* expected_content_type must accept every image/<subtype>."""
+    _patch_dns(monkeypatch, PUBLIC_IP)
+    body = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32  # few bytes; sniff is by header
+    with respx.mock:
+        respx.get("https://cdn.example.com/img").mock(
+            return_value=httpx.Response(
+                200, content=body, headers={"Content-Type": image_subtype}
+            )
+        )
+        result = safe_fetch(
+            "https://cdn.example.com/img",
+            expected_content_type="image/*",
+            max_bytes=15_000_000,
+        )
+    assert isinstance(result, SafeFetchResult)
+    assert result.content_type == image_subtype
+    assert result.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "non_image_type",
+    ["text/html", "application/pdf", "application/json"],
+)
+def test_safe_fetch_image_wildcard_rejects_non_image_types(
+    monkeypatch, non_image_type
+):
+    """image/* expected_content_type must reject anything that is not image/<...>."""
+    _patch_dns(monkeypatch, PUBLIC_IP)
+    with respx.mock:
+        respx.get("https://cdn.example.com/notimg").mock(
+            return_value=httpx.Response(
+                200, content=b"<html/>", headers={"Content-Type": non_image_type}
+            )
+        )
+        with pytest.raises(SafeFetchError, match="Content-Type"):
+            safe_fetch(
+                "https://cdn.example.com/notimg",
+                expected_content_type="image/*",
+                max_bytes=15_000_000,
+            )
+
+
+# ---------------------------------------------------------------------------
 # Defense 7: gzip-bomb defense
 # ---------------------------------------------------------------------------
 
