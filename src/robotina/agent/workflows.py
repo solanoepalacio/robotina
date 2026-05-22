@@ -42,7 +42,8 @@ class WorkflowStepDef(BaseModel):
                      are converted to a StepUnavailableArtifact via
                      workflow_runner._finalize_step_unavailable and the workflow
                      continues. Default False preserves v1.0 strict semantics.
-                     Only recipe-image opts in (Phase 24 / D-01b).
+                     Per D-01b, this is an opt-in flag — downstream plans
+                     declare opt-ins on a per-step basis.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
