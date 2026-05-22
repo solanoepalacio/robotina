@@ -117,6 +117,7 @@ class RecipeData(BaseModel):
     - metadata:      ``servings_qty``, ``servings_unit``, ``prep_time``,
                      ``cook_time``, ``total_time``, ``source_url``; clears
                      ``gathered_sources`` to ``None`` on emit.
+    - recipe-image:  ``image_url`` (Phase 24 D-04)
     Other fields must be preserved verbatim from the incoming artifact.
     """
 
@@ -128,6 +129,7 @@ class RecipeData(BaseModel):
     cook_time: int | None = None       # minutes
     total_time: int | None = None      # minutes
     source_url: str | None = None      # original recipe URL if found
+    image_url: str | None = None       # Phase 24 / D-04 — owned by recipe-image step
     ingredients: list[RecipeIngredient] = []
     steps: list[RecipeStep] = []
     # Phase 15 additions:
@@ -286,6 +288,37 @@ RecipeResearchGatherOutput = RecipeData
 RecipeResearchInstructionsOutput = RecipeData
 RecipeResearchIngredientsOutput = RecipeData
 RecipeResearchMetadataOutput = RecipeData
+
+
+# ---------------------------------------------------------------------------
+# recipe-image (Phase 24 / D-03) — deterministic agent-less task
+# ---------------------------------------------------------------------------
+
+
+class RecipeImageInput(BaseModel):
+    """Phase 24 / D-03 — input to the deterministic recipe-image task.
+
+    Mirrors RecipeResearchInstructionsInput shape: the accumulator carries
+    the RecipeData from prior steps (with image_url=None), and the
+    recipe-image step's output sets image_url. The reply_context and
+    household_id are present for parity with the other steps; they are
+    unused by acquire_recipe_image but flow through workflow_runner the
+    same way.
+
+    No to_user_message method — this task is deterministic (agent-less per
+    D-02); no LLM consumes the input.
+    """
+    model_config = ConfigDict(extra="forbid")
+    recipe: RecipeData
+    reply_context: ReplyContext
+    household_id: NonEmptyHouseholdId
+
+
+# Phase 24 / D-03 — RecipeImageOutput is shape-identical to RecipeData
+# (image_url is now a RecipeData field). Sentinel-alias matches the
+# RecipeResearch*Output convention so workflow_runner can pass the artifact
+# dump through downstream build_input lambdas unchanged.
+RecipeImageOutput = RecipeData
 
 
 # ---------------------------------------------------------------------------
