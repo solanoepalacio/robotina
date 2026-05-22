@@ -38,10 +38,10 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 - [x] **Phase 17: Conversation FK closure** — Single Alembic revision 0006 adds `WorkflowRun.conversation_id` NOT NULL FK (table pre-cleaned via runbook) and nullable `outcome` column; `StartWorkflowTool` and `queue_workflow` write the FK; legacy `reply_context` JSON path remains readable. Code/migration shipped 2026-05-19; runbook executed and Telegram smoke test + integration migration test confirmed green against live DB (2026-05-19).
 - [x] **Phase 18: RobotinaInvocation entity** — New `robotina_invocations` table + `InvocationTrigger` enum + idempotency `UniqueConstraint`; gateway inserts invocation on user_message; `WorkflowRun.triggered_by_invocation_id` FK populated by `StartWorkflowTool`; dashboard surfaces the new FK on detail view. (completed 2026-05-19)
 - [ ] **Phase 19**: _removed 2026-05-19_ — original "LLM multi-call smoke test" was infeasible against the current `return_direct=True` tool surface, which terminates the turn after one `start-workflow` call. The empirical gate is folded into Phase 21 as a manual smoke checkpoint after the surface is flipped. Phase number left vacant to avoid renumbering churn on downstream phases.
-- [ ] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell.
-- [ ] **Phase 21: Tool-surface flip + remove acknowledge/notify (+ manual multi-call smoke)** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides. Includes a manual smoke checkpoint on Ollama (`gpt-oss:20b` local) + OpenAI (staging) with 5–8 hand-curated Spanish utterances; results committed as `.planning/phases/21-.../SMOKE.md`; if reliability is unacceptable on the staging backend, pivot to list-form `start-workflow(actions=[...])` before merging the phase.
-- [ ] **Phase 22: Multi-recipe per message** — Robotina prompt V006 teaches multi-recipe extraction + consolidated post-batch reply + soft cap at 5; eval set committed; partial-failure reporting verified end-to-end.
-- [ ] **Phase 23: URL ingestion** — `safe_fetch` helper (six SSRF defenses, lands FIRST commit); `gather-from-url` task type with `recipe-scrapers` + LLM fallback; `add-recipe-from-url` workflow variant; Robotina URL detection + routing; experiment script; 20-URL eval ≥85% field-level success.
+- [x] **Phase 20: Wake rule + outcome plumbing** — `_check_wake_robotina(session)` helper called from `on_step_complete`/`on_step_failed`; `wake_dispatched_at` atomic guard; pre-assigned `job_id` (D-07); startup reconciler; `AddRecipeOutcome` Pydantic + `finalize-outcome` deterministic step; `WakeInvocationInput`; dashboard `outcome` summary cell. (completed 2026-05-22)
+- [x] **Phase 21: Tool-surface flip + remove acknowledge/notify (+ manual multi-call smoke)** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides. Manual smoke checkpoint on Ollama + OpenAI passed; results in `.planning/phases/21-.../SMOKE.md`. (completed 2026-05-22)
+- [x] **Phase 22: Multi-recipe per message** — Robotina prompt V006 teaches multi-recipe extraction + consolidated post-batch reply + soft cap at 5; eval set committed; partial-failure reporting verified end-to-end. (completed 2026-05-22)
+- [x] **Phase 23: URL ingestion** — `safe_fetch` helper (six SSRF defenses, lands FIRST commit); `gather-from-url` task type with `recipe-scrapers` + LLM fallback; `add-recipe-from-url` workflow variant; Robotina URL detection + routing; experiment script; 20-URL eval ≥85% field-level success. (completed 2026-05-22)
 - [ ] **Phase 24: Recipe images** — `recipe-image` task type with Tavily image search + source-page fallback; new per-step non-fatal-failure runner capability; `safe_fetch` reused for image URL validation; `image_url` persisted via household-manager API; `AddRecipeOutcome.image_present` flag; experiment script.
 
 ## Phase Details
@@ -92,12 +92,12 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   4. Each terminal workflow has a non-null `WorkflowRun.outcome` (`AddRecipeOutcome` JSON, < 300 bytes) written by the deterministic `finalize-outcome` step; the dashboard renders a compact outcome summary.
   5. The wake agent receives a `WakeInvocationInput` with the previous invocation id and list of `WorkflowOutcome` summaries.
 **Plans**: 6 plans
-- [ ] 20-01-PLAN.md — Wave 1: Pydantic models (WakeInvocationInput, WorkflowOutcomeSummary, FinalizeOutcomeInput)
-- [ ] 20-02-PLAN.md — Wave 1: finalize-outcome task type + agent-less run_task branch + workflow step append
-- [ ] 20-03-PLAN.md — Wave 2: _check_and_dispatch_wake helper + wiring in on_step_complete / on_step_failed (UPDATE-RETURNING + pre-assigned rq_job_id + dead-letter fallback)
-- [ ] 20-04-PLAN.md — Wave 2: run_task trigger dispatch + invocation lifecycle + V004 prompt with wake-context section
-- [ ] 20-05-PLAN.md — Wave 3: startup reconciler module + runner.py boot wiring
-- [ ] 20-06-PLAN.md — Wave 3: dashboard Conversation + Outcome rows + REQUIREMENTS.md ticks + manual smoke checkpoint
+- [x] 20-01-PLAN.md — Wave 1: Pydantic models (WakeInvocationInput, WorkflowOutcomeSummary, FinalizeOutcomeInput)
+- [x] 20-02-PLAN.md — Wave 1: finalize-outcome task type + agent-less run_task branch + workflow step append
+- [x] 20-03-PLAN.md — Wave 2: _check_and_dispatch_wake helper + wiring in on_step_complete / on_step_failed (UPDATE-RETURNING + pre-assigned rq_job_id + dead-letter fallback)
+- [x] 20-04-PLAN.md — Wave 2: run_task trigger dispatch + invocation lifecycle + V004 prompt with wake-context section
+- [x] 20-05-PLAN.md — Wave 3: startup reconciler module + runner.py boot wiring
+- [x] 20-06-PLAN.md — Wave 3: dashboard Conversation + Outcome rows + REQUIREMENTS.md ticks + manual smoke checkpoint
 **UI hint**: yes
 
 ### Phase 21: Tool-surface flip + remove acknowledge/notify
@@ -112,14 +112,14 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   5. `experiments/acknowledge_add_recipe.py` and its `[project.scripts]` entry are removed; documentation updated.
   6. **Manual multi-call smoke checkpoint**: 5–8 hand-curated Spanish utterances (single-recipe, multi-recipe 2–3 items, compound dish, ambiguous, over-cap) are run once on Ollama `gpt-oss:20b` (local) and once on OpenAI (staging), with the resulting tool-call traces eyeballed and recorded in `.planning/phases/21-*/SMOKE.md` (utterance, backend, expected N, observed N, pass/fail, LangWatch trace link). The file ends with an explicit go/no-go line. If OpenAI staging shows unacceptable reliability, the phase pivots `StartWorkflowTool` to single-call list-form `start-workflow(actions=[{workflow_type, input}, ...])` before merge; Ollama-only failures are noted but do not block merge (dev-only backend).
 **Plans**: 8 plans
-- [ ] 21-01-PLAN.md — Add RespondTool (non-terminal send-notification enqueue at_front=True) + unit tests
-- [ ] 21-02-PLAN.md — Add TerminateTool (return_direct=True, no-arg) + unit tests
-- [ ] 21-03-PLAN.md — Refactor StartWorkflowTool to multi-call surface ({workflow_type, input}, return_direct=False) + AddRecipeQueryInput + tests
-- [ ] 21-04-PLAN.md — Coupled deletion: jobs.py tool swap, agents.py V004→V005, workflows.py 6-step list, dead-letter block, QueueTool/acknowledge-add-recipe/AcknowledgeAddRecipeInput, overrides entries (D-06 single PR) + repo grep gate
-- [ ] 21-05-PLAN.md — V005 Robotina prompt (new tool surface, strict output rule, single-recipe examples; V004 retained)
-- [ ] 21-06-PLAN.md — CI guard test: AGENT_REGISTRY ↔ overrides/*.json bidirectional sync + AGENT_REGISTRY content tests
-- [ ] 21-07-PLAN.md — Dashboard task-type label map (DASH-11, Jinja-side _macros.html, Spanish labels) + template tests
-- [ ] 21-08-PLAN.md — Manual multi-call smoke checkpoint (21-SMOKE.md, Ollama+OpenAI) + REQUIREMENTS.md ticks + doc updates (autonomous=false)
+- [x] 21-01-PLAN.md — Add RespondTool (non-terminal send-notification enqueue at_front=True) + unit tests
+- [x] 21-02-PLAN.md — Add TerminateTool (return_direct=True, no-arg) + unit tests
+- [x] 21-03-PLAN.md — Refactor StartWorkflowTool to multi-call surface ({workflow_type, input}, return_direct=False) + AddRecipeQueryInput + tests
+- [x] 21-04-PLAN.md — Coupled deletion: jobs.py tool swap, agents.py V004→V005, workflows.py 6-step list, dead-letter block, QueueTool/acknowledge-add-recipe/AcknowledgeAddRecipeInput, overrides entries (D-06 single PR) + repo grep gate
+- [x] 21-05-PLAN.md — V005 Robotina prompt (new tool surface, strict output rule, single-recipe examples; V004 retained)
+- [x] 21-06-PLAN.md — CI guard test: AGENT_REGISTRY ↔ overrides/*.json bidirectional sync + AGENT_REGISTRY content tests
+- [x] 21-07-PLAN.md — Dashboard task-type label map (DASH-11, Jinja-side _macros.html, Spanish labels) + template tests
+- [x] 21-08-PLAN.md — Manual multi-call smoke checkpoint (21-SMOKE.md, Ollama+OpenAI) + REQUIREMENTS.md ticks + doc updates (autonomous=false)
 **UI hint**: yes
 
 ### Phase 22: Multi-recipe per message (Topic 1)
@@ -135,7 +135,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 - [x] 22-01-PLAN.md — Wave 1: WorkflowOutcomeSummary.recipe_query + ORDER BY + to_user_message rewrite (BATCH-03/04)
 - [x] 22-02-PLAN.md — Wave 1: V006 prompt fork (multi-recipe + ambiguity + over-cap + wake-reply examples) + agents.py bump (BATCH-01/02/05)
 - [x] 22-03-PLAN.md — Wave 2: 30-utterance eval set + per-backend harness + result templates
-- [ ] 22-04-PLAN.md — Wave 3: Operator smoke checkpoint + conditional REQUIREMENTS.md ticks
+- [x] 22-04-PLAN.md — Wave 3: Operator smoke checkpoint + conditional REQUIREMENTS.md ticks
 
 ### Phase 23: URL ingestion (Topic 2)
 **Goal**: A user can paste a recipe URL and have Robotina save that exact recipe, with SSRF/abuse defenses around every URL fetch.
@@ -154,7 +154,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 - [x] 23-04-PLAN.md — gather-from-url agent registration (V001 prompt + AGENT_REGISTRY + overrides/*.json sync + run_task tool injection + tests) (URL-02, URL-04)
 - [x] 23-05-PLAN.md — Robotina V007 prompt (URL detection + per-source routing) + agents.py prompt_path bump + tests (URL-05)
 - [x] 23-06-PLAN.md — experiments/gather_from_url.py eval harness + 21-URL canonical eval set + pyproject script entry (URL-06, EXP-02)
-- [ ] 23-07-PLAN.md — Operator eval + 23-SMOKE.md verdict + conditional REQUIREMENTS.md ticks (autonomous=false, blocking gate)
+- [x] 23-07-PLAN.md — Operator eval + 23-SMOKE.md verdict + conditional REQUIREMENTS.md ticks (autonomous=false, blocking gate)
 
 ### Phase 24: Recipe images (Topic 3)
 **Goal**: Saved recipes have an associated image when one can be acquired; image acquisition failure never blocks recipe save.
@@ -191,11 +191,11 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 | 16. household_id propagation fix                     | v1.0      | 7/7   | Complete    | 2026-05-15 |
 | 17. Conversation FK closure                          | v1.1      | 4/4 | Complete   | 2026-05-19 |
 | 18. RobotinaInvocation entity                        | v1.1      | 4/4 | Complete    | 2026-05-19 |
-| 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Not started | —          |
-| 20. Wake rule + outcome plumbing                     | v1.1      | 0/6   | Planned     | —          |
-| 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 0/0   | Not started | —          |
-| 22. Multi-recipe per message                         | v1.1      | 3/4 | In Progress|  |
-| 23. URL ingestion                                    | v1.1      | 6/7 | In Progress|  |
+| 19. LLM multi-call smoke test                        | v1.1      | 0/0   | Removed | —          |
+| 20. Wake rule + outcome plumbing                     | v1.1      | 6/6   | Complete    | 2026-05-22 |
+| 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 8/8   | Complete    | 2026-05-22 |
+| 22. Multi-recipe per message                         | v1.1      | 4/4   | Complete    | 2026-05-22 |
+| 23. URL ingestion                                    | v1.1      | 7/7   | Complete    | 2026-05-22 |
 | 24. Recipe images                                    | v1.1      | 0/0   | Not started | —          |
 
 ## Backlog
