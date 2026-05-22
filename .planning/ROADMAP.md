@@ -42,7 +42,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for the full v1.0 phase detail at clo
 - [x] **Phase 21: Tool-surface flip + remove acknowledge/notify (+ manual multi-call smoke)** — `RespondTool` (queue-at-front) + `TerminateTool` (return_direct); `StartWorkflowTool` refactored (multi-call, discriminated `{workflow_type, input}`, `invocation_id` constructor-injected); `acknowledge-add-recipe` agent/prompts/registry/overrides/dashboard label/experiment all removed; `notify` workflow step deleted; CI guard for AGENT_REGISTRY ↔ overrides. Manual smoke checkpoint on Ollama + OpenAI passed; results in `.planning/phases/21-.../SMOKE.md`. (completed 2026-05-22)
 - [x] **Phase 22: Multi-recipe per message** — Robotina prompt V006 teaches multi-recipe extraction + consolidated post-batch reply + soft cap at 5; eval set committed; partial-failure reporting verified end-to-end. (completed 2026-05-22)
 - [x] **Phase 23: URL ingestion** — `safe_fetch` helper (six SSRF defenses, lands FIRST commit); `gather-from-url` task type with `recipe-scrapers` + LLM fallback; `add-recipe-from-url` workflow variant; Robotina URL detection + routing; experiment script; 20-URL eval ≥85% field-level success. (completed 2026-05-22)
-- [ ] **Phase 24: Recipe images** — `recipe-image` task type with Tavily image search + source-page fallback; new per-step non-fatal-failure runner capability; `safe_fetch` reused for image URL validation; `image_url` persisted via household-manager API; `AddRecipeOutcome.image_present` flag; experiment script.
+- [ ] **Phase 24: Recipe images** — `recipe-image` task type with Tavily image search + source-page fallback; new per-step non-fatal-failure runner capability; `safe_fetch` reused for image URL validation; `image_url` persisted via household-manager API; `AddRecipeOutcome.image_present` flag; experiment scripts. **9 plans planned 2026-05-22.**
 
 ## Phase Details
 
@@ -166,7 +166,16 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   3. The new per-step non-fatal-failure runner capability is declared on `recipe-image`: failure writes a structured "unavailable" artifact and advances the workflow; the recipe still saves; `WorkflowRun.outcome.image_present=False` records the gap.
   4. The image URL is validated via `safe_fetch` before persist (re-uses Phase 23's SSRF defenses); persisted to the household-manager API per the storage strategy decided at planning time.
   5. `uv run experiments.recipe_image` exercises Tavily image search + source-page fallback with LangWatch traces; `experiments.robotina_wake` exercises wake-context Robotina iteration; existing experiment scripts (recipe_research, recipe_load) still run unchanged thanks to default source discriminators; `pyproject.toml` and CLAUDE.md experiment list reflect the new entry points.
-**Plans**: TBD
+**Plans**: 9 plans
+- [ ] 24-01-PLAN.md — Runner non-fatal-failure capability (WorkflowStepDef.non_fatal_on_failure + StepUnavailableArtifact + _finalize_step_unavailable + dispatch) — FIRST commit standalone
+- [ ] 24-02-PLAN.md — Schema extensions: RecipeData.image_url, RecipeImageInput/Output, safe_fetch image/* regression test
+- [ ] 24-03-PLAN.md — tavily_image_search function + tests
+- [ ] 24-04-PLAN.md — acquire_recipe_image deterministic function + tests
+- [ ] 24-05-PLAN.md — Workflow registry insertion (inline-duplicated per D-06) + jobs.py recipe-image branch + A3 backend pre-flight
+- [ ] 24-06-PLAN.md — finalize-outcome image_present plumbing
+- [ ] 24-07-PLAN.md — experiments/recipe_image.py + 24-IMG-EVAL-SET + pyproject + CLAUDE.md
+- [ ] 24-08-PLAN.md — experiments/robotina_wake.py + pyproject + CLAUDE.md
+- [ ] 24-09-PLAN.md — Dashboard label + operator manual eval gate (autonomous=false)
 
 ## Progress
 
@@ -196,7 +205,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 8/8   | Complete    | 2026-05-22 |
 | 22. Multi-recipe per message                         | v1.1      | 4/4   | Complete    | 2026-05-22 |
 | 23. URL ingestion                                    | v1.1      | 7/7   | Complete    | 2026-05-22 |
-| 24. Recipe images                                    | v1.1      | 0/0   | Not started | —          |
+| 24. Recipe images                                    | v1.1      | 0/9   | Planned     | —          |
 
 ## Backlog
 
