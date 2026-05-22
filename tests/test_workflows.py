@@ -38,13 +38,15 @@ def test_workflow_registry_is_dict():
 def test_add_recipe_workflow_registered():
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     assert "add-recipe-from-query" in WORKFLOW_REGISTRY
-    # Phase 21 D-06: 6 steps after deleting legacy acknowledge + notify.
-    assert len(WORKFLOW_REGISTRY["add-recipe-from-query"].steps) == 6
+    # Phase 24 D-06: 7 steps after recipe-image insertion between metadata
+    # and load (was 6 at end of Phase 21).
+    assert len(WORKFLOW_REGISTRY["add-recipe-from-query"].steps) == 7
 
 
-def test_add_recipe_workflow_has_6_steps():
-    """Phase 21 D-06: add-recipe is exactly gather → instructions → ingredients
-    → metadata → load → finalize-outcome. NO acknowledge step, NO notify step.
+def test_add_recipe_workflow_has_7_steps():
+    """Phase 24 D-06: add-recipe-from-query is exactly gather → instructions
+    → ingredients → metadata → recipe-image → load → finalize-outcome.
+    NO acknowledge step, NO notify step (Phase 21 D-06).
     """
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     steps = WORKFLOW_REGISTRY["add-recipe-from-query"].steps
@@ -53,6 +55,7 @@ def test_add_recipe_workflow_has_6_steps():
         ("instructions", "recipe-research-instructions"),
         ("ingredients", "recipe-research-ingredients"),
         ("metadata", "recipe-research-metadata"),
+        ("recipe-image", "recipe-image"),
         ("load", "recipe-load"),
         ("finalize-outcome", "finalize-outcome"),
     ]
@@ -117,21 +120,32 @@ def test_metadata_build_input_reads_ingredients_artifact():
     assert result.recipe.missing_ingredients == ["paprika"]
 
 
-def test_load_build_input_reads_metadata_artifact_directly():
-    """Phase 15: artifacts['metadata'] IS the RecipeData dump (no 'recipe' wrapper)."""
+def test_load_build_input_reads_recipe_image_artifact_directly():
+    """Phase 24 D-06b: artifacts['recipe-image'] IS a full RecipeData dump
+    (RecipeImageOutput is shape-identical to RecipeData with image_url set).
+    The load step at index 5 (after recipe-image insertion) reads it on the
+    happy path."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.task_types import RecipeLoadInput
-    artifacts = {"metadata": _recipe_dump(name="pasta", servings_qty=4)}
-    result = WORKFLOW_REGISTRY["add-recipe-from-query"].steps[4].build_input(_ctx(), artifacts)
+    artifacts = {
+        "metadata": _recipe_dump(name="pasta", servings_qty=4),
+        "recipe-image": _recipe_dump(
+            name="pasta", servings_qty=4, image_url="https://x/y.jpg"
+        ),
+    }
+    result = WORKFLOW_REGISTRY["add-recipe-from-query"].steps[5].build_input(_ctx(), artifacts)
     assert isinstance(result, RecipeLoadInput)
     assert result.recipe.name == "pasta"
     assert result.recipe.servings_qty == 4
+    assert result.recipe.image_url == "https://x/y.jpg"
     assert result.household_id == "h1"
 
 
 def test_finalize_outcome_build_input_collects_artifacts():
-    """Phase 21 D-06: finalize-outcome is now the last step (no notify) and
-    receives metadata + load artifacts to compose the AddRecipeOutcome."""
+    """Phase 21 D-06: finalize-outcome is the last step (no notify) and
+    receives metadata + load artifacts to compose the AddRecipeOutcome.
+    Phase 24 D-06: finalize-outcome is now at index 6 (after recipe-image
+    inserted between metadata and load)."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.task_types import FinalizeOutcomeInput
     artifacts = {
@@ -143,7 +157,7 @@ def test_finalize_outcome_build_input_collects_artifacts():
             "recipe_slug": "pasta",
         },
     }
-    result = WORKFLOW_REGISTRY["add-recipe-from-query"].steps[5].build_input(_ctx(), artifacts)
+    result = WORKFLOW_REGISTRY["add-recipe-from-query"].steps[6].build_input(_ctx(), artifacts)
     assert isinstance(result, FinalizeOutcomeInput)
     assert result.load == artifacts["load"]
     assert result.metadata == artifacts["metadata"]

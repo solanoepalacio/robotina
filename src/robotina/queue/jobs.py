@@ -164,6 +164,76 @@ def run_task(task_input) -> object:
         finally:
             _session.close()
 
+    # Phase 24 / D-02 — recipe-image deterministic agent-less branch.
+    # Mirrors the finalize-outcome shape above (no LLM, no skills, no prompt).
+    # Pitfall 8: the LLM-branch LangWatch trace wrap at the bottom of run_task
+    # is unreachable from here (this branch returns before it), so the branch
+    # adds its OWN langwatch.trace wrap so the recipe-image span is collected.
+    # On failure, this branch INLINES the non-fatal dispatch (Phase 24 / D-01)
+    # because deterministic branches sit OUTSIDE the outer try where the
+    # registry dispatch lives — without this inline copy the recipe-image
+    # step's non_fatal_on_failure=True flag would be ignored.
+    if task_type == "recipe-image":
+        from robotina.agent.tasks.recipe_image import acquire_recipe_image
+        try:
+            try:
+                import langwatch
+                with langwatch.trace(
+                    metadata={"task_type": "recipe-image", "phase": 24}
+                ):
+                    output = acquire_recipe_image(task_input)
+            except ImportError:
+                output = acquire_recipe_image(task_input)
+
+            artifact = output.model_dump(mode="json")
+            workflow_runner.on_step_complete(job.id, artifact, _session, _queue)
+            return artifact
+        except Exception as exc:
+            # Phase 24 / D-01 dispatch (inlined — see banner). Look up the
+            # step's WorkflowStepDef.non_fatal_on_failure flag; when True,
+            # write a StepUnavailableArtifact via _finalize_step_unavailable
+            # (DONE-path advancement) instead of marking the step FAILED.
+            # The lookup is wrapped in its own try/except so any lookup
+            # failure CANNOT mask the original exception path.
+            from robotina.agent.workflows import WORKFLOW_REGISTRY
+            from robotina.queue.models import WorkflowRun, WorkflowRunStep
+
+            is_non_fatal = False
+            try:
+                step = (
+                    _session.query(WorkflowRunStep)
+                    .filter(WorkflowRunStep.task_job_id == job.id)
+                    .first()
+                )
+                if step is not None:
+                    run = (
+                        _session.query(WorkflowRun)
+                        .filter(WorkflowRun.id == step.workflow_run_id)
+                        .first()
+                    )
+                    if run is not None:
+                        wf_def = WORKFLOW_REGISTRY.get(run.workflow_type)
+                        if wf_def is not None:
+                            step_def = next(
+                                (s for s in wf_def.steps if s.step_key == step.step_key),
+                                None,
+                            )
+                            if step_def is not None and step_def.non_fatal_on_failure:
+                                is_non_fatal = True
+            except Exception:
+                is_non_fatal = False
+
+            if is_non_fatal:
+                reason = f"{type(exc).__name__}: {exc}"
+                workflow_runner._finalize_step_unavailable(
+                    job.id, reason, _session, _queue
+                )
+            else:
+                workflow_runner.on_step_failed(job.id, _session, _queue, exc=exc)
+            raise  # re-raise so RQ moves the job to FailedJobRegistry
+        finally:
+            _session.close()
+
     try:
         # Step 2: Look up AgentConfig (includes AGENT_OVERRIDES_FILEPATH hot-reload)
         from robotina.agent.agents import get_agent_config

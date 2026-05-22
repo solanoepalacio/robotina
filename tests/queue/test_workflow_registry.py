@@ -54,8 +54,9 @@ def test_workflow_registry_lacks_legacy_add_recipe():
     assert "add-recipe" not in WORKFLOW_REGISTRY
 
 
-def test_url_variant_has_six_steps():
-    """Phase 23: URL variant inline-duplicates the 5-step tail; total = 6."""
+def test_url_variant_has_seven_steps():
+    """Phase 24 D-06: URL variant now has 7 steps after recipe-image
+    insertion between metadata and load."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     steps = WORKFLOW_REGISTRY["add-recipe-from-url"].steps
     expected = [
@@ -63,6 +64,7 @@ def test_url_variant_has_six_steps():
         ("instructions", "recipe-research-instructions"),
         ("ingredients", "recipe-research-ingredients"),
         ("metadata", "recipe-research-metadata"),
+        ("recipe-image", "recipe-image"),
         ("load", "recipe-load"),
         ("finalize-outcome", "finalize-outcome"),
     ]
@@ -111,18 +113,144 @@ def test_url_variant_instructions_reads_gather_from_url_artifact():
     ]
 
 
-def test_url_variant_load_reads_metadata_artifact():
-    """Sanity: the URL variant's load step reads artifacts['metadata']
-    (same as the query variant — tail steps share key names)."""
+def test_url_variant_load_reads_recipe_image_artifact():
+    """Phase 24 D-06b: the URL variant's load step reads
+    artifacts['recipe-image'] on the happy path (same as the query variant —
+    tail steps share key names). Load is at index 5 after recipe-image
+    insertion (Phase 24 / D-06)."""
     from robotina.agent.workflows import WORKFLOW_REGISTRY
     from robotina.queue.task_types import RecipeLoadInput
 
     artifacts = {
         "metadata": _recipe_dump(name="ReceptaURL", servings_qty=4),
+        "recipe-image": _recipe_dump(
+            name="ReceptaURL",
+            servings_qty=4,
+            image_url="https://example.com/ricky.jpg",
+        ),
     }
-    result = WORKFLOW_REGISTRY["add-recipe-from-url"].steps[4].build_input(
+    result = WORKFLOW_REGISTRY["add-recipe-from-url"].steps[5].build_input(
         _ctx_url(), artifacts
     )
     assert isinstance(result, RecipeLoadInput)
     assert result.recipe.name == "ReceptaURL"
     assert result.recipe.servings_qty == 4
+    assert result.recipe.image_url == "https://example.com/ricky.jpg"
+
+
+# ---------------------------------------------------------------------------
+# Phase 24 / D-19 — recipe-image insertion + load.build_input fallback tests
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+_VARIANTS = ["add-recipe-from-query", "add-recipe-from-url"]
+
+
+def _ctx_query():
+    return {
+        "recipe_query": "canelones de espinaca",
+        "reply_context": {
+            "platform": "telegram",
+            "chat_id": "c-q",
+            "user_id": "u-q",
+        },
+        "household_id": "h-q",
+    }
+
+
+def _ctx_for(variant: str):
+    return _ctx_url() if variant == "add-recipe-from-url" else _ctx_query()
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_recipe_image_step_present_in_both_variants(variant):
+    """D-19: recipe-image is present in both variants, between metadata and load."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    keys = [s.step_key for s in WORKFLOW_REGISTRY[variant].steps]
+    assert "recipe-image" in keys, f"recipe-image missing in {variant}"
+    metadata_idx = keys.index("metadata")
+    image_idx = keys.index("recipe-image")
+    load_idx = keys.index("load")
+    assert image_idx == metadata_idx + 1
+    assert load_idx == image_idx + 1
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_recipe_image_step_has_non_fatal_on_failure_true(variant):
+    """D-19: recipe-image step opts in to non_fatal_on_failure=True (D-01b)."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    step = next(
+        s for s in WORKFLOW_REGISTRY[variant].steps if s.step_key == "recipe-image"
+    )
+    assert step.non_fatal_on_failure is True
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_only_recipe_image_opts_in_to_non_fatal(variant):
+    """D-19 (D-01b): no OTHER step in either variant has non_fatal_on_failure=True.
+    Only recipe-image opts in; every other step keeps the v1.0 strict default."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    for step in WORKFLOW_REGISTRY[variant].steps:
+        if step.step_key == "recipe-image":
+            continue
+        assert step.non_fatal_on_failure is False, (
+            f"{variant}::{step.step_key} unexpectedly opts into non_fatal_on_failure"
+        )
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_load_build_input_falls_back_to_metadata_on_unavailable_artifact(variant):
+    """D-19 (D-06b / Pitfall 6): when recipe-image artifact is the
+    StepUnavailableArtifact sentinel shape, load.build_input must fall back
+    to artifacts['metadata'] so the recipe payload is preserved."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    from robotina.queue.task_types import RecipeLoadInput
+
+    steps = WORKFLOW_REGISTRY[variant].steps
+    load_step = next(s for s in steps if s.step_key == "load")
+
+    artifacts = {
+        "metadata": _recipe_dump(name="ReceptaFallback"),
+        "recipe-image": {
+            "status": "unavailable",
+            "step_key": "recipe-image",
+            "reason": "test forced miss",
+        },
+    }
+    result = load_step.build_input(_ctx_for(variant), artifacts)
+    assert isinstance(result, RecipeLoadInput)
+    assert result.recipe.name == "ReceptaFallback"
+    # Fallback path does NOT pull image_url from the sentinel artifact.
+    assert result.recipe.image_url is None
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_load_build_input_uses_recipe_image_artifact_on_happy_path(variant):
+    """D-19 (D-06b): on the happy path the load step reads
+    artifacts['recipe-image'] (a full RecipeData dump with image_url set)."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    from robotina.queue.task_types import RecipeLoadInput
+
+    steps = WORKFLOW_REGISTRY[variant].steps
+    load_step = next(s for s in steps if s.step_key == "load")
+
+    artifacts = {
+        "metadata": _recipe_dump(name="ReceptaNoImage"),
+        "recipe-image": _recipe_dump(
+            name="ReceptaHappy", image_url="https://x/y.jpg"
+        ),
+    }
+    result = load_step.build_input(_ctx_for(variant), artifacts)
+    assert isinstance(result, RecipeLoadInput)
+    # Happy path uses the recipe-image artifact, NOT metadata.
+    assert result.recipe.name == "ReceptaHappy"
+    assert result.recipe.image_url == "https://x/y.jpg"
+
+
+@pytest.mark.parametrize("variant", _VARIANTS)
+def test_each_variant_has_exactly_seven_steps(variant):
+    """D-19: both variants have exactly 7 steps after Phase 24 wiring."""
+    from robotina.agent.workflows import WORKFLOW_REGISTRY
+    assert len(WORKFLOW_REGISTRY[variant].steps) == 7
