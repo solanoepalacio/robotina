@@ -168,8 +168,8 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
   5. `uv run experiments.recipe_image` exercises Tavily image search + source-page fallback with LangWatch traces; `experiments.robotina_wake` exercises wake-context Robotina iteration; existing experiment scripts (recipe_research, recipe_load) still run unchanged thanks to default source discriminators; `pyproject.toml` and CLAUDE.md experiment list reflect the new entry points.
 **Plans**: 9 plans
 - [x] 24-01-PLAN.md — Runner non-fatal-failure capability (WorkflowStepDef.non_fatal_on_failure + StepUnavailableArtifact + _finalize_step_unavailable + dispatch) — FIRST commit standalone
-- [ ] 24-02-PLAN.md — Schema extensions: RecipeData.image_url, RecipeImageInput/Output, safe_fetch image/* regression test
-- [ ] 24-03-PLAN.md — tavily_image_search function + tests
+- [x] 24-02-PLAN.md — Schema extensions: RecipeData.image_url, RecipeImageInput/Output, safe_fetch image/* regression test
+- [x] 24-03-PLAN.md — tavily_image_search function + tests
 - [ ] 24-04-PLAN.md — acquire_recipe_image deterministic function + tests
 - [ ] 24-05-PLAN.md — Workflow registry insertion (inline-duplicated per D-06) + jobs.py recipe-image branch + A3 backend pre-flight
 - [ ] 24-06-PLAN.md — finalize-outcome image_present plumbing
@@ -205,7 +205,7 @@ Originally scoped as a standalone LLM multi-call smoke test. Removed 2026-05-19 
 | 21. Tool-surface flip + remove acknowledge/notify    | v1.1      | 8/8   | Complete    | 2026-05-22 |
 | 22. Multi-recipe per message                         | v1.1      | 4/4   | Complete    | 2026-05-22 |
 | 23. URL ingestion                                    | v1.1      | 7/7   | Complete    | 2026-05-22 |
-| 24. Recipe images                                    | v1.1      | 1/9 | In Progress|  |
+| 24. Recipe images                                    | v1.1      | 3/9 | In Progress|  |
 
 ## Backlog
 
