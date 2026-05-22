@@ -247,19 +247,31 @@ def test_non_fatal_step_raises_advances_to_done_with_unavailable_artifact(monkey
 
 def test_strict_step_still_fails_workflow():
     """D-14 #2: the default non_fatal_on_failure=False preserves v1.0 strict
-    semantics — no opt-in step should trigger the new helper. We verify by
-    confirming that a freshly registered WORKFLOW_REGISTRY step has the
-    default False and that the StepUnavailableArtifact model only ever
-    surfaces for opt-in steps (no inline path triggers it).
+    semantics — only an explicit opt-in step should trigger the new helper.
+    We verify by confirming that a freshly registered WORKFLOW_REGISTRY step
+    has the default False and that the StepUnavailableArtifact model only
+    ever surfaces for opt-in steps.
+
+    Phase 24 / D-01b: this test originally asserted that NO registered step
+    opts in (true at 24-01 timestamp). After 24-05 inserts the `recipe-image`
+    step in both add-recipe variants, exactly that step is the registered
+    opt-in. The assertion is scoped to "every non-recipe-image step is
+    strict" so the no-other-opt-in invariant is preserved.
     """
     from robotina.agent.workflows import WORKFLOW_REGISTRY, WorkflowStepDef
 
-    # All existing registered steps must remain strict (non_fatal_on_failure=False)
+    # All existing registered steps must remain strict except recipe-image
+    # (the Phase 24 / D-01b opt-in landed by plan 24-05).
     for wf in WORKFLOW_REGISTRY.values():
         for step in wf.steps:
+            if step.step_key == "recipe-image":
+                # Sanity: recipe-image MUST stay opt-in (verified separately
+                # by D-19 tests in test_workflow_registry.py).
+                assert step.non_fatal_on_failure is True
+                continue
             assert step.non_fatal_on_failure is False, (
                 f"step {step.step_key!r} in workflow {wf.workflow_type!r} "
-                "should not opt in to non-fatal failure in plan 24-01"
+                "should not opt in to non-fatal failure"
             )
 
     # The default on a freshly constructed WorkflowStepDef is False.

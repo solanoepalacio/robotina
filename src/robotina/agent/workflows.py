@@ -20,6 +20,7 @@ from robotina.queue.task_types import (
     FinalizeOutcomeInput,
     GatherFromUrlInput,
     RecipeData,
+    RecipeImageInput,
     RecipeLoadInput,
     RecipeResearchGatherInput,
     RecipeResearchIngredientsInput,
@@ -119,12 +120,32 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     household_id=ctx["household_id"],
                 ),
             ),
+            # Phase 24 / D-06: inline-duplicated recipe-image step + load key swap below.
+            # NO shared-tail helper — recipe-quality iteration is expected to churn the
+            # tail steps; abstracting now would force repeated refactoring.
+            WorkflowStepDef(
+                step_key="recipe-image",
+                task_type="recipe-image",
+                build_input=lambda ctx, artifacts: RecipeImageInput(
+                    recipe=RecipeData(**artifacts["metadata"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+                non_fatal_on_failure=True,    # Phase 24 / D-01b
+            ),
             WorkflowStepDef(
                 step_key="load",
                 task_type="recipe-load",
-                # Phase 15: artifacts["metadata"] IS the RecipeData dump (no "recipe" wrapper).
+                # Phase 24 / D-06b: read recipe-image artifact (full RecipeData dump with
+                # image_url set). On the unavailable path (D-01), the artifact has
+                # shape {status, step_key, reason}; fall back to artifacts["metadata"]
+                # to preserve the recipe payload (Pitfall 6).
                 build_input=lambda ctx, artifacts: RecipeLoadInput(
-                    recipe=RecipeData(**artifacts["metadata"]),
+                    recipe=RecipeData(**(
+                        artifacts["metadata"]
+                        if artifacts.get("recipe-image", {}).get("status") == "unavailable"
+                        else artifacts["recipe-image"]
+                    )),
                     reply_context=ReplyContext(**ctx["reply_context"]),
                     household_id=ctx["household_id"],
                 ),
@@ -194,11 +215,32 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                     household_id=ctx["household_id"],
                 ),
             ),
+            # Phase 24 / D-06: inline-duplicated recipe-image step + load key swap below.
+            # NO shared-tail helper — recipe-quality iteration is expected to churn the
+            # tail steps; abstracting now would force repeated refactoring.
+            WorkflowStepDef(
+                step_key="recipe-image",
+                task_type="recipe-image",
+                build_input=lambda ctx, artifacts: RecipeImageInput(
+                    recipe=RecipeData(**artifacts["metadata"]),
+                    reply_context=ReplyContext(**ctx["reply_context"]),
+                    household_id=ctx["household_id"],
+                ),
+                non_fatal_on_failure=True,    # Phase 24 / D-01b
+            ),
             WorkflowStepDef(
                 step_key="load",
                 task_type="recipe-load",
+                # Phase 24 / D-06b: read recipe-image artifact (full RecipeData dump with
+                # image_url set). On the unavailable path (D-01), the artifact has
+                # shape {status, step_key, reason}; fall back to artifacts["metadata"]
+                # to preserve the recipe payload (Pitfall 6).
                 build_input=lambda ctx, artifacts: RecipeLoadInput(
-                    recipe=RecipeData(**artifacts["metadata"]),
+                    recipe=RecipeData(**(
+                        artifacts["metadata"]
+                        if artifacts.get("recipe-image", {}).get("status") == "unavailable"
+                        else artifacts["recipe-image"]
+                    )),
                     reply_context=ReplyContext(**ctx["reply_context"]),
                     household_id=ctx["household_id"],
                 ),
