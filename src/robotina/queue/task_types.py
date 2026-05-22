@@ -371,6 +371,37 @@ class AddRecipeOutcome(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Phase 24 / D-01 — structured "unavailable" sentinel artifact
+# ---------------------------------------------------------------------------
+# Written by workflow_runner._finalize_step_unavailable when a step with
+# WorkflowStepDef.non_fatal_on_failure=True raises. Routed through the
+# DONE-path advancement (not FAILED-path cancellation). Downstream consumers
+# (recipe-load build_input, finalize-outcome) detect this shape by
+# ``status == "unavailable"`` and fall back to the previous step's artifact
+# / set image_present=False.
+
+
+class StepUnavailableArtifact(BaseModel):
+    """Phase 24 / D-01 — structured 'unavailable' sentinel artifact.
+
+    Written by workflow_runner._finalize_step_unavailable when a step with
+    WorkflowStepDef.non_fatal_on_failure=True raises. Routed through the
+    DONE-path advancement (not FAILED-path cancellation). Downstream
+    consumers (recipe-load build_input, finalize-outcome) detect this shape
+    by ``status == "unavailable"`` and fall back to the previous step's
+    artifact / set image_present=False.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["unavailable"] = "unavailable"
+    step_key: str
+    reason: str  # ≤ 150 chars; truncated by _finalize_step_unavailable using the
+                 # same Pydantic-URL-noise strip + collapse logic as
+                 # workflow_runner._compose_failure_outcome.
+
+
+# ---------------------------------------------------------------------------
 # WAKE-04 — wake-input + finalize-outcome contracts
 # ---------------------------------------------------------------------------
 # WorkflowOutcomeSummary is the thin envelope used by WakeInvocationInput.outcomes
