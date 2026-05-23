@@ -79,6 +79,7 @@ Robotina is the AI agent component of a household management system. It listens 
 # agent = "robotina.task_runner:main"
 # migrate = "robotina.db:run_migrations"
 # "experiments.recipe_research" = "experiments.recipe_research:main"
+# "experiments.recipe_image" = "experiments.recipe_image:main"  # Phase 24 / EXP-03 — manual eval harness for deterministic recipe-image acquisition (Tavily image search + source-page fallback). LangWatch traces tagged experiment=recipe-image-eval, phase=24.
 ## Alternatives Considered
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
