@@ -48,6 +48,13 @@ def test_finalize_outcome_label() -> None:
     assert _render(env, "finalize-outcome") == "Cierre del flujo"
 
 
+def test_recipe_image_label() -> None:
+    # Phase 24-09 D-21 — `recipe-image` step renders as "Imagen" so the
+    # new workflow step surfaces in Spanish on the dashboard timeline.
+    env = _make_env()
+    assert _render(env, "recipe-image") == "Imagen"
+
+
 def test_unknown_task_type_falls_back_to_raw() -> None:
     env = _make_env()
     assert _render(env, "unknown-task-xyz") == "unknown-task-xyz"
