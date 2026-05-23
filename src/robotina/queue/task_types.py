@@ -510,10 +510,17 @@ class FinalizeOutcomeInput(BaseModel):
     in the chain include the `metadata` step's RecipeData dump and the `load`
     step's RecipeLoadOutput dump. The composer in run_task derives an
     AddRecipeOutcome from these per D-03.
+
+    Phase 24 / D-07: `recipe_image` carries the recipe-image step's artifact
+    (either the full RecipeData dump with image_url set, or a
+    StepUnavailableArtifact with shape {status, step_key, reason}, or None
+    when no recipe-image step is part of the workflow — defensive for legacy
+    callers).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     metadata: dict | None = None
     load: dict | None = None
+    recipe_image: dict | None = None    # Phase 24 / D-07
     failure_reason: str | None = None

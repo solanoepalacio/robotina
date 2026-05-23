@@ -161,6 +161,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 build_input=lambda ctx, artifacts: FinalizeOutcomeInput(
                     metadata=artifacts.get("metadata"),
                     load=artifacts.get("load"),
+                    recipe_image=artifacts.get("recipe-image"),    # Phase 24 / D-07
                 ),
             ),
         ],
@@ -251,6 +252,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowDefinition] = {
                 build_input=lambda ctx, artifacts: FinalizeOutcomeInput(
                     metadata=artifacts.get("metadata"),
                     load=artifacts.get("load"),
+                    recipe_image=artifacts.get("recipe-image"),    # Phase 24 / D-07
                 ),
             ),
         ],
