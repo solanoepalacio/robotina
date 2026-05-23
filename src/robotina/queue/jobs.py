@@ -26,6 +26,22 @@ from rq import get_current_job
 logger = logging.getLogger(__name__)
 
 
+def _derive_image_present(recipe_image: dict | None) -> bool:
+    """Phase 24 / D-07 — True iff the recipe-image artifact carries a usable image_url.
+
+    Returns False when:
+    - recipe_image is None (no recipe-image step in this workflow / legacy)
+    - recipe_image has status == "unavailable" (StepUnavailableArtifact)
+    - recipe_image.image_url is None / empty string / missing
+    """
+    if not isinstance(recipe_image, dict):
+        return False
+    if recipe_image.get("status") == "unavailable":
+        return False
+    url = recipe_image.get("image_url")
+    return bool(url) and isinstance(url, str)
+
+
 def run_task(task_input) -> object:
     """Universal RQ job function for all task types.
 
@@ -128,7 +144,7 @@ def run_task(task_input) -> object:
                     recipe_id=recipe_id,
                     recipe_name=load.get("recipe_name"),
                     recipe_slug=load.get("recipe_slug") or None,
-                    image_present=False,  # the recipe-image milestone flips this
+                    image_present=_derive_image_present(task_input.recipe_image),  # Phase 24 / D-07
                 )
             else:
                 outcome = AddRecipeOutcome(
