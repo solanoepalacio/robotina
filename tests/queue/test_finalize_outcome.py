@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from robotina.queue.jobs import _derive_image_present
 from robotina.queue.task_types import FinalizeOutcomeInput
 
 
@@ -145,7 +146,12 @@ def test_finalize_outcome_propagates_failure_reason():
 
 
 def test_finalize_outcome_image_present_is_false():
-    """image_present is always False until the recipe-image milestone."""
+    """image_present is False when no recipe_image artifact is passed.
+
+    Phase 24 / D-07: image_present is now derived via `_derive_image_present` from
+    `FinalizeOutcomeInput.recipe_image`. When the field defaults to None (legacy
+    callers / no recipe-image step in the workflow), the helper returns False.
+    """
     mock_job = _make_job()
     mock_session = _make_session_with_run()
 
@@ -189,3 +195,54 @@ def test_finalize_outcome_exception_calls_on_step_failed():
     mock_failed.assert_called_once()
     # `exc` is a kwarg
     assert isinstance(mock_failed.call_args.kwargs.get("exc"), RuntimeError)
+
+
+# -----------------------------------------------------------------------------
+# Phase 24 / D-18: image_present derivation tests
+#
+# Covers the four named cases required by 24-CONTEXT.md D-18 plus a parametrized
+# sweep over the same edge cases. The helper `_derive_image_present` reads the
+# recipe-image artifact dict (or None) and computes the boolean stamped on
+# AddRecipeOutcome.image_present by the finalize-outcome branch.
+# -----------------------------------------------------------------------------
+
+
+def test_image_present_true_when_artifact_has_image_url():
+    """Happy path: recipe-image artifact carrying a populated image_url → True."""
+    assert _derive_image_present({"name": "x", "image_url": "https://a/b.jpg"}) is True
+
+
+def test_image_present_false_when_artifact_unavailable():
+    """StepUnavailableArtifact (status=='unavailable') → False, regardless of other keys."""
+    assert (
+        _derive_image_present(
+            {"status": "unavailable", "step_key": "recipe-image", "reason": "y"}
+        )
+        is False
+    )
+
+
+def test_image_present_false_when_image_url_is_none():
+    """Artifact present but image_url is None → False (no usable URL acquired)."""
+    assert _derive_image_present({"name": "x", "image_url": None}) is False
+
+
+def test_image_present_false_when_recipe_image_artifact_absent():
+    """No recipe-image artifact at all (e.g. legacy / pre-Phase-24 runs) → False."""
+    assert _derive_image_present(None) is False
+
+
+@pytest.mark.parametrize(
+    "artifact,expected",
+    [
+        ({"name": "x", "image_url": "https://cdn.example/a.jpg"}, True),
+        ({"name": "x", "image_url": None}, False),
+        ({"name": "x", "image_url": ""}, False),
+        ({"name": "x"}, False),
+        ({"status": "unavailable", "step_key": "recipe-image", "reason": "test"}, False),
+        (None, False),
+    ],
+)
+def test_derive_image_present(artifact, expected):
+    """Parametrized sweep covering the full D-18 truth table for _derive_image_present."""
+    assert _derive_image_present(artifact) is expected
