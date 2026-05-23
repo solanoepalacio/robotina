@@ -80,6 +80,7 @@ Robotina is the AI agent component of a household management system. It listens 
 # migrate = "robotina.db:run_migrations"
 # "experiments.recipe_research" = "experiments.recipe_research:main"
 # "experiments.recipe_image" = "experiments.recipe_image:main"  # Phase 24 / EXP-03 — manual eval harness for deterministic recipe-image acquisition (Tavily image search + source-page fallback). LangWatch traces tagged experiment=recipe-image-eval, phase=24.
+# "experiments.robotina_wake" = "experiments.robotina_wake:main"  # Phase 24 / EXP-04 — synthetic wake-context Robotina eval (D-08b fixture set: image_present True/False + failure + mixed batch). LangWatch traces tagged experiment=robotina-wake-eval, phase=24.
 ## Alternatives Considered
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
