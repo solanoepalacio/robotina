@@ -71,6 +71,26 @@ uv run experiments.send_notification
 
 **RQ Dashboard** — inspect job queues at http://localhost:9181
 
+## Service Ports
+
+Ports exposed by the stack. Docker Compose services bind on the host; `uv run`
+processes are listed for completeness even when they bind no port.
+
+| Service | URL / Port | Runs in | Configurable via |
+|---------|------------|---------|------------------|
+| Dashboard (queue visibility) | http://localhost:8001 | `docker compose` | `DASHBOARD_PORT` / `DASHBOARD_HOST` |
+| RQ Dashboard (job inspector) | http://localhost:9181 | `docker compose` | image default |
+| Gateway (Telegram bot) | — (long-poll, no port) | `uv run gateway` | — |
+| Task runner (RQ worker) | — (no port) | `uv run agent` | — |
+| Redis (queue backing store) | `localhost:6379` | `docker compose` | `REDIS_URL` |
+| Postgres (database) | `localhost:5433` → container `5432` | `docker compose` | `DATABASE_URL` |
+| Household-manager backend API | `http://localhost:3001` (external) | external service | `HOUSEHOLD_MANAGER_BASE_URL` |
+
+> **Note:** Postgres is published on host port **5433** (container `5432`) to avoid
+> colliding with a local Postgres. `.env.example` ships `DATABASE_URL` pointing at
+> `5432`, so adjust it to `5433` when connecting from a host process to the
+> Compose database.
+
 ## Development
 
 **Run tests**
