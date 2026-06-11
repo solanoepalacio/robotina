@@ -1,0 +1,66 @@
+{
+  "handle-incoming-message": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-gather": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "gather-from-url": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-instructions": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-ingredients": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "recipe-research-metadata": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "recipe-load": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": true
+    }
+  },
+  "validate-catalog": {
+    "model_config": {
+      "provider": "ollama",
+      "url": "http://llm.home:11434",
+      "model": "qwen3.5:9b",
+      "reasoning": false
+    }
+  }
+}
